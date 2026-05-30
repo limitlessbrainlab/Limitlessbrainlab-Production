@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NeuroSense360 - What This Software Does</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; color: #222; background: #fff; line-height: 1.7; font-size: 12pt; }
+  @media print { @page { margin: 0.8in; size: A4; } .page-break { page-break-before: always; } }
+  .container { max-width: 800px; margin: 0 auto; padding: 40px 30px; }
+
+  /* Cover */
+  .cover { text-align: center; padding: 100px 40px 70px; background: linear-gradient(135deg, #1a1a4e, #3a3a8a); color: #fff; margin: -40px -30px 40px; }
+  .cover h1 { font-size: 28pt; font-weight: 800; margin-bottom: 10px; }
+  .cover p { font-size: 13pt; color: #c8c8e8; font-weight: 300; }
+  .cover .line { width: 60px; height: 3px; background: #8080ff; margin: 25px auto; }
+  .cover .date { font-size: 10pt; color: #9999bb; margin-top: 30px; }
+
+  h2 { font-size: 17pt; font-weight: 700; color: #1a1a4e; margin: 36px 0 14px; padding-bottom: 6px; border-bottom: 3px solid #8080ff; }
+  h3 { font-size: 13pt; font-weight: 600; color: #333; margin: 22px 0 8px; }
+  p { margin-bottom: 10px; }
+  ul { margin: 6px 0 14px 22px; }
+  li { margin-bottom: 5px; }
+
+  .highlight { background: #f0f0ff; border-left: 4px solid #8080ff; padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 14px 0 18px; }
+  .highlight strong { color: #1a1a4e; }
+
+  .role-tag { display: inline-block; padding: 3px 12px; border-radius: 14px; font-size: 9pt; font-weight: 600; margin-bottom: 8px; }
+  .tag-admin { background: #ffe0e6; color: #c0392b; }
+  .tag-clinic { background: #d5f5e3; color: #1e8449; }
+  .tag-patient { background: #d6eaf8; color: #2471a3; }
+  .tag-visitor { background: #fef3e2; color: #d68910; }
+
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 18px; font-size: 11pt; }
+  th { background: #1a1a4e; color: #fff; padding: 8px 12px; text-align: left; font-size: 10pt; }
+  td { padding: 7px 12px; border-bottom: 1px solid #e0e0e8; }
+  tr:nth-child(even) { background: #f8f8fc; }
+
+  .flow { background: #fafafe; border: 1px solid #e0e0ee; border-radius: 10px; padding: 18px 22px; margin: 12px 0 18px; }
+  .flow-step { display: flex; align-items: flex-start; margin-bottom: 10px; }
+  .flow-num { min-width: 28px; height: 28px; background: #1a1a4e; color: #fff; border-radius: 50%; text-align: center; line-height: 28px; font-size: 10pt; font-weight: 700; margin-right: 12px; margin-top: 2px; }
+  .flow-text { flex: 1; }
+  .flow-arrow { text-align: center; color: #8080ff; font-size: 16pt; margin: -4px 0 -4px 8px; }
+
+  .footer { text-align: center; margin-top: 50px; padding-top: 16px; border-top: 2px solid #e8e8f0; color: #999; font-size: 9pt; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- COVER -->
+<div class="cover">
+  <h1>NeuroSense360</h1>
+  <div class="line"></div>
+  <p>What This Software Does<br>A Simple Guide</p>
+  <div class="date">Limitless Brain Lab | March 2026<br>www.neurosense360.site</div>
+</div>
+
+<!-- WHAT IS IT -->
+<h2>What is NeuroSense360?</h2>
+<p>NeuroSense360 is an <strong>online platform for brain health</strong>. It helps doctors and clinics check how a person's brain is performing using EEG scans, and gives easy-to-understand reports with suggestions to improve brain health.</p>
+
+<div class="highlight">
+  <strong>Think of it like this:</strong> A patient gets a brain scan at a clinic. The clinic uploads the scan to NeuroSense360. The software uses AI to read the scan, create a detailed report, and suggest ways to improve brain health. The patient can then log in and see their report online.
+</div>
+
+<!-- WHO USES IT -->
+<h2>Who Uses This Software?</h2>
+
+<p>There are <strong>4 types of users</strong>:</p>
+
+<table>
+  <tr><th>User</th><th>Who are they?</th><th>What do they do?</th></tr>
+  <tr><td><strong>Website Visitor</strong></td><td>Anyone visiting the website</td><td>Learn about brain health, view pricing, register</td></tr>
+  <tr><td><strong>Super Admin</strong></td><td>The NeuroSense360 team (you)</td><td>Manage the entire platform, all clinics, all data</td></tr>
+  <tr><td><strong>Clinic Admin</strong></td><td>Doctors / clinic staff</td><td>Manage their patients, upload brain scans, view reports</td></tr>
+  <tr><td><strong>Patient</strong></td><td>People getting brain assessments</td><td>View their brain reports, track progress, book appointments</td></tr>
+</table>
+
+<!-- WEBSITE VISITOR -->
+<h2 class="page-break">What a Website Visitor Can Do</h2>
+<p><span class="role-tag tag-visitor">WEBSITE VISITOR</span></p>
+
+<p>When someone opens <strong>www.neurosense360.site</strong>, they see a professional website with:</p>
+
+<ul>
+  <li><strong>Home Page</strong> - What NeuroSense360 is, how it works, success stories</li>
+  <li><strong>About Us</strong> - The team and company information</li>
+  <li><strong>Science Page</strong> - How brain scanning works (the research behind it)</li>
+  <li><strong>Brainwave Guide</strong> - Simple explanation of brain waves (Delta, Theta, Alpha, Beta, Gamma)</li>
+  <li><strong>Pricing Page</strong> - Different plans and their costs</li>
+  <li><strong>Locations</strong> - Find a clinic near you (with map)</li>
+  <li><strong>Contact Form</strong> - Send a message to the team</li>
+  <li><strong>Book an Appointment</strong> - Schedule a brain assessment</li>
+  <li><strong>Register</strong> - Create an account (as a patient or as a clinic)</li>
+  <li><strong>Login</strong> - Sign in to their dashboard</li>
+</ul>
+
+<div class="highlight">
+  <strong>Goal:</strong> The website convinces visitors to either sign up as a patient or register their clinic.
+</div>
+
+<!-- SUPER ADMIN -->
+<h2>What the Super Admin Can Do</h2>
+<p><span class="role-tag tag-admin">SUPER ADMIN</span></p>
+
+<p>The Super Admin is the <strong>owner/operator of the platform</strong>. They can see and control everything.</p>
+
+<h3>1. Dashboard - See the Big Picture</h3>
+<ul>
+  <li>How many clinics are registered</li>
+  <li>How many patients are on the platform</li>
+  <li>How many reports have been generated</li>
+  <li>How much money has been earned this month</li>
+</ul>
+
+<h3>2. Manage Clinics</h3>
+<ul>
+  <li>See all registered clinics</li>
+  <li>Approve or reject new clinic registrations</li>
+  <li>Activate or deactivate a clinic</li>
+  <li>Edit clinic details (name, contact, address)</li>
+  <li>See which clinics are on trial and when their trial ends</li>
+</ul>
+
+<h3>3. View All Reports</h3>
+<ul>
+  <li>See every brain report generated across all clinics</li>
+  <li>Filter by clinic name, patient name, or date</li>
+  <li>Download any report as PDF</li>
+  <li>Check report quality</li>
+</ul>
+
+<h3>4. Track Payments & Revenue</h3>
+<ul>
+  <li>See all payments received from clinics and patients</li>
+  <li>View revenue breakdown (which clinic paid how much)</li>
+  <li>Check payment status (paid, pending, failed)</li>
+  <li>Export payment reports</li>
+</ul>
+
+<h3>5. Analytics - Understand the Business</h3>
+<ul>
+  <li>See growth trends (new users per month)</li>
+  <li>Track which features are most popular</li>
+  <li>Monitor how many clinics are active vs. inactive</li>
+  <li>Advanced reports on retention and revenue</li>
+</ul>
+
+<h3>6. Manage Coaches</h3>
+<ul>
+  <li>Add brain health coaches to the platform</li>
+  <li>Assign coaches to specific clinics</li>
+  <li>Track coach schedules and certifications</li>
+</ul>
+
+<h3>7. Process Brain Scan Data</h3>
+<ul>
+  <li>Run the brain analysis algorithm on uploaded scans</li>
+  <li>Process multiple scans at once (bulk processing)</li>
+  <li>Check if the algorithm ran successfully</li>
+</ul>
+
+<h3>8. Manage Website Content</h3>
+<ul>
+  <li>Edit pages on the website (like a mini website builder)</li>
+  <li>Add new pages or remove old ones</li>
+  <li>Update FAQs, privacy policy, etc.</li>
+</ul>
+
+<h3>9. Set Up Alerts</h3>
+<ul>
+  <li>Get notified when a clinic's trial is about to end</li>
+  <li>Get notified when a clinic is running out of reports</li>
+  <li>Set up email alerts for important events</li>
+</ul>
+
+<h3>10. System Settings</h3>
+<ul>
+  <li>Configure email settings</li>
+  <li>Set up payment gateway keys</li>
+  <li>Manage API keys for AI services</li>
+</ul>
+
+<!-- CLINIC ADMIN -->
+<h2 class="page-break">What a Clinic Admin Can Do</h2>
+<p><span class="role-tag tag-clinic">CLINIC ADMIN</span></p>
+
+<p>A Clinic Admin is a <strong>doctor or clinic staff member</strong> who manages their clinic's patients and reports.</p>
+
+<h3>1. Clinic Dashboard - Quick Overview</h3>
+<ul>
+  <li>See how many patients they have</li>
+  <li>See how many reports they've used out of their allowed limit</li>
+  <li>Check their subscription status (trial, active, expired)</li>
+  <li>See recent activity</li>
+</ul>
+
+<h3>2. Manage Patients</h3>
+<ul>
+  <li><strong>Add a new patient</strong> - Enter name, email, phone, date of birth, gender</li>
+  <li><strong>Edit patient details</strong> - Update contact info, medical history</li>
+  <li><strong>Search patients</strong> - Find a patient by name or ID</li>
+  <li><strong>Import patients</strong> - Upload a list of patients from a file</li>
+  <li><strong>Set improvement focus</strong> - What does this patient need help with? (anxiety, sleep, focus, ADHD, etc.)</li>
+  <li><strong>View patient history</strong> - See all past reports and progress</li>
+</ul>
+
+<h3>3. Upload Brain Scans & Get Reports</h3>
+<div class="highlight">
+  This is the <strong>most important feature</strong> for clinics. Here's what happens:
+</div>
+<div class="flow">
+  <div class="flow-step"><div class="flow-num">1</div><div class="flow-text">Clinic does an EEG brain scan on the patient</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">2</div><div class="flow-text">Clinic uploads the scan files (Eyes Open + Eyes Closed PDFs) to NeuroSense360</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">3</div><div class="flow-text">The software adds NeuroSense branding to the reports</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">4</div><div class="flow-text">AI reads the brain scan data and analyzes brain wave patterns</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">5</div><div class="flow-text">The system calculates brain health scores and identifies areas of concern</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">6</div><div class="flow-text">AI generates a detailed, easy-to-understand PDF report with recommendations</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">7</div><div class="flow-text">Report is saved and the patient is notified (takes about 8-10 minutes total)</div></div>
+</div>
+
+<h3>4. View & Download Reports</h3>
+<ul>
+  <li>See all reports for their clinic's patients</li>
+  <li>Download reports as PDF</li>
+  <li>Filter reports by patient name or date</li>
+  <li>Track progress across multiple reports for the same patient</li>
+</ul>
+
+<h3>5. Buy More Reports</h3>
+<ul>
+  <li>Each clinic gets a fixed number of reports based on their plan</li>
+  <li>When reports are running low, they can buy more</li>
+  <li>Reports are sold in packages (10, 25, 50, or 100)</li>
+  <li>Payment via Razorpay (India) or Stripe (international)</li>
+</ul>
+
+<h3>6. Track Usage</h3>
+<ul>
+  <li>See how many reports have been used vs. how many are left</li>
+  <li>Monthly usage trends</li>
+  <li>Cost per report</li>
+</ul>
+
+<h3>7. Clinic Settings</h3>
+<ul>
+  <li>Update clinic name, address, phone number</li>
+  <li>Upload clinic logo</li>
+  <li>Manage team members</li>
+</ul>
+
+<!-- PATIENT -->
+<h2 class="page-break">What a Patient Can Do</h2>
+<p><span class="role-tag tag-patient">PATIENT</span></p>
+
+<p>A patient is someone who has had a <strong>brain scan done at a clinic</strong> and wants to track their brain health.</p>
+
+<h3>1. Personal Dashboard</h3>
+<ul>
+  <li>See their brain health scores at a glance</li>
+  <li>View their latest report</li>
+  <li>See recommended next steps</li>
+  <li>Track goals and targets</li>
+</ul>
+
+<h3>2. View Brain Reports</h3>
+<ul>
+  <li>Open their AI-generated brain health report</li>
+  <li>Download report as PDF</li>
+  <li>Understand their brain wave patterns in simple language</li>
+  <li>See what areas need improvement</li>
+</ul>
+
+<h3>3. Brain Health Scores</h3>
+<p>The system gives patients these scores:</p>
+<table>
+  <tr><th>Score</th><th>What it measures</th></tr>
+  <tr><td><strong>Brain Fitness Score</strong></td><td>Overall brain health (0-100)</td></tr>
+  <tr><td><strong>Brain Burnout Score</strong></td><td>How stressed the brain is</td></tr>
+  <tr><td><strong>Brain Performance Score</strong></td><td>How well the brain is working (focus, memory, etc.)</td></tr>
+  <tr><td><strong>Neuro Age</strong></td><td>Is your brain older or younger than your actual age?</td></tr>
+</table>
+
+<h3>4. Track Progress Over Time</h3>
+<ul>
+  <li>Compare current scores with previous scores</li>
+  <li>See trend charts (is brain health improving?)</li>
+  <li>View milestones and achievements</li>
+  <li>Weekly progress reports</li>
+</ul>
+
+<h3>5. Wellness Programs (based on subscription)</h3>
+<p>Patients can access different programs depending on their plan:</p>
+<table>
+  <tr><th>Program</th><th>What it is</th><th>Available in</th></tr>
+  <tr><td><strong>ANS Reset Protocol</strong></td><td>Exercises to calm the nervous system</td><td>Basic and above</td></tr>
+  <tr><td><strong>MOVERS</strong></td><td>Movement-based brain exercises</td><td>Basic and above</td></tr>
+  <tr><td><strong>Five Pillars</strong></td><td>Foundation wellness habits</td><td>Basic and above</td></tr>
+  <tr><td><strong>Frequencies & Music</strong></td><td>Therapeutic sounds for the brain</td><td>Pro and above</td></tr>
+  <tr><td><strong>Meditations</strong></td><td>Guided meditations</td><td>Pro and above</td></tr>
+  <tr><td><strong>Supplements Guide</strong></td><td>Brain health supplement suggestions</td><td>Pro and above</td></tr>
+  <tr><td><strong>Brain Coach</strong></td><td>One-on-one coaching sessions</td><td>Premium and above</td></tr>
+  <tr><td><strong>Home Neurofeedback</strong></td><td>Brain training you can do at home</td><td>Premium and above</td></tr>
+</table>
+
+<h3>6. Book Appointments</h3>
+<ul>
+  <li>Schedule a new brain scan or follow-up</li>
+  <li>See available time slots</li>
+  <li>Get reminders before appointments</li>
+  <li>Cancel or reschedule</li>
+</ul>
+
+<h3>7. Manage Subscription</h3>
+<ul>
+  <li>See current plan (Free, Basic, Pro, Premium)</li>
+  <li>Upgrade to a higher plan for more features</li>
+  <li>View billing history</li>
+</ul>
+
+<!-- PRICING -->
+<h2 class="page-break">Pricing Plans</h2>
+
+<table>
+  <tr><th>Plan</th><th>Price (INR)</th><th>Price (USD)</th><th>Reports</th><th>What's included</th></tr>
+  <tr><td><strong>Free</strong></td><td>Free</td><td>Free</td><td>0</td><td>Profile, brain info, daily inspiration</td></tr>
+  <tr><td><strong>Basic</strong></td><td>&#8377;999</td><td>$9.99</td><td>10</td><td>+ ANS Reset, MOVERS, Five Pillars</td></tr>
+  <tr><td><strong>Pro</strong></td><td>&#8377;1,999</td><td>$19.99</td><td>25</td><td>+ Frequencies, Meditations, Supplements</td></tr>
+  <tr><td><strong>Premium</strong></td><td>&#8377;3,499</td><td>$34.99</td><td>50</td><td>+ Brain Coach, Home Neurofeedback, Assessments</td></tr>
+  <tr><td><strong>Enterprise</strong></td><td>&#8377;5,999</td><td>Custom</td><td>100+</td><td>Everything + custom support</td></tr>
+</table>
+
+<p>Also available in EUR, GBP, AED, AUD, CAD, SGD.</p>
+
+<h3>For Clinics Specifically</h3>
+<ul>
+  <li><strong>Free Trial:</strong> 30 days with 50 free reports</li>
+  <li><strong>After trial:</strong> Buy report packages (10, 25, 50, or 100 reports)</li>
+  <li><strong>Alerts:</strong> Email reminders when trial is ending or reports are running low</li>
+</ul>
+
+<!-- HOW PAYMENTS WORK -->
+<h2>How Payments Work</h2>
+
+<div class="flow">
+  <div class="flow-step"><div class="flow-num">1</div><div class="flow-text">User clicks "Upgrade" or "Buy Reports"</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">2</div><div class="flow-text">System detects user's location automatically</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">3</div><div class="flow-text"><strong>If in India:</strong> Razorpay opens (can pay by card, UPI, net banking, wallet)<br><strong>If outside India:</strong> Stripe opens (can pay by card, Apple Pay, Google Pay)</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">4</div><div class="flow-text">Payment is processed instantly</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">5</div><div class="flow-text">Features unlock immediately + confirmation email sent</div></div>
+</div>
+
+<!-- THE AI REPORT -->
+<h2 class="page-break">What's Inside the AI-Generated Report?</h2>
+
+<p>When a clinic uploads a brain scan, the AI generates a <strong>detailed PDF report</strong> with these sections:</p>
+
+<table>
+  <tr><th>#</th><th>Section</th><th>What it shows</th></tr>
+  <tr><td>1</td><td><strong>Cover Page</strong></td><td>Patient name, date, clinic name, NeuroSense branding</td></tr>
+  <tr><td>2</td><td><strong>Introduction</strong></td><td>What this assessment is and how to read the report</td></tr>
+  <tr><td>3</td><td><strong>Brain Type</strong></td><td>What type of brain the patient has (e.g., "The Overthinker", "The Creative")</td></tr>
+  <tr><td>4</td><td><strong>Brain Wave Profiles</strong></td><td>Analysis of each brain wave (Delta, Theta, Alpha, Beta, Gamma) - what's normal, what's high/low</td></tr>
+  <tr><td>5</td><td><strong>Brain Topology</strong></td><td>Map of the brain showing which regions are active/inactive</td></tr>
+  <tr><td>6</td><td><strong>Brain Map Comparison</strong></td><td>How the patient's brain compares to normal/healthy brains</td></tr>
+  <tr><td>7</td><td><strong>Cognition Page</strong></td><td>Focus, memory, processing speed, attention analysis</td></tr>
+  <tr><td>8</td><td><strong>Your Numbers</strong></td><td>Detailed scores for each brain metric</td></tr>
+  <tr><td>9</td><td><strong>Numbers at a Glance</strong></td><td>Simple summary scorecard</td></tr>
+  <tr><td>10</td><td><strong>Detailed Metrics</strong></td><td>Graphs and charts showing brain performance</td></tr>
+  <tr><td>11</td><td><strong>Congratulations</strong></td><td>Summary of findings + suggested next steps</td></tr>
+  <tr><td>12</td><td><strong>Appendix</strong></td><td>Technical details and scientific references</td></tr>
+  <tr><td>13</td><td><strong>Disclaimers</strong></td><td>Legal and medical disclaimers</td></tr>
+</table>
+
+<!-- EMAIL NOTIFICATIONS -->
+<h2>Email Notifications</h2>
+<p>The system automatically sends emails for:</p>
+<ul>
+  <li>New account registration confirmation</li>
+  <li>New report ready for viewing</li>
+  <li>Trial ending soon (7 days, 3 days, 1 day warnings)</li>
+  <li>Reports running low</li>
+  <li>Payment confirmation and invoice</li>
+  <li>Appointment reminders</li>
+  <li>Password reset requests</li>
+  <li>Contact form submissions (sent to sweta.adatia@gmail.com)</li>
+</ul>
+
+<!-- HOW IT ALL CONNECTS -->
+<h2 class="page-break">How Everything Connects - The Big Picture</h2>
+
+<div class="flow">
+  <div class="flow-step"><div class="flow-num">1</div><div class="flow-text"><strong>Patient visits a clinic</strong> and gets an EEG brain scan done</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">2</div><div class="flow-text"><strong>Clinic staff logs into NeuroSense360</strong> and adds the patient to the system</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">3</div><div class="flow-text"><strong>Clinic uploads the brain scan files</strong> (2 PDF files - eyes open and eyes closed)</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">4</div><div class="flow-text"><strong>AI processes the scan</strong> - reads the data, analyzes patterns, calculates scores (8-10 minutes)</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">5</div><div class="flow-text"><strong>A branded PDF report is generated</strong> with brain health scores, brain maps, and care recommendations</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">6</div><div class="flow-text"><strong>Patient gets an email notification</strong> that their report is ready</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">7</div><div class="flow-text"><strong>Patient logs into their dashboard</strong> and views/downloads their brain health report</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">8</div><div class="flow-text"><strong>Patient follows the care plan</strong> - wellness programs, exercises, coaching</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">9</div><div class="flow-text"><strong>Patient comes back for follow-up scan</strong> - progress is tracked and compared</div></div>
+  <div class="flow-arrow">&darr;</div>
+  <div class="flow-step"><div class="flow-num">10</div><div class="flow-text"><strong>Super Admin monitors everything</strong> - clinics, revenue, reports, system health</div></div>
+</div>
+
+<!-- HOW MONEY IS MADE -->
+<h2>How the Business Makes Money</h2>
+
+<table>
+  <tr><th>Revenue Source</th><th>How it works</th></tr>
+  <tr><td><strong>Clinic Report Packages</strong></td><td>Clinics buy report credits in packs of 10, 25, 50, or 100. Each brain scan report uses 1 credit.</td></tr>
+  <tr><td><strong>Patient Subscriptions</strong></td><td>Patients pay monthly for access to wellness programs (Basic/Pro/Premium/Enterprise).</td></tr>
+  <tr><td><strong>Free Trial Conversion</strong></td><td>Clinics get 30 days free trial with 50 reports. After that, they need to purchase.</td></tr>
+</table>
+
+<!-- SECURITY -->
+<h2>Security & Data Protection</h2>
+
+<ul>
+  <li><strong>Passwords are encrypted</strong> - No one can see a user's password, not even the admin</li>
+  <li><strong>Data is private</strong> - Clinics can only see their own patients. Patients can only see their own reports.</li>
+  <li><strong>Secure payments</strong> - All payments go through Razorpay or Stripe (bank-level security)</li>
+  <li><strong>HTTPS encryption</strong> - All data transfer is encrypted</li>
+  <li><strong>Access logs</strong> - The system tracks who accessed what and when</li>
+  <li><strong>Email verification</strong> - Accounts must verify email before they can be used</li>
+</ul>
+
+<!-- DEPLOYMENT -->
+<h2>Where the Software Runs</h2>
+
+<table>
+  <tr><th>Component</th><th>Where it runs</th><th>What it does</th></tr>
+  <tr><td><strong>Website (Frontend)</strong></td><td>Vercel</td><td>Everything the user sees and clicks</td></tr>
+  <tr><td><strong>Server (Backend)</strong></td><td>Render</td><td>Processes brain scans, generates reports, handles payments</td></tr>
+  <tr><td><strong>Database</strong></td><td>Supabase</td><td>Stores all data - patients, clinics, reports, payments</td></tr>
+  <tr><td><strong>File Storage</strong></td><td>Supabase Storage</td><td>Stores uploaded brain scans and generated PDF reports</td></tr>
+  <tr><td><strong>AI</strong></td><td>Google Gemini</td><td>Reads brain scans and writes the report content</td></tr>
+  <tr><td><strong>Domain</strong></td><td>neurosense360.site</td><td>The website address users visit</td></tr>
+</table>
+
+<!-- FOOTER -->
+<div class="footer">
+  <p><strong>NeuroSense360</strong> - Limitless Brain Lab</p>
+  <p>Simple Guide | March 2026</p>
+  <p>www.neurosense360.site</p>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,238 @@
+QEEG PDF GENERATION SYSTEM - ANALYSIS REPORT
+=============================================
+
+EXECUTIVE SUMMARY
+The system has a fundamental architectural mismatch between what the Gemini prompt asks for (magazine-quality visual infographics) and what actually gets delivered (text-based PDF with styled boxes).
+
+1. CURRENT MODEL USAGE
+====================
+
+Model Selection (geminiService.js lines 54-76):
+- Priority: '3-pro-preview' (Gemini 3 Pro Preview)
+- Fallback: 'flash', then 'pro'
+- Method: Simple substring matching in model names
+- Only searches for models with 'generateContent' capability
+- DOES NOT search for image generation models
+
+Critical Gap:
+- Code ignores 'generateImages' capability
+- Never attempts to detect gemini-3-pro-flash-image
+- Cannot use image generation APIs even if available
+
+Model Discovery (lines 25-49):
+- Queries: https://generativelanguage.googleapis.com/v1/models
+- Filters: supportedGenerationMethods.includes('generateContent')
+- Problem: This filter excludes image generation models
+
+2. PDF GENERATION FLOW
+======================
+
+Complete Pipeline:
+Upload QEEG files
+  -> Parse with QEEGParser
+  -> Calculate 7 parameters with AlgorithmCalculator
+  -> Create GeminiPdfGenerator
+  -> transformToGeminiFormat() converts to brain parameters JSON
+  -> GeminiService.generateBrainPerformanceReport() calls Gemini API
+  -> Gemini returns JSON with scores, colors, layout suggestions
+  -> PDFKit renders JSON as styled PDF document
+  -> Upload to Supabase or save locally
+  -> Return PDF URL to frontend
+
+Data Flow:
+Algorithm Results (7 parameters) 
+  -> Gemini Input: { Cognition: {score, maxScore, bucket, subparameters}, ... }
+  -> Gemini Output: { title, parameters[], layoutSuggestions, recommendations[] }
+  -> PDFKit Rendering: Styled text boxes and shapes
+
+What Gemini Returns:
+- JSON structure with parameter information
+- bucketColor specifications (#38A169, #F59E0B, #E53E3E)
+- layoutSuggestions object with colorScheme and structure
+- Interpretations and recommendations
+
+What PDFKit Renders:
+1. Header bar (colored background)
+2. Patient information box
+3. Parameter sections (7 sections for 7 parameters)
+4. Summary section
+5. Recommendations
+6. Footer
+
+All rendering is text/shape-based (rectangles, circles, text at various sizes)
+
+3. INFOGRAPHIC GENERATION ISSUES
+=================================
+
+Issue #1: Architectural Mismatch
+Prompt says: "Magazine-quality visual infographic with visual progress indicators"
+Reality: JSON descriptions rendered as styled text boxes in PDF
+
+Issue #2: Unused Graphics Libraries
+Installed but never used:
+- canvas (v3.2.0) - for drawing graphics
+- chartjs-node-canvas (v5.0.0) - for chart generation
+Could generate actual visualizations but currently dead dependencies
+
+Issue #3: Ignored AI Suggestions
+Gemini provides layoutSuggestions object with:
+- colorScheme recommendations
+- structure suggestions (2-column layout, grid layout)
+Code never reads or applies these suggestions
+
+Issue #4: Visual Elements Missing
+Prompt asks for:
+- Progress bars -> Only text "2/3"
+- Graphical elements -> Only rectangles and circles
+- Magazine quality -> Basic text styling
+- Visual hierarchy -> Sequential layout
+
+Issue #5: PDFKit Limitations
+PDFKit can do:
+- Draw rectangles, circles, lines
+- Render text in different sizes/colors
+Cannot do:
+- Complex visual designs
+- True graphics/infographics
+- Gradients or advanced styling
+- Magazine-quality layouts
+
+4. ROOT CAUSE ANALYSIS
+======================
+
+Question: Is Gemini returning infographic-style content?
+Answer: Partially. Returns JSON with visual descriptions, not actual images.
+
+Question: Is PDFKit not rendering it properly?
+Answer: No, PDFKit works fine. Problem is PDFKit cannot create magazine-quality graphics.
+
+Question: Are we using text-based PDF generation?
+Answer: YES. Entire flow is: Gemini (text) -> PDFKit (text/shape rendering) -> PDF
+
+Question: Is gemini-3-pro-flash-image available?
+Answer: Unknown. Code doesn't attempt to detect it.
+
+Key Insight:
+The prompt is asking for something that text generation + text-based PDF rendering cannot deliver. To create true infographics, you need:
+- Either image generation (Gemini image APIs)
+- Or graphics rendering (Canvas library)
+- Or chart generation (ChartJS)
+
+5. WHAT'S WORKING WELL
+======================
+
+Score Accuracy:
+- Input scores preserved exactly from algorithm
+- Validation prevents modifications
+- Console logs verify input vs output
+
+Color Coding:
+- Correctly handles problem parameters (Stress, Burnout = low is good)
+- Health parameters (Cognition, Focus = high is good)
+- Correct color mapping for each category
+
+PDF Output:
+- Professional-looking document
+- All patient data properly displayed
+- All parameters included with sub-metrics
+- Recommendations included
+- Fallback system works if Gemini fails
+
+What Doesn't Work:
+- True visual infographics
+- Magazine-quality design
+- Visual progress indicators
+- Graphical elements
+- Dynamic layouts from AI suggestions
+
+6. SOLUTION OPTIONS
+===================
+
+OPTION A: Use Gemini Image Generation (IF available)
+Approach:
+1. Detect models with generateImages capability
+2. Use generateImages() API instead of generateContent()
+3. Embed generated image in PDF
+
+Pros: True infographics, magazine quality, uses new capabilities
+Cons: Model availability uncertain, slower, more expensive
+
+OPTION B: Canvas-Based Graphics
+Approach:
+1. Use installed canvas library
+2. Draw progress bars, badges, charts
+3. Convert to PNG, embed in PDF
+
+Pros: Full control, library already installed, deterministic
+Cons: Graphics programming required, system dependencies
+
+OPTION C: ChartJS Visualization
+Approach:
+1. Use installed chartjs-node-canvas
+2. Create radar chart of 7 parameters
+3. Embed chart images in PDF
+
+Pros: Quick to implement, professional-looking, library installed
+Cons: Only solves data visualization, not full infographic
+
+OPTION D: Hybrid Approach (BEST LONG-TERM)
+Combine:
+1. Canvas/ChartJS for visual elements (progress bars, charts, badges)
+2. Gemini for clinical text (interpretations, recommendations)
+3. PDFKit to combine both
+
+Result: True infographic + AI insights
+
+7. QUICK WINS (under 10 minutes each)
+=====================================
+
+Fix #1: Log actual model name
+- In selectBestModel(), add console.log(modelName)
+- See exactly what model is being used
+
+Fix #2: Detect image generation capability
+- Update model filter to check for 'generateImages'
+- Log which image-capable models exist
+
+Fix #3: Simple progress bar visualization
+- In addParameterSection(), draw filled rect based on score
+- Adds one visual element without major refactoring
+
+Fix #4: Show layout suggestions
+- In generatePDFContent(), log layoutSuggestions
+- See what AI thinks the layout should be
+
+8. SUMMARY AND NEXT STEPS
+==========================
+
+Current State:
+- Model: Likely gemini-3-pro-preview or similar
+- Generation: JSON descriptions from Gemini
+- Rendering: PDFKit text/shape rendering
+- Result: Professional PDF, not true infographic
+
+To achieve true infographics:
+A) Use Gemini image generation (if available)
+B) Use Canvas library to draw graphics
+C) Use ChartJS for data visualization
+D) Use hybrid approach with all three
+
+Files to examine:
+- server/services/geminiService.js (model selection, prompts)
+- server/services/geminiPdfGenerator.js (PDF rendering)
+- server/routes/qeegRoutes.js (API endpoints)
+- server/package.json (dependencies)
+
+Key line numbers:
+- Model selection: geminiService.js 54-76
+- Model fetching: geminiService.js 25-49
+- Prompt definition: geminiService.js 134-296
+- PDF rendering: geminiPdfGenerator.js 189-584
+- API routes: qeegRoutes.js 86-675
+
+Next immediate actions:
+1. Check server logs to see which exact model name is selected
+2. Run fix #1 and #2 to understand model capabilities
+3. Verify if gemini-3-pro-flash-image is available
+4. Decide on implementation approach (A/B/C/D)
+5. Implement and test selected approach

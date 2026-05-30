@@ -1,0 +1,137 @@
+name: CI/CD Pipeline
+# Point 25: CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Test & Lint
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          npm install
+          cd server && npm install && cd ..
+
+      # Run linting
+      - name: ESLint
+        run: npm run lint --max-warnings 0
+        continue-on-error: false
+
+      # Type checking
+      - name: Type Check
+        run: npx tsc --noEmit
+        continue-on-error: false
+
+      # Run tests
+      - name: Unit Tests
+        run: npm test -- --coverage
+        continue-on-error: false
+
+      # Upload coverage
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/coverage-final.json
+          flags: unittests
+
+      # Security scan
+      - name: Security Audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+  build:
+    runs-on: ubuntu-latest
+    name: Build
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build backend
+        run: |
+          cd server && npm install && cd ..
+          # Backend doesn't need build, just verify no syntax errors
+          node -c server/index.js
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: |
+            dist/
+            server/
+
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy
+    needs: build
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy to production
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK not set"
+            exit 1
+          fi
+          curl "$RENDER_DEPLOY_HOOK"
+
+      - name: Run smoke tests
+        run: npm run test:smoke
+        continue-on-error: true
+
+  notify:
+    runs-on: ubuntu-latest
+    name: Notify
+    if: always()
+    needs: [test, build, deploy]
+
+    steps:
+      - name: Determine status
+        id: status
+        run: |
+          if [ "${{ needs.test.result }}" = "failure" ] || \
+             [ "${{ needs.build.result }}" = "failure" ] || \
+             [ "${{ needs.deploy.result }}" = "failure" ]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+          else
+            echo "status=success" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Slack notification
+        uses: 8398a7/action-slack@v3
+        if: always()
+        with:
+          status: ${{ steps.status.outputs.status }}
+          text: 'CI/CD Pipeline: ${{ steps.status.outputs.status }}'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        continue-on-error: true

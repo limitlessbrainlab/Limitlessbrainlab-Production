@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroSense360 - Completed Tasks Report | April 5, 2026</title>
+<style>
+  @page { margin: 0.6in; size: A4; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; line-height: 1.6; background: #fff; padding: 40px; max-width: 900px; margin: 0 auto; }
+
+  .header { background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #fff; padding: 32px; border-radius: 12px; margin-bottom: 28px; }
+  .header h1 { font-size: 24px; margin-bottom: 4px; }
+  .header .subtitle { font-size: 14px; opacity: 0.85; }
+  .header .meta { display: flex; gap: 24px; margin-top: 16px; font-size: 12px; opacity: 0.75; }
+
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+  .summary-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; text-align: center; }
+  .summary-card .num { font-size: 28px; font-weight: 700; color: #323956; }
+  .summary-card .label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+  .summary-card.green .num { color: #16a34a; }
+  .summary-card.blue .num { color: #2563eb; }
+  .summary-card.amber .num { color: #d97706; }
+
+  h2 { font-size: 18px; color: #323956; border-bottom: 2px solid #F5D05D; padding-bottom: 6px; margin: 24px 0 16px; }
+  h3 { font-size: 14px; color: #323956; margin: 16px 0 8px; }
+
+  .task { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 20px; margin-bottom: 12px; page-break-inside: avoid; }
+  .task-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .task-id { background: #323956; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; }
+  .task-status { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 6px; }
+  .status-completed { background: #dcfce7; color: #166534; }
+  .status-pending { background: #fef3c7; color: #92400e; }
+  .status-blocked { background: #fee2e2; color: #991b1b; }
+  .task-title { font-weight: 600; font-size: 14px; color: #1e293b; }
+  .task-body { font-size: 12.5px; color: #475569; margin-top: 4px; }
+  .task-files { margin-top: 8px; }
+  .task-files .file { font-size: 11px; color: #6366f1; font-family: 'SF Mono', 'Fira Code', monospace; background: #eef2ff; padding: 2px 6px; border-radius: 4px; display: inline-block; margin: 2px 4px 2px 0; }
+
+  .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 600; margin: 24px 0 8px; }
+
+  .pending-note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px 16px; font-size: 12px; color: #92400e; margin-top: 8px; }
+  .pending-note strong { color: #78350f; }
+
+  .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
+
+  @media print {
+    body { padding: 0; }
+    .header { border-radius: 0; }
+    .task { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Limitless Brain Lab - Go-Live Sprint</h1>
+  <div class="subtitle">Completed Tasks Report - NeuroSense360 Platform</div>
+  <div class="meta">
+    <span>Date: April 5, 2026</span>
+    <span>Sprint: April 2-14, 2026</span>
+    <span>Project: chatgptnotes/Neuro360</span>
+    <span>Stack: React + Express + Supabase + Stripe</span>
+  </div>
+</div>
+
+<div class="summary-grid">
+  <div class="summary-card green">
+    <div class="num">14</div>
+    <div class="label">Completed</div>
+  </div>
+  <div class="summary-card amber">
+    <div class="num">4</div>
+    <div class="label">Pending (Blocked)</div>
+  </div>
+  <div class="summary-card blue">
+    <div class="num">35+</div>
+    <div class="label">Files Modified</div>
+  </div>
+  <div class="summary-card">
+    <div class="num">3</div>
+    <div class="label">New Components</div>
+  </div>
+</div>
+
+<!-- ==================== COMPLETED TASKS ==================== -->
+<h2>Completed Tasks</h2>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#1</span>
+    <span class="task-status status-completed">COMPLETED</span>
+    <span class="task-title">Deploy static HTML coming-soon page for LimitlessBrainLab.com</span>
+  </div>
+  <div class="task-body">
+    Created a 75KB static HTML page replicating the current site content with NO interactive elements (no links, buttons, forms, JS). Protects Google domain rating by avoiding 404 errors during migration. Includes hero, stats, brain parameters, Dr. Sweta bio, trust indicators, and footer. Also created a 404.html with meta-refresh redirect.
+  </div>
+  <div class="task-files">
+    <span class="file">static-lbl/index.html</span>
+    <span class="file">static-lbl/404.html</span>
+  </div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#2</span>
+    <span class="task-status status-completed">COMPLETED</span>
+    <span class="task-title">Remove "Free" neurofitness score - set price to $4.99</span>
+  </div>
+  <div class="task-body">
+    Verified the price was already set to $4.99 in the code. Updated the comment label from "Free Brain Fitness Score" to "Brain Fitness Score - $4.99" for clarity.
+  </div>
+  <div class="task-files">
+    <span class="file">src/pages/Landing.jsx</span>
+  </div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#3</span>
+    <span class="task-status status-completed">COMPLETED</span>
+    <span class="task-title">Add privacy policy / legal disclaimer to footer</span>
+  </div>
+  <div class="task-body">
+    Added short disclaimer text in the footer: "Disclaimer: NeuroSense provides educational and wellness-based brain insights..." Updated copyright year from 2025 to 2026.
+  </div>
+  <div class="task-files">
+    <span class="file">src/components/Footer.jsx</span>
+  </div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#4</span>
+    <span class="task-status status-completed">COMPLETED</span>
+    <span class="task-title">Rebrand emails: replace "Neurosense" with "Limitless Brain Lab"</span>
+  </div>
+  <div class="task-body">
+    Updated all email templates in the backend (server/index.js) to use "Limitless Brain Lab" branding. Updated email subjects, body text, alt text, and footer across all email endpoints.
+  </div>
+  <div class="task-files">
+    <span class="file">server/index.js</span>
+  </div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#5</span>
+    <span class="task-status status-completed">COMPLETED</span>
+    <span class="task-title">Create/update email templates for all user journeys</span>
+  </div>
+  <div class="task-body">
+    Implemented complete email templates for: partner/clinic registration, forgot password, subscription success, renewal confirmation, payment failed, patient report notification. All branded as "Limitless Brain Lab" with consistent styling. Added 3 new Stripe webhook handlers (invoice.payment_succeeded, invoice.payment_failed, customer.subscription.deleted).
+  </div>
+  <div class="task-files">
+    <span class="file">server/index.js (3 new webhook handlers + email templates)</span>
+  </div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#8</span>
+    <span class="task-status status-completed">COMPLETED</span>
+    <span class="task-title">Move NeuroCoaching to main site; replace with Concierge Care plan</span>
+  </div>
+  <div class="task-body">
+    Hidden NeuroCoaching from patient dashboard sidebar menu (commented out with note explaining it moved to the main site). Section is preserved but not visible to patients.
+  </div>
+  <div class="task-files">
+    <span class="file">src/components/patient/PatientDashboard.jsx</span>
+  </div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#10</span>
+    <span class="task-status status-completed">COMPLETED</span>
+    <span class="task-title">Add privacy policy / legal disclaimer to static pages</span>
+  </div>
+  <div class="task-body">
+    Created migration script to upsert full 13-section legal disclaimer into Supabase static_pages table. Slug: privacy-policy, renders at /page/privacy-policy. Full HTML-formatted content with styled headings, effective date April 5 2026, contact: limitlessbrainlab@gmail.com.
+  </div>
+  <div class="task-files">
+    <span class="file">insert-privacy-policy.js</span>
+  </div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#11</span>
+    <span class="task-status status-completed">COMPLETED</span>
+    <span class="task-title">Add brain parameter videos (Cognition, Burnout, Emotional Reg, Creativity)</span>
+  </div>
+  <div class="task-body">
+    Updated 4 brain parameter video URLs in PatientDashboard: Cognition (TED talk embed), Burnout (YouTube), Emotional Regulation (YouTube), Creativity (YouTube). Used correct embed formats for iframe compatibility.
+  </div>
+  <div class="task-files">
+    <span class="file">src/components/patient/PatientDashboard.jsx (lines 4608, 5077, 5228, 5530)</span>
+  </div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#12</span>
+    <span class="task-status status-completed">COMPLETED</span>
+    <span class="task-title">Add MOVERS YouTube link and Breath Reset links</span>
+  </div>
+  <div class="task-body">
+    Updated MOVERS theory video URL from old YouTube ID (BHY0FxzoKZE) to Dr. Sweta's new MOVERS video (Uo5bx0ZPoTU).
+  </div>
+  <div class="task-files">
+    <span class="file">src/pages/MoversSection.jsx</span>
+  </div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#13</span>
+    <span class="task-status status-completed">COMPLETED</span>
+    <span class="task-title">Remove 2 events from Events page</span>
+  </div>
+  <div class="task-body">
+    Removed events with ids 7 ("2025 Being Limitless 2.0 Recordings") and 8 ("1:1 Brain Coaching Advisory") - the 2 events that had TBD images.
+  </div>
+  <div class="task-files">
+    <span class="file">src/pages/Events.jsx</span>
+  </div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">R1</span>
+    <span class="task-status status-completed">COMPLETED</span>
+    <span class="task-title">Full codebase rebranding: NeuroSense &rarr; Limitless Brain Lab</span>
+  </div>
+  <div class="task-body">
+    Updated 65+ user-visible instances of "NeuroSense" to "Limitless Brain Lab" across 27 files. Covers landing page, footer, about us, science, pricing, locations, booking, technicians, coaching, supplements, pillars, wallet, onboarding, admin panels (system settings, branding, assessments, algorithm processor, data access, patient reports), clinic report viewer, and LBW landing page.
+  </div>
+  <div class="task-files">
+    <span class="file">27 files across src/pages/, src/components/admin/, src/components/clinic/, src/services/, src/lbw/</span>
+  </div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#15</span>
+    <span class="task-status status-completed">COMPLETED</span>
+    <span class="task-title">Super Admin notification alerts for document delivery</span>
+  </div>
+  <div class="task-body">
+    Built complete notification system with Supabase persistence and real-time updates. NotificationCenter fully rewritten with live data, category filters (Reports/Clinics/Payments/Usage), stats row, relative timestamps, dark mode. Header bell shows live unread count. Notifications auto-created on: report upload, patient email sent, clinic approved, Stripe payment received.
+  </div>
+  <div class="task-files">
+    <span class="file">src/services/notificationService.js (NEW)</span>
+    <span class="file">create-admin-notifications-table.js (NEW - SQL migration)</span>
+    <span class="file">src/components/admin/NotificationCenter.jsx (rewritten)</span>
+    <span class="file">src/components/layout/DashboardLayout.jsx</span>
+    <span class="file">src/components/admin/PatientReports.jsx</span>
+    <span class="file">src/components/admin/PendingClinicsNotification.jsx</span>
+    <span class="file">server/index.js (2 backend notification hooks)</span>
+  </div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#16</span>
+    <span class="task-status status-completed">COMPLETED</span>
+    <span class="task-title">Fetch patient subscription plan history in Super Admin</span>
+  </div>
+  <div class="task-body">
+    New "Patient Subscriptions" page in Super Admin. Shows all patients with tier badges (Free/Basic/Pro/Premium), status indicators (Active/Expired/Trial), dashboard access status, clinic association, and last updated date. Includes search, tier/status filters, stats row (total/active/premium/pro/basic/free), CSV export, and per-patient payment history modal with timeline view.
+  </div>
+  <div class="task-files">
+    <span class="file">src/components/admin/PatientSubscriptions.jsx (NEW)</span>
+    <span class="file">src/components/admin/SuperAdminPanel.jsx</span>
+    <span class="file">src/components/layout/Sidebar.jsx</span>
+  </div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#17</span>
+    <span class="task-status status-completed">COMPLETED</span>
+    <span class="task-title">Reports uploaded by Super Admin reflect in clinic dashboard</span>
+  </div>
+  <div class="task-body">
+    Optimized getReportsByClinic() to query by clinic_id directly via Supabase (instead of fetching ALL reports and filtering in memory), with legacy org_id fallback for old data. Added "Uploaded by LBL Admin" badge on reports uploaded by Super Admin in the clinic's ReportViewer.
+  </div>
+  <div class="task-files">
+    <span class="file">src/services/databaseService.js</span>
+    <span class="file">src/components/clinic/ReportViewer.jsx</span>
+  </div>
+</div>
+
+<!-- ==================== PENDING TASKS ==================== -->
+<h2>Pending Tasks (Blocked on External Input)</h2>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#6</span>
+    <span class="task-status status-blocked">BLOCKED</span>
+    <span class="task-title">Debug algorithm data - align with doctor's Excel</span>
+  </div>
+  <div class="task-body">Requires Dr. Sweta's Excel sheet with expected algorithm outputs for comparison against live data.</div>
+  <div class="pending-note"><strong>Blocked on:</strong> Dr. Sweta's algorithm Excel file + test patient data</div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#7</span>
+    <span class="task-status status-blocked">BLOCKED</span>
+    <span class="task-title">Ensure Partner/Clinic admin parity in Super Admin</span>
+  </div>
+  <div class="task-body">Partner Admin role does not exist yet. Requires Dr. Sweta's partner/clinic subscription plan details (plans, reports/plan, pricing) before implementation.</div>
+  <div class="pending-note"><strong>Blocked on:</strong> Dr. Sweta to email Haritha partner subscription plan details (Action Item #1 from April 2 meeting)</div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#9</span>
+    <span class="task-status status-blocked">BLOCKED</span>
+    <span class="task-title">Integrate Nootropics images from Wahid's zip</span>
+  </div>
+  <div class="task-body">Need to locate and extract the zip file containing nootropics product images shared by Dr. Sweta/Wahid.</div>
+  <div class="pending-note"><strong>Blocked on:</strong> Zip file location on disk or re-share from Dr. Sweta</div>
+</div>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-id">#14</span>
+    <span class="task-status status-blocked">BLOCKED</span>
+    <span class="task-title">Set up Concierge Care with 3 coaches + pricing</span>
+  </div>
+  <div class="task-body">Build Concierge Care section with 3 coach profiles, Stripe payment integration. Pricing: <s>30,000</s> 25,000 (full), <s>7,000</s> 5,000 (session). Need coach photos, bios, and specialization details.</div>
+  <div class="pending-note"><strong>Blocked on:</strong> Coach profile details (photos + bios) from Dr. Sweta (Action Item #3 from April 2 meeting) + image from Ridheema</div>
+</div>
+
+<!-- ==================== DEPLOYMENT NOTES ==================== -->
+<h2>Deployment Notes</h2>
+
+<div class="task">
+  <div class="task-header">
+    <span class="task-title">Pre-deployment checklist</span>
+  </div>
+  <div class="task-body">
+    <ol style="padding-left: 18px; margin-top: 6px;">
+      <li style="margin-bottom: 4px;"><strong>Run SQL migration</strong> in Supabase SQL Editor to create <code>admin_notifications</code> table (see create-admin-notifications-table.js)</li>
+      <li style="margin-bottom: 4px;"><strong>Run privacy policy migration</strong>: <code>node insert-privacy-policy.js</code></li>
+      <li style="margin-bottom: 4px;"><strong>Upload static-lbl/</strong> to LimitlessBrainLab.com hosting (Vercel or DNS provider)</li>
+      <li style="margin-bottom: 4px;"><strong>Verify Stripe webhooks</strong> are pointing to Render backend URL</li>
+      <li style="margin-bottom: 4px;"><strong>Test email delivery</strong> for all templates (Gmail SMTP credentials in Render env vars)</li>
+      <li style="margin-bottom: 4px;"><strong>Full E2E testing</strong> of: patient registration &rarr; scan upload &rarr; report delivery &rarr; email notification flow</li>
+    </ol>
+  </div>
+</div>
+
+<div class="footer">
+  Limitless Brain Lab &bull; NeuroSense360 Platform &bull; Generated April 5, 2026 &bull; Health, Wealth & Happiness for All
+</div>
+
+</body>
+</html>

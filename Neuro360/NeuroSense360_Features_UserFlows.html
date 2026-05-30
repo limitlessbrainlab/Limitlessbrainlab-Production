@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuroSense360 - Complete Features & User Flows</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    color: #1a1a2e;
+    background: #fff;
+    line-height: 1.6;
+    font-size: 11pt;
+  }
+
+  @media print {
+    body { font-size: 10pt; }
+    .page-break { page-break-before: always; }
+    .no-break { page-break-inside: avoid; }
+    @page { margin: 0.7in; size: A4; }
+  }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 40px 30px; }
+
+  /* Cover */
+  .cover {
+    text-align: center;
+    padding: 120px 40px 80px;
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    color: #fff;
+    border-radius: 0;
+    margin: -40px -30px 0;
+  }
+  .cover-logo { font-size: 14pt; letter-spacing: 6px; text-transform: uppercase; color: #7c7cf0; margin-bottom: 20px; }
+  .cover h1 { font-size: 32pt; font-weight: 800; margin-bottom: 12px; }
+  .cover .subtitle { font-size: 14pt; font-weight: 300; color: #b8b8d4; margin-bottom: 40px; }
+  .cover .meta { font-size: 10pt; color: #8888aa; }
+  .cover .divider { width: 80px; height: 3px; background: #7c7cf0; margin: 30px auto; }
+
+  /* Section headers */
+  h2 {
+    font-size: 18pt;
+    font-weight: 700;
+    color: #302b63;
+    margin: 40px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 3px solid #7c7cf0;
+  }
+  h3 {
+    font-size: 13pt;
+    font-weight: 600;
+    color: #24243e;
+    margin: 24px 0 10px;
+  }
+  h4 {
+    font-size: 11pt;
+    font-weight: 600;
+    color: #444;
+    margin: 16px 0 6px;
+  }
+
+  p { margin-bottom: 10px; }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px;
+    font-size: 10pt;
+  }
+  th {
+    background: #302b63;
+    color: #fff;
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  td {
+    padding: 7px 12px;
+    border-bottom: 1px solid #e8e8f0;
+  }
+  tr:nth-child(even) { background: #f8f8fc; }
+  tr:hover { background: #f0f0fa; }
+
+  /* Lists */
+  ul, ol { margin: 8px 0 14px 20px; }
+  li { margin-bottom: 4px; }
+
+  /* Flow diagrams */
+  .flow-box {
+    background: #f4f4fb;
+    border-left: 4px solid #7c7cf0;
+    padding: 16px 20px;
+    margin: 12px 0 20px;
+    border-radius: 0 8px 8px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 10pt;
+    line-height: 1.8;
+    white-space: pre-wrap;
+  }
+
+  /* Feature cards */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 12px 0 20px;
+  }
+  .feature-card {
+    background: #f8f8fc;
+    border: 1px solid #e0e0f0;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .feature-card .num {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    background: #302b63;
+    color: #fff;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 24px;
+    font-size: 9pt;
+    font-weight: 700;
+    margin-right: 8px;
+  }
+  .feature-card .title { font-weight: 600; color: #302b63; }
+  .feature-card .desc { font-size: 9.5pt; color: #666; margin-top: 4px; }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 8.5pt;
+    font-weight: 600;
+  }
+  .badge-admin { background: #ffeef0; color: #d63031; }
+  .badge-clinic { background: #e8f5e9; color: #27ae60; }
+  .badge-patient { background: #e3f2fd; color: #2196f3; }
+  .badge-public { background: #fff3e0; color: #f39c12; }
+
+  /* Integration table */
+  .int-icon { font-size: 14pt; vertical-align: middle; margin-right: 6px; }
+
+  /* Tier table special */
+  .tier-table th { text-align: center; }
+  .tier-table td { text-align: center; }
+  .tier-table td:first-child { text-align: left; font-weight: 500; }
+  .check { color: #27ae60; font-weight: 700; }
+  .cross { color: #ccc; }
+
+  /* Pipeline steps */
+  .pipeline {
+    counter-reset: step;
+    list-style: none;
+    margin-left: 0;
+    padding-left: 0;
+  }
+  .pipeline li {
+    counter-increment: step;
+    position: relative;
+    padding: 12px 16px 12px 50px;
+    margin-bottom: 8px;
+    background: #f8f8fc;
+    border-radius: 8px;
+    border: 1px solid #e8e8f0;
+  }
+  .pipeline li::before {
+    content: counter(step);
+    position: absolute;
+    left: 14px;
+    top: 12px;
+    width: 26px;
+    height: 26px;
+    background: #302b63;
+    color: #fff;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 26px;
+    font-size: 10pt;
+    font-weight: 700;
+  }
+  .pipeline li strong { color: #302b63; }
+
+  /* TOC */
+  .toc { background: #f8f8fc; padding: 24px 30px; border-radius: 10px; margin: 30px 0; }
+  .toc h3 { margin-top: 0; color: #302b63; }
+  .toc ol { margin-left: 18px; }
+  .toc li { margin-bottom: 6px; }
+  .toc a { text-decoration: none; color: #302b63; }
+  .toc a:hover { color: #7c7cf0; }
+
+  /* Footer */
+  .doc-footer {
+    text-align: center;
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 2px solid #e8e8f0;
+    color: #999;
+    font-size: 9pt;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<!-- COVER PAGE -->
+<div class="cover">
+  <div class="cover-logo">NeuroSense360</div>
+  <h1>Complete Features &<br>User Flow Documentation</h1>
+  <div class="divider"></div>
+  <div class="subtitle">EEG-Based Brain Wellness SaaS Platform</div>
+  <div class="meta">
+    Version 2.0 &nbsp;|&nbsp; March 2026<br><br>
+    Limitless Brain Lab (LBW)<br>
+    https://www.neurosense360.site
+  </div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc page-break">
+  <h3>Table of Contents</h3>
+  <ol>
+    <li><a href="#overview">Platform Overview</a></li>
+    <li><a href="#tech">Technology Stack</a></li>
+    <li><a href="#routes">All Routes & Pages</a></li>
+    <li><a href="#superadmin">Super Admin Features</a></li>
+    <li><a href="#clinic">Clinic Admin Features</a></li>
+    <li><a href="#patient">Patient Features</a></li>
+    <li><a href="#tiers">Subscription Tiers & Pricing</a></li>
+    <li><a href="#flows">User Flows</a></li>
+    <li><a href="#pipeline">QEEG Report Generation Pipeline</a></li>
+    <li><a href="#payments">Payment & Subscription Flow</a></li>
+    <li><a href="#integrations">Integrations & External Services</a></li>
+    <li><a href="#database">Database Schema</a></li>
+    <li><a href="#landing">Landing Page Sections</a></li>
+    <li><a href="#security">Security & Compliance</a></li>
+  </ol>
+</div>
+
+<!-- 1. OVERVIEW -->
+<h2 id="overview">1. Platform Overview</h2>
+<p>NeuroSense360 is a comprehensive, multi-role SaaS platform for EEG-based brain wellness assessment, clinic management, and patient engagement. It combines a public-facing marketing site with role-based dashboards for <strong>Super Admins</strong>, <strong>Clinic Administrators</strong>, and <strong>Patients</strong>.</p>
+<p>The platform enables neurofeedback clinics to upload raw QEEG (quantitative EEG) data, process it through AI-powered algorithms, and generate branded brain wellness reports&mdash;all with built-in subscription management and payment processing.</p>
+
+<h3>Key Metrics Displayed</h3>
+<ul>
+  <li>25,000+ members across the platform</li>
+  <li>2,500+ registered clinics</li>
+  <li>Multi-currency payment support (8 currencies)</li>
+  <li>AI-powered report generation in ~8-10 minutes</li>
+</ul>
+
+<!-- 2. TECH STACK -->
+<h2 id="tech" class="page-break">2. Technology Stack</h2>
+
+<table>
+  <tr><th width="30%">Layer</th><th>Technology</th></tr>
+  <tr><td><strong>Frontend</strong></td><td>React 18.2 + Vite 7.3 + Tailwind CSS 3.3</td></tr>
+  <tr><td><strong>Routing</strong></td><td>React Router v6</td></tr>
+  <tr><td><strong>State / Forms</strong></td><td>React Hook Form, React Query (TanStack)</td></tr>
+  <tr><td><strong>UI</strong></td><td>Lucide Icons, Framer Motion, Recharts, React Hot Toast</td></tr>
+  <tr><td><strong>Backend</strong></td><td>Node.js + Express.js (port 5000)</td></tr>
+  <tr><td><strong>Database</strong></td><td>Supabase (PostgreSQL + Auth + Storage)</td></tr>
+  <tr><td><strong>AI Services</strong></td><td>Google Gemini AI (primary), OpenAI (backup)</td></tr>
+  <tr><td><strong>EEG Processing</strong></td><td>qEEG Pro API + NeuroSense Cloud algorithms</td></tr>
+  <tr><td><strong>Payments</strong></td><td>Stripe (international) + Razorpay (India)</td></tr>
+  <tr><td><strong>Email</strong></td><td>Nodemailer via Gmail SMTP</td></tr>
+  <tr><td><strong>PDF Generation</strong></td><td>PDFKit + pdf-lib (13 modular page generators)</td></tr>
+  <tr><td><strong>File Upload</strong></td><td>Multer</td></tr>
+  <tr><td><strong>Deployment</strong></td><td>Vercel (frontend) + Render (backend)</td></tr>
+</table>
+
+<!-- 3. ROUTES -->
+<h2 id="routes" class="page-break">3. All Routes & Pages</h2>
+
+<h3><span class="badge badge-public">PUBLIC</span> Public Routes (No Authentication)</h3>
+<table>
+  <tr><th>Route</th><th>Purpose</th></tr>
+  <tr><td><code>/</code></td><td>Main landing page (18 sections, marketing site)</td></tr>
+  <tr><td><code>/about-us</code></td><td>Company information and team profiles</td></tr>
+  <tr><td><code>/pricing</code></td><td>Subscription tier comparison and pricing</td></tr>
+  <tr><td><code>/science</code></td><td>Scientific research and methodology</td></tr>
+  <tr><td><code>/guide-to-brainwaves</code></td><td>Educational content on brain waves</td></tr>
+  <tr><td><code>/technicians</code></td><td>Technician information and resources</td></tr>
+  <tr><td><code>/locations</code></td><td>Clinic locator with map integration</td></tr>
+  <tr><td><code>/contact</code></td><td>Contact form (sends to sweta.adatia@gmail.com)</td></tr>
+  <tr><td><code>/neurosense-booking</code></td><td>Appointment booking system</td></tr>
+  <tr><td><code>/coach-certification</code></td><td>Coach certification program info</td></tr>
+  <tr><td><code>/100x-program-join</code></td><td>100x program enrollment form</td></tr>
+  <tr><td><code>/professional-onboarding</code></td><td>Professional registration form</td></tr>
+  <tr><td><code>/login</code></td><td>User login (all roles)</td></tr>
+  <tr><td><code>/register</code></td><td>User registration (patient or clinic)</td></tr>
+  <tr><td><code>/forgot-password</code></td><td>Password recovery</td></tr>
+  <tr><td><code>/reset-password</code></td><td>Password reset via token</td></tr>
+  <tr><td><code>/activation-pending</code></td><td>Account activation waiting page</td></tr>
+  <tr><td><code>/page/:slug</code></td><td>Dynamic CMS-managed static pages</td></tr>
+  <tr><td><code>/privacy-policy</code></td><td>Privacy policy</td></tr>
+</table>
+
+<h4>Wellness Protocol Pages (Public)</h4>
+<table>
+  <tr><th>Route</th><th>Purpose</th></tr>
+  <tr><td><code>/movers-section</code></td><td>MOVERS movement-based protocol</td></tr>
+  <tr><td><code>/ans-reset-protocol</code></td><td>Autonomic nervous system reset</td></tr>
+  <tr><td><code>/frequencies-music</code></td><td>Therapeutic frequencies and music</td></tr>
+  <tr><td><code>/supplements-nootropics</code></td><td>Supplement recommendations</td></tr>
+  <tr><td><code>/five-pillars</code></td><td>Five Pillars wellness framework</td></tr>
+  <tr><td><code>/brain-coach</code></td><td>Brain coaching program</td></tr>
+  <tr><td><code>/home-neurofeedback</code></td><td>Home neurofeedback protocol</td></tr>
+  <tr><td><code>/interactive-brain</code></td><td>Interactive brain visualization</td></tr>
+  <tr><td><code>/wallet</code></td><td>Patient wallet / credits</td></tr>
+</table>
+
+<h4>LBW (Limitless Brain Wellness) Pages</h4>
+<table>
+  <tr><th>Route</th><th>Purpose</th></tr>
+  <tr><td><code>/lbw</code></td><td>LBW main landing page</td></tr>
+  <tr><td><code>/lbw-updates</code></td><td>Project updates</td></tr>
+  <tr><td><code>/assessments</code></td><td>Brain wellness assessments</td></tr>
+  <tr><td><code>/coaching</code></td><td>Coaching programs</td></tr>
+  <tr><td><code>/lbw/dashboard</code></td><td>LBW user dashboard</td></tr>
+  <tr><td><code>/lbw/progress</code></td><td>Progress tracking</td></tr>
+  <tr><td><code>/lbw/content</code></td><td>Educational content library</td></tr>
+</table>
+
+<h3 class="page-break"><span class="badge badge-admin">SUPER ADMIN</span> Admin Routes</h3>
+<table>
+  <tr><th>Route</th><th>Feature</th></tr>
+  <tr><td><code>/admin</code></td><td>System-wide dashboard and analytics</td></tr>
+  <tr><td><code>/admin/clinics</code></td><td>Clinic management (CRUD, approval, trials)</td></tr>
+  <tr><td><code>/admin/reports</code></td><td>All patient reports viewer</td></tr>
+  <tr><td><code>/admin/payments</code></td><td>Revenue tracking and transactions</td></tr>
+  <tr><td><code>/admin/analytics</code></td><td>System usage statistics</td></tr>
+  <tr><td><code>/admin/advanced-analytics</code></td><td>Cohort analysis, retention, churn</td></tr>
+  <tr><td><code>/admin/algorithm-processor</code></td><td>QEEG algorithm job processing</td></tr>
+  <tr><td><code>/admin/coaches</code></td><td>Coach management and assignments</td></tr>
+  <tr><td><code>/admin/alerts</code></td><td>Alert configuration and history</td></tr>
+  <tr><td><code>/admin/assessments</code></td><td>Assessment template management</td></tr>
+  <tr><td><code>/admin/static-pages</code></td><td>CMS - static page editor</td></tr>
+  <tr><td><code>/admin/settings</code></td><td>System configuration</td></tr>
+</table>
+
+<h3><span class="badge badge-clinic">CLINIC</span> Clinic Routes</h3>
+<table>
+  <tr><th>Route</th><th>Feature</th></tr>
+  <tr><td><code>/clinic</code></td><td>Clinic overview dashboard</td></tr>
+  <tr><td><code>/clinic/patients</code></td><td>Patient management (CRUD, search, import)</td></tr>
+  <tr><td><code>/clinic/reports</code></td><td>Clinic's report viewer and downloads</td></tr>
+  <tr><td><code>/clinic/subscription</code></td><td>Purchase report packages</td></tr>
+  <tr><td><code>/clinic/usage</code></td><td>Usage analytics and trends</td></tr>
+  <tr><td><code>/clinic/admin</code></td><td>Clinic admin panel</td></tr>
+  <tr><td><code>/clinic/settings</code></td><td>Clinic configuration</td></tr>
+</table>
+
+<h3><span class="badge badge-patient">PATIENT</span> Patient Routes</h3>
+<table>
+  <tr><th>Route</th><th>Feature</th></tr>
+  <tr><td><code>/patient</code></td><td>Patient dashboard</td></tr>
+  <tr><td><code>/patient-dashboard</code></td><td>Patient dashboard (alternate)</td></tr>
+  <tr><td><code>/dashboard</code></td><td>Smart router (redirects by role)</td></tr>
+  <tr><td><code>/dashboard/*</code></td><td>Patient SPA sub-routes</td></tr>
+  <tr><td><code>/dashboard/subscription</code></td><td>Tier upgrade and management</td></tr>
+</table>
+
+<!-- 4. SUPER ADMIN FEATURES -->
+<h2 id="superadmin" class="page-break">4. Super Admin Features</h2>
+
+<div class="feature-grid">
+  <div class="feature-card no-break">
+    <div><span class="num">1</span><span class="title">Dashboard</span></div>
+    <div class="desc">System-wide analytics: active clinics, total patients, total reports, monthly revenue, system health, quick navigation to all sections.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">2</span><span class="title">Clinic Management</span></div>
+    <div class="desc">Create/edit/deactivate clinics, manage trial periods, approve new registrations, monitor usage and payment status, onboarding workflow.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">3</span><span class="title">Patient Reports</span></div>
+    <div class="desc">View all reports across all clinics, filter by clinic/date/status, download PDFs, manual upload, report approval workflow.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">4</span><span class="title">Payment History</span></div>
+    <div class="desc">Track all transactions, revenue breakdown by clinic, subscription tier monitoring, invoice management, payment status updates.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">5</span><span class="title">Analytics Dashboard</span></div>
+    <div class="desc">Real-time metrics, user growth trends, revenue analytics, clinic usage statistics, feature adoption, custom report generation.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">6</span><span class="title">Advanced Analytics</span></div>
+    <div class="desc">Deep-dive cohort analysis, retention metrics, churn analysis, custom dashboards, data export functionality.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">7</span><span class="title">Algorithm Processor</span></div>
+    <div class="desc">Process QEEG data through algorithms, manage configurations, view processing logs, validate results, bulk processing.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">8</span><span class="title">Coach Management</span></div>
+    <div class="desc">Create/manage coaches, assign to clinics, manage schedules, track performance, certification and specialization tracking.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">9</span><span class="title">Assessment Management</span></div>
+    <div class="desc">Create custom assessments, manage templates, track usage, view results, assessment analytics.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">10</span><span class="title">Alert System</span></div>
+    <div class="desc">Configure usage thresholds, email notification management, alert templates, alert history and logs.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">11</span><span class="title">Static Page CMS</span></div>
+    <div class="desc">Edit website pages, add/remove pages, manage content, SEO metadata, page versioning.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">12</span><span class="title">System Settings</span></div>
+    <div class="desc">Global configuration, email settings, payment gateway config, API key management, rate limiting.</div>
+  </div>
+</div>
+
+<!-- 5. CLINIC FEATURES -->
+<h2 id="clinic" class="page-break">5. Clinic Admin Features</h2>
+
+<div class="feature-grid">
+  <div class="feature-card no-break">
+    <div><span class="num">1</span><span class="title">Clinic Dashboard</span></div>
+    <div class="desc">Clinic-specific analytics, patient count, reports used vs. allowed, subscription status, recent activities, quick actions.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">2</span><span class="title">Patient Management</span></div>
+    <div class="desc">Add/edit patients, bulk import, search &amp; filter, medical history, improvement focus areas, contact details, external ID tracking.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">3</span><span class="title">Report Viewer</span></div>
+    <div class="desc">View clinic's reports, download as PDF/EDF, filter by patient/date, report analytics per patient, progress timeline view.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">4</span><span class="title">Subscription Manager</span></div>
+    <div class="desc">View current tier, purchase additional report packages (per-10 model), billing history, upgrade/downgrade, trial tracking.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">5</span><span class="title">Usage Analytics</span></div>
+    <div class="desc">Reports used vs. allowed, monthly trends, patient activity, report processing times, storage usage, cost per report.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">6</span><span class="title">Clinic Settings</span></div>
+    <div class="desc">Edit clinic info, manage contact details, upload logo, configure address, team members, API credentials.</div>
+  </div>
+</div>
+
+<!-- 6. PATIENT FEATURES -->
+<h2 id="patient">6. Patient Features</h2>
+
+<div class="feature-grid">
+  <div class="feature-card no-break">
+    <div><span class="num">1</span><span class="title">Patient Dashboard</span></div>
+    <div class="desc">Personal profile, brain assessment results, progress tracking, appointment booking, report downloads, recommended actions.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">2</span><span class="title">Brain Assessments</span></div>
+    <div class="desc">Brain Fitness Score, Brain Burnout Score, Brain Performance Score, Neuro Age Estimator, CogniFit Assessment, NeuroSense QEEG.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">3</span><span class="title">Progress Tracking</span></div>
+    <div class="desc">Historical data comparison, trend visualization, milestone achievements, weekly progress reports, goal tracking.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">4</span><span class="title">Wellness Programs</span></div>
+    <div class="desc">ANS Reset, MOVERS, Five Pillars, Frequencies &amp; Music, Meditations, Supplements, Brain Coach, Home Neurofeedback (tier-gated).</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">5</span><span class="title">Bookings</span></div>
+    <div class="desc">Schedule appointments, view available time slots, booking confirmations, reminders, cancellation/rescheduling.</div>
+  </div>
+  <div class="feature-card no-break">
+    <div><span class="num">6</span><span class="title">Subscription</span></div>
+    <div class="desc">View/upgrade tier, compare plans, manage payment methods, billing history, instant feature unlock on upgrade.</div>
+  </div>
+</div>
+
+<!-- 7. SUBSCRIPTION TIERS -->
+<h2 id="tiers" class="page-break">7. Subscription Tiers & Pricing</h2>
+
+<table class="tier-table">
+  <tr>
+    <th style="text-align:left">Feature</th>
+    <th>FREE</th>
+    <th>BASIC<br><small>&#8377;999</small></th>
+    <th>PRO<br><small>&#8377;1,999</small></th>
+    <th>PREMIUM<br><small>&#8377;3,499</small></th>
+    <th>ENTERPRISE<br><small>&#8377;5,999</small></th>
+  </tr>
+  <tr><td>Profile &amp; Brain Info</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+  <tr><td>Daily Inspiration</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+  <tr><td>ANS Reset Protocol</td><td class="cross">&mdash;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+  <tr><td>MOVERS Protocol</td><td class="cross">&mdash;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+  <tr><td>Five Pillars Framework</td><td class="cross">&mdash;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+  <tr><td>Frequencies &amp; Music</td><td class="cross">&mdash;</td><td class="cross">&mdash;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+  <tr><td>Meditations</td><td class="cross">&mdash;</td><td class="cross">&mdash;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+  <tr><td>Supplements &amp; Nootropics</td><td class="cross">&mdash;</td><td class="cross">&mdash;</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+  <tr><td>Brain Coach (1-on-1)</td><td class="cross">&mdash;</td><td class="cross">&mdash;</td><td class="cross">&mdash;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+  <tr><td>Home Neurofeedback</td><td class="cross">&mdash;</td><td class="cross">&mdash;</td><td class="cross">&mdash;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+  <tr><td>Assessments</td><td class="cross">&mdash;</td><td class="cross">&mdash;</td><td class="cross">&mdash;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+  <tr><td><strong>Reports Included</strong></td><td><strong>0</strong></td><td><strong>10</strong></td><td><strong>25</strong></td><td><strong>50</strong></td><td><strong>100+</strong></td></tr>
+</table>
+
+<h3>Multi-Currency Pricing</h3>
+<table>
+  <tr><th>Tier</th><th>USD</th><th>INR</th><th>EUR</th><th>GBP</th><th>AED</th></tr>
+  <tr><td>Basic</td><td>$9.99</td><td>&#8377;849</td><td>&euro;9.20</td><td>&pound;7.90</td><td>AED 36.70</td></tr>
+  <tr><td>Pro</td><td>$19.99</td><td>&#8377;1,699</td><td>&euro;18.39</td><td>&pound;15.79</td><td>AED 73.37</td></tr>
+  <tr><td>Premium</td><td>$34.99</td><td>&#8377;2,999</td><td>&euro;32.19</td><td>&pound;27.59</td><td>AED 128.31</td></tr>
+  <tr><td>Enterprise</td><td colspan="5" style="text-align:center;">Custom pricing</td></tr>
+</table>
+
+<!-- 8. USER FLOWS -->
+<h2 id="flows" class="page-break">8. User Flows</h2>
+
+<h3>Flow 1: Public Visitor &rarr; Patient</h3>
+<div class="flow-box">Landing Page  &rarr;  Click "Get Started"
+  &rarr;  Register (name, email, password, phone, address)
+  &rarr;  Email confirmation
+  &rarr;  Login  &rarr;  Patient Dashboard
+  &rarr;  Complete profile onboarding
+  &rarr;  Take initial brain assessments
+  &rarr;  View brain health scores
+  &rarr;  Access FREE tier content
+  &rarr;  Upgrade to BASIC/PRO/PREMIUM for more features</div>
+
+<h3>Flow 2: Public Visitor &rarr; Clinic Registration</h3>
+<div class="flow-box">Landing Page  &rarr;  Click "Clinic Login" / "Get Started"
+  &rarr;  Register as clinic (name, contact person, email, phone)
+  &rarr;  30-day trial starts (50 free reports)
+  &rarr;  Clinic Dashboard  &rarr;  Onboarding wizard
+  &rarr;  Add first patient
+  &rarr;  Upload QEEG PDFs (Eyes Open + Eyes Closed)
+  &rarr;  AI pipeline generates report (~8-10 min)
+  &rarr;  Patient gets notified, views report
+  &rarr;  Monitor usage  &rarr;  Purchase more reports when low</div>
+
+<h3>Flow 3: Patient Report Viewing</h3>
+<div class="flow-box">Patient Login  &rarr;  Dashboard
+  &rarr;  Notification: "New report available"
+  &rarr;  View generated PDF report
+  &rarr;  See brain wave analysis &amp; scores
+  &rarr;  Review personalized care plan
+  &rarr;  Track improvement metrics over time
+  &rarr;  Schedule follow-up appointment</div>
+
+<h3>Flow 4: Super Admin Daily Operations</h3>
+<div class="flow-box">Admin Login (superadmin@neuro360.com)
+  &rarr;  Dashboard: check system analytics
+  &rarr;  Review pending clinic registrations  &rarr;  Approve/reject
+  &rarr;  Monitor revenue in Payment History
+  &rarr;  Check report quality in Reports section
+  &rarr;  Review algorithm processing queue
+  &rarr;  Manage coach assignments
+  &rarr;  Update CMS content if needed
+  &rarr;  Review alerts for system issues</div>
+
+<h3>Flow 5: Payment / Subscription Upgrade</h3>
+<div class="flow-box">User hits usage limit or wants more features
+  &rarr;  Navigate to Subscription page
+  &rarr;  View current usage &amp; available packages
+  &rarr;  Select desired package/tier
+
+  IF location = India:
+    &rarr;  Razorpay checkout (INR, UPI, cards, wallets)
+  ELSE:
+    &rarr;  Stripe checkout (USD/EUR/GBP/AED + cards)
+
+  &rarr;  Payment processed
+  &rarr;  Instant quota increase / feature unlock
+  &rarr;  Confirmation email + invoice generated</div>
+
+<!-- 9. PIPELINE -->
+<h2 id="pipeline" class="page-break">9. QEEG Report Generation Pipeline</h2>
+
+<ol class="pipeline">
+  <li><strong>Upload Phase</strong><br>Clinic admin uploads Eyes Open PDF + Eyes Closed PDF. Files stored in temporary server location via Multer.</li>
+  <li><strong>Logo Modification</strong><br>Original EEG vendor logo removed from PDFs. NeuroSense branding applied. Modified PDFs re-saved with metadata preserved.</li>
+  <li><strong>Cloud Upload</strong><br>Both modified PDFs uploaded to Supabase <code>qeeg-uploads</code> storage bucket. Public access URLs generated for downstream processing.</li>
+  <li><strong>qEEG Pro Processing</strong><br>PDFs parsed to extract EEG data. Brain frequency bands calculated. Brain asymmetry analyzed. Coherence metrics computed. Standardized qEEG report generated.</li>
+  <li><strong>NeuroSense Algorithm Analysis</strong><br>Proprietary algorithms analyze brain wave patterns. Neurological risk assessment performed. Brain health scores calculated. Standardized report generated. Personalized care plan created.</li>
+  <li><strong>Gemini AI Report Generation</strong><br>Clinical insights synthesized from all data. Narrative report generated with recommendations. Care protocols personalized. Content formatted for PDF. NeuroSense branding applied.</li>
+  <li><strong>Report Finalization</strong><br>Final PDF stored in Supabase <code>neurosense-reports</code> bucket. Patient record updated with report link. Audit log entry created. Patient notification sent via email. Reports-used counter incremented for clinic.</li>
+</ol>
+
+<p style="margin-top: 16px; padding: 10px 16px; background: #e8f5e9; border-radius: 6px;"><strong>Estimated Total Processing Time:</strong> 8&ndash;10 minutes from upload to final report delivery.</p>
+
+<h3>PDF Report Structure (13 Modules)</h3>
+<table>
+  <tr><th>#</th><th>Module</th><th>Content</th></tr>
+  <tr><td>1</td><td>coverPage.js</td><td>Branded cover with patient info and date</td></tr>
+  <tr><td>2</td><td>introductionPage.js</td><td>Introduction to brain wellness assessment</td></tr>
+  <tr><td>3</td><td>brainTypePage.js</td><td>Brain type classification and description</td></tr>
+  <tr><td>4</td><td>brainwaveProfilesPage.js</td><td>Delta, Theta, Alpha, Beta, Gamma analysis</td></tr>
+  <tr><td>5</td><td>brainTopology.js</td><td>Brain region mapping and topology</td></tr>
+  <tr><td>6</td><td>brainMapComparisonPage.js</td><td>Before/after or norm comparison maps</td></tr>
+  <tr><td>7</td><td>cognitionPage.js</td><td>Cognitive function assessment</td></tr>
+  <tr><td>8</td><td>yourNumbersPage.js</td><td>Detailed numerical scores and metrics</td></tr>
+  <tr><td>9</td><td>numbersAtGlance.js</td><td>Summary scorecard view</td></tr>
+  <tr><td>10</td><td>metricsPages.js</td><td>Detailed metrics with graphs</td></tr>
+  <tr><td>11</td><td>congratulationsPage.js</td><td>Summary and next steps</td></tr>
+  <tr><td>12</td><td>appendix.js</td><td>Technical appendix and references</td></tr>
+  <tr><td>13</td><td>staticPages.js</td><td>Legal disclaimers and static info</td></tr>
+</table>
+
+<!-- 10. PAYMENTS -->
+<h2 id="payments" class="page-break">10. Payment & Subscription Flow</h2>
+
+<h3>Clinic Subscription Model</h3>
+<ol>
+  <li><strong>Registration:</strong> 30-day trial period with 50 free reports, no payment required</li>
+  <li><strong>Trial Warnings:</strong> Email alerts at 7 days, 3 days, and 1 day before expiration</li>
+  <li><strong>Purchase:</strong> Choose package (10 / 25 / 50 / 100 reports) with volume discounts</li>
+  <li><strong>Payment:</strong> India &rarr; Razorpay (INR, UPI, cards) | International &rarr; Stripe (multi-currency)</li>
+  <li><strong>Activation:</strong> Instant quota increase, confirmation email, invoice generated</li>
+</ol>
+
+<h3>Patient Subscription Model</h3>
+<ol>
+  <li><strong>Free Tier:</strong> Basic brain info, profile, limited assessments, 0 reports</li>
+  <li><strong>Upgrade:</strong> Click "Upgrade" in dashboard, see tier comparison</li>
+  <li><strong>Payment:</strong> Currency auto-detected by location, Stripe or Razorpay</li>
+  <li><strong>Activation:</strong> Features unlock instantly, confirmation email sent</li>
+</ol>
+
+<h3>Supported Payment Methods</h3>
+<table>
+  <tr><th>Gateway</th><th>Region</th><th>Methods</th><th>Currencies</th></tr>
+  <tr><td><strong>Razorpay</strong></td><td>India</td><td>Credit/Debit Cards, UPI, Net Banking, Wallets</td><td>INR</td></tr>
+  <tr><td><strong>Stripe</strong></td><td>International</td><td>Credit/Debit Cards, Apple Pay, Google Pay</td><td>USD, EUR, GBP, AED, AUD, CAD, SGD</td></tr>
+</table>
+
+<!-- 11. INTEGRATIONS -->
+<h2 id="integrations">11. Integrations & External Services</h2>
+
+<table>
+  <tr><th>Service</th><th>Purpose</th><th>Usage</th></tr>
+  <tr><td><strong>Supabase</strong></td><td>Database, Auth, Storage</td><td>PostgreSQL for all data, Auth for user management, 3 storage buckets (neurosense-reports, clinic-logos, qeeg-uploads)</td></tr>
+  <tr><td><strong>Google Gemini AI</strong></td><td>Report Generation</td><td>PDF report content, care plan synthesis, personalized recommendations. Models: gemini-3-pro, flash, pro</td></tr>
+  <tr><td><strong>OpenAI</strong></td><td>Backup AI</td><td>Fallback for report generation when Gemini is unavailable</td></tr>
+  <tr><td><strong>Stripe</strong></td><td>International Payments</td><td>Subscription checkout, one-time purchases, 8 currencies, invoices</td></tr>
+  <tr><td><strong>Razorpay</strong></td><td>Indian Payments</td><td>INR transactions, UPI, subscription management, payment links</td></tr>
+  <tr><td><strong>qEEG Pro</strong></td><td>EEG Processing</td><td>EDF file processing, brain wave analysis, quantitative EEG computation</td></tr>
+  <tr><td><strong>NeuroSense Cloud</strong></td><td>Algorithm Processing</td><td>Proprietary brain wave algorithms, risk assessment, care plan generation</td></tr>
+  <tr><td><strong>Gmail SMTP</strong></td><td>Email</td><td>Transactional emails, notifications, payment confirmations, appointment reminders</td></tr>
+  <tr><td><strong>Google Maps</strong></td><td>Location</td><td>Clinic location detection, address geocoding, map display</td></tr>
+</table>
+
+<!-- 12. DATABASE -->
+<h2 id="database" class="page-break">12. Database Schema</h2>
+
+<table>
+  <tr><th>Table</th><th>Purpose</th><th>Key Fields</th></tr>
+  <tr><td><code>clinics</code></td><td>Clinic information</td><td>name, email, phone, address, is_active, trial_end_date, reports_allowed</td></tr>
+  <tr><td><code>patients</code></td><td>Patient records</td><td>name, email, phone, dob, gender, clinic_id, external_id, medical_history</td></tr>
+  <tr><td><code>profiles</code></td><td>User profiles (auth)</td><td>user_id, role, clinic_id, display_name</td></tr>
+  <tr><td><code>reports</code></td><td>Report metadata</td><td>patient_id, clinic_id, pdf_url, status, created_at, type</td></tr>
+  <tr><td><code>appointments</code></td><td>Booking data</td><td>patient_id, clinic_id, date, time_slot, status, type</td></tr>
+  <tr><td><code>subscriptions</code></td><td>Subscription tracking</td><td>user_id, tier, status, start_date, end_date, payment_method</td></tr>
+  <tr><td><code>payment_history</code></td><td>Transaction records</td><td>user_id, amount, currency, gateway, status, invoice_id</td></tr>
+  <tr><td><code>coaches</code></td><td>Coach information</td><td>name, specialization, clinic_ids, schedule, certification</td></tr>
+  <tr><td><code>algorithm_results</code></td><td>QEEG processing results</td><td>patient_id, report_id, scores, brain_type, metrics</td></tr>
+  <tr><td><code>access_logs</code></td><td>Feature access tracking</td><td>user_id, feature, timestamp, ip_address</td></tr>
+  <tr><td><code>clinical_forms</code></td><td>Assessment form data</td><td>patient_id, form_type, responses, score, completed_at</td></tr>
+</table>
+
+<h3>Supabase Storage Buckets</h3>
+<table>
+  <tr><th>Bucket</th><th>Purpose</th><th>Access</th></tr>
+  <tr><td><code>neurosense-reports</code></td><td>Final generated PDF reports for patients</td><td>Authenticated (RLS)</td></tr>
+  <tr><td><code>clinic-logos</code></td><td>Clinic branding and logo images</td><td>Public</td></tr>
+  <tr><td><code>qeeg-uploads</code></td><td>Raw QEEG/EDF files uploaded by clinics</td><td>Authenticated (RLS)</td></tr>
+</table>
+
+<!-- 13. LANDING PAGE -->
+<h2 id="landing" class="page-break">13. Landing Page Sections (18 Total)</h2>
+
+<table>
+  <tr><th>#</th><th>Section</th><th>Description</th></tr>
+  <tr><td>1</td><td>Announcement Bar</td><td>Limited-time promotional offers</td></tr>
+  <tr><td>2</td><td>Scroll Progress</td><td>Visual progress indicator while scrolling</td></tr>
+  <tr><td>3</td><td>Navigation Bar</td><td>Fixed top menu with CTAs</td></tr>
+  <tr><td>4</td><td>Hero Section</td><td>Bold headline, social proof stats, primary CTAs</td></tr>
+  <tr><td>5</td><td>How It Works</td><td>4-step process visualization</td></tr>
+  <tr><td>6</td><td>Stats Section</td><td>7 animated statistics counters</td></tr>
+  <tr><td>7</td><td>Benefits</td><td>6 use-case cards (stress, sleep, focus, ADHD, etc.)</td></tr>
+  <tr><td>8</td><td>Press &amp; Media</td><td>6 publication logos and mentions</td></tr>
+  <tr><td>9</td><td>Testimonials</td><td>3 customer stories with photos</td></tr>
+  <tr><td>10</td><td>Trust Badges</td><td>Partner hospitals and certifications</td></tr>
+  <tr><td>11</td><td>What's Included</td><td>Feature breakdown by tier</td></tr>
+  <tr><td>12</td><td>Comparison Table</td><td>NeuroSense vs. Medication vs. Therapy</td></tr>
+  <tr><td>13</td><td>Expert Team</td><td>Team member profiles and credentials</td></tr>
+  <tr><td>14</td><td>Results Timeline</td><td>5-phase improvement journey</td></tr>
+  <tr><td>15</td><td>Pricing</td><td>Subscription tier cards</td></tr>
+  <tr><td>16</td><td>FAQ Accordion</td><td>8 commonly asked questions</td></tr>
+  <tr><td>17</td><td>Final CTA</td><td>Strong closing call-to-action</td></tr>
+  <tr><td>18</td><td>Footer</td><td>Links, newsletter signup, social media</td></tr>
+</table>
+
+<!-- 14. SECURITY -->
+<h2 id="security">14. Security & Compliance</h2>
+
+<table>
+  <tr><th>Area</th><th>Implementation</th></tr>
+  <tr><td><strong>Authentication</strong></td><td>Password hashing with bcryptjs, JWT tokens, session cookies, Supabase Auth</td></tr>
+  <tr><td><strong>Authorization</strong></td><td>Role-based access control (RBAC): super_admin, clinic_admin, patient. ProtectedRoute component enforces access.</td></tr>
+  <tr><td><strong>Data Protection</strong></td><td>Supabase Row Level Security (RLS), HTTPS encryption, secure password recovery flow</td></tr>
+  <tr><td><strong>Audit Trail</strong></td><td>Access logs for sensitive data, report download tracking, payment transaction logging, admin action logging</td></tr>
+  <tr><td><strong>Email Security</strong></td><td>Email verification before account activation, Gmail App Passwords (not plain passwords)</td></tr>
+  <tr><td><strong>Compliance</strong></td><td>HIPAA considerations (medical data), GDPR data handling, privacy policy page, terms of service</td></tr>
+</table>
+
+<!-- FOOTER -->
+<div class="doc-footer page-break-avoid">
+  <p><strong>NeuroSense360</strong> &mdash; Limitless Brain Lab</p>
+  <p>Document Version 2.0 | Generated March 2026</p>
+  <p>https://www.neurosense360.site</p>
+</div>
+
+</div>
+</body>
+</html>

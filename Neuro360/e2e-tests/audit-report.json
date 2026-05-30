@@ -1,0 +1,86 @@
+{
+  "issues": [
+    {
+      "url": "http://localhost:5173",
+      "issue": "Broken images (8): http://localhost:5173/ridheema.jpg, http://localhost:5173/komal.jpg, http://localhost:5173/shilpa.jpg",
+      "severity": "Medium"
+    },
+    {
+      "url": "http://localhost:5173",
+      "issue": "No contact link/form found on landing page",
+      "severity": "Low"
+    },
+    {
+      "url": "http://localhost:5173",
+      "issue": "Console errors: Warning: Received `%s` for a non-boolean attribute `%s`.\n\nIf you want to write it to the DOM, pass a string instead: %s=\"%s\" or %s={value.toString()}.%s true jsx jsx true jsx \n    at style\n    at div\n    at Landing (http://localhost:5173/src/pages/Landing.jsx:30:20)\n    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:4130:5)\n    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:4600:5)\n    at Suspense\n    at div\n    at LocationsPopupProvider (http://localhost:5173/src/context/LocationsPopupContext.jsx:30:42)\n    at ProgramFormProvider (http://localhost:5173/src/context/ProgramFormContext.jsx:30:39)\n    at ProfessionalFormProvider (http://localhost:5173/src/context/ProfessionalFormContext.jsx:30:44)\n    at ContactFormProvider (http://localhost:5173/src/context/ContactFormContext.jsx:30:39)\n    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:4543:15)\n    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:5289:5)\n    at AuthProvider (http://localhost:5173/src/contexts/AuthContext.jsx:43:32)\n    at ThemeProvider (http://localhost:5173/src/contexts/ThemeContext.jsx:29:33)\n    at ErrorBoundary (http://localhost:5173/src/components/ErrorBoundary.jsx:8:5)\n    at App (http://localhost:5173/src/App.jsx:121:3)",
+      "severity": "High"
+    },
+    {
+      "url": "http://localhost:5173/login",
+      "issue": "Console errors: Failed to load resource: the server responded with a status of 400 () | ALERT: Login error: Invalid email or password | ALERT: AuthContext: Login failed: Error: Invalid email or password\n    at Object.loginWithEmail (http://localhost:5173/src/services/authService.js:249:15)\n    at async login (http://localhost:5173/src/contexts/AuthContext.jsx:169:22)\n    at async onSubmit (http://localhost:5173/src/components/auth/LoginForm.jsx:65:22)\n    at async http://localhost:5173/node_modules/.vite/deps/react-hook-form.js?v=f34a0765:1506:9",
+      "severity": "High"
+    },
+    {
+      "url": "http://localhost:5173/contact",
+      "issue": "No form found on contact page",
+      "severity": "High"
+    },
+    {
+      "url": "http://localhost:5173/clinic",
+      "issue": "Clinic dashboard redirects to login — not accessible without credentials",
+      "severity": "Medium"
+    },
+    {
+      "url": "http://localhost:5173/patient",
+      "issue": "Patient dashboard redirects to login — not accessible without credentials",
+      "severity": "Medium"
+    },
+    {
+      "url": "http://localhost:5173/about",
+      "issue": "Broken images (8): http://localhost:5173/ridheema.jpg, http://localhost:5173/komal.jpg, http://localhost:5173/shilpa.jpg",
+      "severity": "Medium"
+    },
+    {
+      "url": "http://localhost:5173/about",
+      "issue": "Console/page errors: Warning: Received `%s` for a non-boolean attribute `%s`.\n\nIf you want to write it to the DOM, pass a string instead: %s=\"%s\" or %s={value.toString()}.%s true jsx jsx true jsx \n    at style\n    at div\n    at Landing (http://localhost:5173/src/pages/Landing.jsx:30:20)\n    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:4130:5)\n    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:4600:5)\n    at Suspense\n    at div\n    at LocationsPopupProvider (http://localhost:5173/src/context/LocationsPopupContext.jsx:30:42)\n    at ProgramFormProvider (http://localhost:5173/src/context/ProgramFormContext.jsx:30:39)\n    at ProfessionalFormProvider (http://localhost:5173/src/context/ProfessionalFormContext.jsx:30:44)\n    at ContactFormProvider (http://localhost:5173/src/context/ContactFormContext.jsx:30:39)\n    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:4543:15)\n    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:5289:5)\n    at AuthProvider (http://localhost:5173/src/contexts/AuthContext.jsx:43:32)\n    at ThemeProvider (http://localhost:5173/src/contexts/ThemeContext.jsx:29:33)\n    at ErrorBoundary (http://localhost:5173/src/components/ErrorBoundary.jsx:8:5)\n    at App (http://localhost:5173/src/App.jsx:121:3)",
+      "severity": "High"
+    },
+    {
+      "url": "http://localhost:5173/science",
+      "issue": "Broken images (1): http://localhost:5173/brain-temporal.png",
+      "severity": "Medium"
+    },
+    {
+      "url": "http://localhost:5173/brain-coach",
+      "issue": "Broken images (8): http://localhost:5173/ridheema.jpg, http://localhost:5173/komal.jpg, http://localhost:5173/shilpa.jpg",
+      "severity": "Medium"
+    },
+    {
+      "url": "http://localhost:5173/brain-coach",
+      "issue": "Console/page errors: Warning: Received `%s` for a non-boolean attribute `%s`.\n\nIf you want to write it to the DOM, pass a string instead: %s=\"%s\" or %s={value.toString()}.%s true jsx jsx true jsx \n    at style\n    at div\n    at Landing (http://localhost:5173/src/pages/Landing.jsx:30:20)\n    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:4130:5)\n    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:4600:5)\n    at Suspense\n    at div\n    at LocationsPopupProvider (http://localhost:5173/src/context/LocationsPopupContext.jsx:30:42)\n    at ProgramFormProvider (http://localhost:5173/src/context/ProgramFormContext.jsx:30:39)\n    at ProfessionalFormProvider (http://localhost:5173/src/context/ProfessionalFormContext.jsx:30:44)\n    at ContactFormProvider (http://localhost:5173/src/context/ContactFormContext.jsx:30:39)\n    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:4543:15)\n    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:5289:5)\n    at AuthProvider (http://localhost:5173/src/contexts/AuthContext.jsx:43:32)\n    at ThemeProvider (http://localhost:5173/src/contexts/ThemeContext.jsx:29:33)\n    at ErrorBoundary (http://localhost:5173/src/components/ErrorBoundary.jsx:8:5)\n    at App (http://localhost:5173/src/App.jsx:121:3)",
+      "severity": "High"
+    },
+    {
+      "url": "http://localhost:5173/supplements-nootropics",
+      "issue": "Broken images (8): http://localhost:5173/ridheema.jpg, http://localhost:5173/komal.jpg, http://localhost:5173/shilpa.jpg",
+      "severity": "Medium"
+    },
+    {
+      "url": "http://localhost:5173/supplements-nootropics",
+      "issue": "Console/page errors: Warning: Received `%s` for a non-boolean attribute `%s`.\n\nIf you want to write it to the DOM, pass a string instead: %s=\"%s\" or %s={value.toString()}.%s true jsx jsx true jsx \n    at style\n    at div\n    at Landing (http://localhost:5173/src/pages/Landing.jsx:30:20)\n    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:4130:5)\n    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:4600:5)\n    at Suspense\n    at div\n    at LocationsPopupProvider (http://localhost:5173/src/context/LocationsPopupContext.jsx:30:42)\n    at ProgramFormProvider (http://localhost:5173/src/context/ProgramFormContext.jsx:30:39)\n    at ProfessionalFormProvider (http://localhost:5173/src/context/ProfessionalFormContext.jsx:30:44)\n    at ContactFormProvider (http://localhost:5173/src/context/ContactFormContext.jsx:30:39)\n    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:4543:15)\n    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:5289:5)\n    at AuthProvider (http://localhost:5173/src/contexts/AuthContext.jsx:43:32)\n    at ThemeProvider (http://localhost:5173/src/contexts/ThemeContext.jsx:29:33)\n    at ErrorBoundary (http://localhost:5173/src/components/ErrorBoundary.jsx:8:5)\n    at App (http://localhost:5173/src/App.jsx:121:3)",
+      "severity": "High"
+    },
+    {
+      "url": "http://localhost:5173/five-pillars",
+      "issue": "Broken images (8): http://localhost:5173/ridheema.jpg, http://localhost:5173/komal.jpg, http://localhost:5173/shilpa.jpg",
+      "severity": "Medium"
+    },
+    {
+      "url": "http://localhost:5173/five-pillars",
+      "issue": "Console/page errors: Warning: Received `%s` for a non-boolean attribute `%s`.\n\nIf you want to write it to the DOM, pass a string instead: %s=\"%s\" or %s={value.toString()}.%s true jsx jsx true jsx \n    at style\n    at div\n    at Landing (http://localhost:5173/src/pages/Landing.jsx:30:20)\n    at RenderedRoute (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:4130:5)\n    at Routes (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:4600:5)\n    at Suspense\n    at div\n    at LocationsPopupProvider (http://localhost:5173/src/context/LocationsPopupContext.jsx:30:42)\n    at ProgramFormProvider (http://localhost:5173/src/context/ProgramFormContext.jsx:30:39)\n    at ProfessionalFormProvider (http://localhost:5173/src/context/ProfessionalFormContext.jsx:30:44)\n    at ContactFormProvider (http://localhost:5173/src/context/ContactFormContext.jsx:30:39)\n    at Router (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:4543:15)\n    at BrowserRouter (http://localhost:5173/node_modules/.vite/deps/react-router-dom.js?v=f34a0765:5289:5)\n    at AuthProvider (http://localhost:5173/src/contexts/AuthContext.jsx:43:32)\n    at ThemeProvider (http://localhost:5173/src/contexts/ThemeContext.jsx:29:33)\n    at ErrorBoundary (http://localhost:5173/src/components/ErrorBoundary.jsx:8:5)\n    at App (http://localhost:5173/src/App.jsx:121:3)",
+      "severity": "High"
+    }
+  ],
+  "screenshotDir": "/Users/murali/Documents/neuro/Neuro360/e2e-tests/screenshots",
+  "totalIssues": 16
+}

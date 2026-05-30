@@ -16,6 +16,12 @@ const getFreshToken = async () => {
   return localStorage.getItem('authToken') || localStorage.getItem('access_token');
 };
 
+const parseResultsData = (data) => {
+  if (Array.isArray(data)) return data;
+  if (typeof data === 'string') { try { return JSON.parse(data); } catch { return []; } }
+  return [];
+};
+
 const AlgorithmDataProcessor = () => {
   const [patients, setPatients] = useState([]);
   const [clinics, setClinics] = useState([]);
@@ -926,7 +932,7 @@ const AlgorithmDataProcessor = () => {
     try {
 
       // Get saved results from the record
-      const savedResults = record.outputData || record.results;
+      const savedResults = parseResultsData(record.outputData || record.results);
       if (!savedResults || savedResults.length === 0) {
         throw new Error('No results found in this record');
       }
@@ -3071,7 +3077,7 @@ const AlgorithmDataProcessor = () => {
 
                     {/* Quick Summary of Results */}
                     {(() => {
-                      const savedResults = record.outputData || record.results;
+                      const savedResults = parseResultsData(record.outputData || record.results);
                       return savedResults && savedResults.length > 0 && (
                         <div className="mt-3 grid grid-cols-2 gap-2">
                           {savedResults.slice(0, 4).map((result, idx) => (
@@ -3091,7 +3097,7 @@ const AlgorithmDataProcessor = () => {
                     <button
                       onClick={() => {
                         // Handle both old format (results) and new format (outputData)
-                        const savedResults = record.outputData || record.results;
+                        const savedResults = parseResultsData(record.outputData || record.results);
                         if (savedResults) {
                           setResults(savedResults);
                           setProcessingComplete(true);
@@ -3122,7 +3128,7 @@ const AlgorithmDataProcessor = () => {
                     {/* Download PDF Button - Always visible - Regenerates PDF with saved notes */}
                     <button
                       onClick={async () => {
-                        const savedResults = record.outputData || record.results;
+                        const savedResults = parseResultsData(record.outputData || record.results);
                         if (!savedResults || savedResults.length === 0) {
                           toast.error('No results available for this record');
                           return;
@@ -3139,7 +3145,7 @@ const AlgorithmDataProcessor = () => {
 
                           // Regenerate PDF with saved notes from database
                           // Backend now sends PDF directly, no URL needed
-                          const savedResults = record.outputData || record.results;
+                          const savedResults = parseResultsData(record.outputData || record.results);
                           if (!savedResults || savedResults.length === 0) {
                             throw new Error('No results available for this record');
                           }
@@ -3354,7 +3360,7 @@ const AlgorithmDataProcessor = () => {
 
                 {/* Expandable Details */}
                 {(() => {
-                  const savedResults = record.outputData || record.results;
+                  const savedResults = parseResultsData(record.outputData || record.results);
                   return savedResults && savedResults.length > 4 && (
                     <div className="mt-2 grid grid-cols-3 gap-2">
                       {savedResults.slice(4).map((result, idx) => (

@@ -1377,7 +1377,7 @@ const PatientDashboard = () => {
         icon: iconMap[param.icon] || Lightbulb
       }))
     },
-    { id: 'neurosense-reports', label: 'Neurosense Reports', icon: Download },
+    { id: 'neurosense-reports', label: 'Neurosense Performance Reports', icon: Download },
     { id: 'care-program', label: 'Customized Care Program', icon: ClipboardList },
     { id: 'ans-reset', label: 'Breath Reset Protocol', icon: RefreshCw },
     { id: 'movers', label: 'MOVERS', icon: Activity },
@@ -2115,7 +2115,7 @@ const PatientDashboard = () => {
                     <Activity className="h-3 w-3" /> Brain Parameters
                   </span>
                   <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full">
-                    <FileText className="h-3 w-3" /> NeuroSense Report
+                    <FileText className="h-3 w-3" /> Neurosense Performance Report
                   </span>
                   <span className="inline-flex items-center gap-1 text-xs bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full">
                     <ClipboardList className="h-3 w-3" /> Care Program
@@ -3396,7 +3396,7 @@ const PatientDashboard = () => {
             <div className="p-1.5 sm:p-2 bg-[#E4EFFF] dark:bg-blue-900/30 rounded-lg">
               <Brain className="h-5 w-5 sm:h-6 sm:w-6 text-[#323956] dark:text-blue-400" />
             </div>
-            <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">NeuroSense Reports</h2>
+            <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">Neurosense Performance Reports</h2>
           </div>
 
         <div className="grid gap-3 sm:gap-4">
@@ -3459,7 +3459,7 @@ const PatientDashboard = () => {
                     <div className="mb-1">
                       <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Test Name</p>
                       <h3 className="font-semibold text-sm sm:text-base text-blue-600 dark:text-blue-400 truncate">
-                        Clinical NeuroSense QEEG Report
+                        Neurosense Performance Report
                       </h3>
                     </div>
                     <div>
@@ -9553,7 +9553,7 @@ const PatientDashboard = () => {
                 <Download className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               </div>
               <div className="min-w-0">
-                <h2 className="text-sm sm:text-xl font-bold leading-tight">Download NeuroSense & Other Reports</h2>
+                <h2 className="text-sm sm:text-xl font-bold leading-tight">Download Neurosense Performance & Other Reports</h2>
                 <p className="text-xs sm:text-sm text-white/70 mt-1">Access your brain assessment reports</p>
               </div>
             </div>
@@ -9563,7 +9563,7 @@ const PatientDashboard = () => {
               <Shield className="h-8 w-8 sm:h-10 sm:w-10 text-amber-500 dark:text-amber-400" />
               <div>
                 <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Complete Your Profile First</p>
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Please complete your profile to access and download your NeuroSense reports.</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Please complete your profile to access and download your Neurosense Performance Reports.</p>
               </div>
               <button
                 onClick={() => navigate('/dashboard/profile')}
@@ -9623,7 +9623,7 @@ const PatientDashboard = () => {
             <div className="space-y-3">
               {displayedReports.map((report) => {
                 const reportData = report.reportData || report.report_data || {};
-                const title = reportData.title || report.fileName || report.file_name || 'NeuroSense Report';
+                const title = reportData.title || report.fileName || report.file_name || 'Neurosense Performance Report';
                 const reportType = reportData.reportType || 'Report';
                 const createdAt = report.createdAt || report.created_at;
                 const isResponse = reportData.isResponseReport;
@@ -9697,7 +9697,7 @@ const PatientDashboard = () => {
             <div className="text-center py-6 sm:py-8">
               <FileText className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3 text-gray-300 dark:text-gray-600" />
               <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No Reports Available Yet</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Your NeuroSense reports will appear here once shared by your clinic.</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Your Neurosense Performance Reports will appear here once shared by your clinic.</p>
             </div>
           )}
         </div>
@@ -9842,7 +9842,7 @@ const PatientDashboard = () => {
                 </div>
                 <div>
                   <p className="text-gray-700 dark:text-gray-300 text-sm">
-                    Your <span className="font-semibold text-amber-600">NeuroSense Brain Scan Report</span> has not been generated yet.
+                    Your <span className="font-semibold text-amber-600">Neurosense Performance Report</span> has not been generated yet.
                   </p>
                   <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">
                     Please complete your brain scan or contact your clinic to access this feature.
@@ -9860,7 +9860,7 @@ const PatientDashboard = () => {
                   </li>
                   <li className="flex items-center text-xs text-gray-600 dark:text-gray-400">
                     <CheckCircle className="w-3.5 h-3.5 text-green-500 mr-2 flex-shrink-0" />
-                    <span>Detailed NeuroSense report download</span>
+                    <span>Detailed Neurosense Performance Report download</span>
                   </li>
                   <li className="flex items-center text-xs text-gray-600 dark:text-gray-400">
                     <CheckCircle className="w-3.5 h-3.5 text-green-500 mr-2 flex-shrink-0" />

@@ -215,7 +215,7 @@ function renderReportHtml(reportData, narrative = {}) {
     <div class="logo-sm" style="color:#fff;font-size:16px;">◉ NeuroSense<div style="font-size:10px;letter-spacing:3px;opacity:.7;font-weight:500;">SMART EEG INTELLIGENCE</div></div>
     <div style="margin-top:120px;">
       <div class="eyebrow" style="color:#9ec2f0;">Personalized Neuro-Profile</div>
-      <h1>Your Brain<br>Type &amp; Performance<br>Report</h1>
+      <h1>Neurosense Performance Report</h1>
       <p class="lead" style="color:#cfe0f7;">A complete map of your brainwave activity, cognitive performance, and dominant brain type — built from 19-channel qEEG analysis and the NeuroSense five-type framework.</p>
     </div>
     <div class="info-cards">

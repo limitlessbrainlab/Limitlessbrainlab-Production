@@ -2349,8 +2349,8 @@ const AlgorithmDataProcessor = () => {
                   className="mt-1 h-4 w-4 text-primary focus:ring-primary border-gray-300 dark:border-gray-600"
                 />
                 <span>
-                  <span className="block text-sm font-medium text-gray-900 dark:text-white">Neuro Performance Report</span>
-                  <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">Only the Claude report is sent to the patient and the clinic. The SA can view both the Neurosense and Claude reports.</span>
+                  <span className="block text-sm font-medium text-gray-900 dark:text-white">Neurosense Performance Report</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">Only the Neurosense Performance Report is sent to the patient and the clinic. The SA can view both the NeuroSense and Neurosense Performance reports.</span>
                 </span>
               </label>
             </div>
@@ -2847,7 +2847,7 @@ const AlgorithmDataProcessor = () => {
                   title={!isSaved ? 'Please save results first' : pdfUrl ? 'Download PDF report' : 'Generate and download PDF report'}
                 >
                   <Download className="h-5 w-5" />
-                  <span>{pdfUrl ? 'Neurosense Clinical Report' : 'Generate PDF Report'}</span>
+                  <span>{pdfUrl ? 'Neurosense Performance Report' : 'Generate PDF Report'}</span>
                 </button>
 
                 {/* Post-generation action buttons — mode-aware. NeuroSense mode sends

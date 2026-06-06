@@ -6828,6 +6828,51 @@ app.post('/api/send-partner-rejection', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════
+// ADMIN NOTIFICATION SEND — used by ClinicManagement.jsx
+// ═══════════════════════════════════════════════════════
+app.post('/api/notifications/send', async (req, res) => {
+  try {
+    const { to, clinicName, message, type } = req.body;
+
+    if (!to || !message) {
+      return res.status(400).json({ success: false, message: 'Recipient email and message are required' });
+    }
+
+    if (!emailTransporter) {
+      return res.status(500).json({ success: false, message: 'Email service not configured' });
+    }
+
+    const mailOptions = {
+      from: EMAIL_FROM,
+      to,
+      subject: `Notification from Limitless Brain Lab${clinicName ? ` — ${clinicName}` : ''}`,
+      attachments: getLogoAttachment(),
+      html: `
+        <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+          <div style="background:linear-gradient(135deg,#323956 0%,#1a1f36 100%);padding:24px 32px;text-align:center;">
+            <img src="cid:company-logo" alt="Limitless Brain Lab" style="width:70px;height:70px;border-radius:50%;object-fit:cover;" />
+            <h1 style="color:#ffffff;margin:12px 0 0;font-size:20px;">Limitless Brain Lab</h1>
+          </div>
+          <div style="padding:28px 32px;">
+            <p style="color:#333;font-size:15px;line-height:1.7;">${message.replace(/\n/g, '<br>')}</p>
+          </div>
+          <div style="background:#f8fafc;padding:16px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+            <p style="margin:0;color:#94a3b8;font-size:11px;">© ${new Date().getFullYear()} Limitless Brain Lab</p>
+          </div>
+        </div>
+      `
+    };
+
+    await emailTransporter.sendMail(mailOptions);
+    console.log(`✉️ Admin notification sent to ${to}`);
+    res.json({ success: true, message: 'Notification sent' });
+  } catch (error) {
+    console.error('❌ Error sending notification:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ===== ERROR HANDLING (Must be after all routes) =====
 setupErrorHandling(app);
 

@@ -2605,9 +2605,13 @@ const ClinicDetails = ({ clinic, onBack, navigate }) => {
                   setSendingNotification(true);
                   try {
                     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                    const { data: notifSession } = await supabase.auth.getSession();
+                    const notifToken = notifSession?.session?.access_token;
+                    const notifHeaders = { 'Content-Type': 'application/json' };
+                    if (notifToken) notifHeaders['Authorization'] = `Bearer ${notifToken}`;
                     await fetch(`${API_URL}/notifications/send`, {
                       method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
+                      headers: notifHeaders,
                       body: JSON.stringify({
                         to: clinic.email,
                         clinicId: clinic.id,

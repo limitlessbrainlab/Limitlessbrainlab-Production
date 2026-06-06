@@ -231,7 +231,7 @@ const AddPatientForm = () => {
       if (!isDefaultClinic && reportsRemaining <= 0) {
         toast.error('You have no report credits remaining. Please purchase a package to continue adding patients.');
         // Send no-credit email notification
-        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://neuro360-backend.onrender.com';
+        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://limitlessbrainlab-backend.onrender.com';
         fetch(`${BACKEND_URL}/api/send-no-credit-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

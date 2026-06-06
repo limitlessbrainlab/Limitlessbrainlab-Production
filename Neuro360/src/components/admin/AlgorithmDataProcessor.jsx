@@ -547,7 +547,7 @@ const AlgorithmDataProcessor = () => {
       // Call backend API with timeout.
       // IMPORTANT: Use VITE_DIRECT_BACKEND_URL for this long-running call to bypass the
       // Vercel proxy (Hobby plan has a 30s hard timeout on rewrites to external URLs).
-      // VITE_DIRECT_BACKEND_URL = https://neuro360-backend.onrender.com  (set on Vercel)
+      // VITE_DIRECT_BACKEND_URL = https://limitlessbrainlab-backend.onrender.com  (set on Vercel)
       const proxyApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
       const directBackendUrl = import.meta.env.VITE_DIRECT_BACKEND_URL;
       const apiUrl = directBackendUrl ? `${directBackendUrl}/api` : proxyApiUrl;

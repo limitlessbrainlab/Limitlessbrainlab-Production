@@ -94,6 +94,68 @@ async function generateClaudeReportFromPdf(filePath, opts = {}) {
  * Claude writes ONLY prose — it must echo every number exactly as given and never
  * recompute or invent values.
  */
+
+// Verbatim prose excerpts from Sagar Ahiwale's real report — used as the hardcoded style reference.
+// Claude matches this style/tone/structure; it does NOT copy these numbers for new patients.
+const SAGAR_TEMPLATE_EXAMPLE = `PATIENT: Sagar Ahiwale | Brain Type: Cautious (Type 5) | Date: 17 Mar 2026
+
+snapshotSummary: "A quick view of where you stand right now. Your stress regulation is exceptional and your cognitive engine runs strong, but your nervous system is sitting on a high arousal baseline — the signature of a driven, vigilant brain that doesn't fully switch off."
+
+topStrength:
+  title: "Excellent stress regulation"
+  points:
+    - "Your brain activates and deactivates the stress response cleanly — pressure does not break you."
+    - "Healthy alpha peak frequency (11.6 Hz) supports clear thinking and learning."
+
+watchZone:
+  title: "Low recovery capacity"
+  points:
+    - "Low recovery capacity (Regeneration 20%). Your brain runs hot but doesn't fully cool down at rest."
+    - "Right-shifted frontal alpha asymmetry suggests overthinking and worry tendency."
+
+brainTypeReason:
+  - "Right-shifted frontal alpha asymmetry (-9.97) — associated with stress vigilance, emotional monitoring, and 'what could go wrong' thinking. A core marker of the Cautious type."
+  - "High arousal score (2.24) with low relaxation (2.47) — the nervous system is on, even at rest. Strongly correlates with Cautious-type SPECT findings of overactive basal ganglia and amygdala."
+  - "Excellent stress regulation (100%) with elevated beta — you don't crumble under pressure; you channel it. This is the Persistent overlay: driven, thorough, follows through."
+  - "Healthy cognition and alpha peak — rules out a low-PFC pattern (Type 2 / Spontaneous)."
+
+brainwaveIntro: "Your brain produces five distinct rhythms simultaneously, each tied to a different mental state. The mix tells us what kind of brain you have. Below is your relative power across the spectrum, recorded in the eyes-closed condition."
+
+brainwaveCards:
+  - title: "Strong, healthy alpha peak (11.6 Hz)"
+    body: "Your alpha rhythm peaks where it should — in the upper-alpha range. This supports good cognitive processing, working memory, and the ability to enter 'relaxed focus.' It's a real asset."
+  - title: "Elevated beta & hi-beta"
+    body: "Higher fast-wave activity suggests the brain is constantly 'on' — running thoughts, scanning for problems, planning. Productive in short bursts; depleting when sustained."
+  - title: "Moderate theta — well-regulated"
+    body: "Theta sits at a healthy level (16%). Not so high that you drift into mental fog; not so low that creativity is starved. The Alpha:Theta balance is in a strong zone for memory and learning."
+  - title: "Delta — borderline, watch this"
+    body: "Daytime delta of 22% is on the higher end of normal. Combined with low regeneration (20%), it suggests recovery debt. Sleep quality may need a closer look."
+
+performance.cognition: "Solid cognitive engine. Memory, learning, and reasoning all working well, with room to optimize. Healthy alpha peak (11.6 Hz) and balanced alpha:theta ratio support clear thinking."
+performance.stress: "A standout strength. Your brain activates and deactivates the stress response cleanly. You stay clear-headed under pressure — most Cautious-type brains struggle here, yours doesn't."
+performance.focus: "Good baseline focus. The risk for your type is that vigilance pulls attention sideways — onto worries rather than the task. Pomodoro intervals will help anchor you."
+performance.burnout: "Mild burnout markers. You're managing — but recovery isn't keeping pace with output. Combined with low regeneration, this is the metric to watch."
+
+performanceFeature: "This is unusual and worth understanding. Cautious-type brains typically show poor stress regulation because the limbic system is overactive. Your data is different — and that matters. Your high arousal (2.24) sits alongside high stress regulation (100%). The interpretation: you're not overwhelmed by stress, you're fueled by it. You've learned, somewhere along the way, to convert anxious energy into productive action. This is the Persistent overlay in your profile — the strong-willed, finish-the-thing wiring. The catch: burning rocket fuel works until it doesn't. Without active recovery, the same arousal that powers your performance becomes the source of insomnia, irritability, and eventual burnout. Your job isn't to lower your drive — it's to add the recovery your current system is missing."
+
+innerBandwidth.emotional: "The right-frontal alpha asymmetry (-9.97) suggests you experience heightened reactivity and slower emotional recovery. This is common in Cautious-brain types."
+innerBandwidth.learning: "Good. Your alpha peak and alpha:theta balance support memory consolidation. Spaced repetition and active recall will work very well for you."
+innerBandwidth.creativity: "Creativity needs an open, low-arousal mode. Your high-beta dominance keeps the brain in execute-mode. Daily downtime unlocks this."
+innerBandwidth.link: "Emotional regulation, creative thinking, and durable learning all depend on the same underlying state: low arousal + alert alpha. When your nervous system is running hot, all three drop. When you give the brain real recovery, all three rise — usually together. This is why the action plan focuses on calming, not on adding more."
+
+deepDive.alphaPeak: "A slightly fast but healthy alpha peak. Supports rapid information processing and clear thinking. This is real cognitive horsepower."
+deepDive.arousal: "Your nervous system is on a high-alert baseline. This is what powers your drive — and what blocks recovery. Lowering this is the central goal."
+deepDive.relaxation: "Difficulty entering and holding the relaxed state. Mirrors the high arousal score — two sides of the same coin. Breathwork and HRV training are direct interventions."
+deepDive.regeneration: "The single most important number on this page. Your brain isn't recovering as fast as it's working. Protect sleep. Add daily downtime. Non-negotiable."
+deepDive.frontalAsymmetry: "Right-frontal dominance suggests heightened threat-monitoring and overthinking — a Cautious-type signature. Goal-activation routines build the left side back up."
+deepDive.daytimeDelta: "Slightly elevated but within normal range. Combined with low regeneration, points to recovery debt rather than a primary issue. Sleep optimization addresses both."
+deepDive.readingPattern: "No single metric tells the story — look at the pattern: high arousal + low relaxation + low regeneration + right-frontal alpha asymmetry — the classic Cautious-brain signature."
+
+plan.intro: "Your 30-day plan targets your core pattern: a nervous system that runs hot, recovers slowly, and channels energy well. Small daily inputs compound fast when they're type-specific."
+plan.after30: "Regeneration and relaxation scores typically shift first — expect clearer mornings and easier wind-downs within 2-3 weeks. Emotional regulation and creativity follow as your baseline arousal lowers."
+
+closing: "You are starting from a position of real strength. Your brain type has genuine advantages — reliability, focus under fire, follow-through. The work ahead isn't about fixing what's broken; it's about adding recovery to an already high-performing system. Your 30-day plan is the lever. Pull it consistently."`;
+
 // The doctor-readable narrative JSON schema, shared by both Claude prompts.
 const NARRATIVE_SCHEMA = `{
   "snapshotSummary": "2-3 sentences: where the patient stands overall, referencing the overall score and their standout strength + main watch-zone.",
@@ -110,10 +172,26 @@ const NARRATIVE_SCHEMA = `{
   "closing": "2-3 sentences, encouraging and forward-looking."
 }`;
 
-function buildNarrativePrompt(reportData) {
+function buildNarrativePrompt(reportData, learnedExamples = []) {
   const safe = JSON.stringify(reportData, null, 2);
+
+  const learnedSection = learnedExamples.length > 0
+    ? `\n=== ADDITIONAL LEARNED EXAMPLES (from real generated reports — match this style too) ===\n${learnedExamples.slice(0, 3).join('\n\n--- next example ---\n\n')}\n=== END LEARNED EXAMPLES ===\n`
+    : '';
+
   return `You are a clinical neuroscience writer producing the narrative prose for a
 "Neuro Performance Report" that a DOCTOR will read alongside a patient.
+
+Below is a REFERENCE EXAMPLE showing exactly the style, tone, and level of detail required.
+This is from a real Sagar Ahiwale Neuro Performance Report. Match this style exactly —
+warm, clinical, grounded in the actual numbers, 1-3 sentences per field.
+Do NOT copy the specific numbers from the example. Use only the numbers from this patient's data.
+
+=== REFERENCE REPORT (Sagar Ahiwale — Cautious Brain, Type 5) ===
+${SAGAR_TEMPLATE_EXAMPLE}
+=== END REFERENCE ===${learnedSection}
+Match the above and create a similar brain type report like sagar ahiwale performance report.
+Do it on the similar lines only — do not change anything, read the data exactly as is.
 
 You are given a JSON object with ALL the computed numbers and the patient's brain
 type (from a deterministic qEEG algorithm). Your job is ONLY to write clear,
@@ -128,7 +206,7 @@ ABSOLUTE RULES:
 
 ${NARRATIVE_SCHEMA}
 
-Here is the report data:
+Here is the report data for this patient:
 ${safe}`;
 }
 
@@ -157,7 +235,39 @@ function parseGatewayJson(responseData) {
 }
 
 /**
+ * Fetch the last N saved report examples from the VPS for few-shot prompting.
+ * Returns [] on any error — never blocks report generation.
+ */
+async function fetchReportExamples() {
+  if (!MASTER_KEY || !GATEWAY_URL) return [];
+  try {
+    const response = await axios.get(`${GATEWAY_URL}/api/report-examples`, {
+      headers: { 'X-Nexaproc-Key': MASTER_KEY },
+      timeout: 10000,
+    });
+    return Array.isArray(response.data?.examples) ? response.data.examples : [];
+  } catch (e) {
+    console.warn('[fetchReportExamples] could not fetch examples:', e.message);
+    return [];
+  }
+}
+
+/**
+ * Fire-and-forget: save a generated narrative as a learned example on the VPS.
+ * Never throws — never blocks the caller.
+ */
+function saveReportExample(narrative, patient) {
+  if (!MASTER_KEY || !GATEWAY_URL) return;
+  axios.post(
+    `${GATEWAY_URL}/api/save-example`,
+    { narrative, patient },
+    { headers: { 'X-Nexaproc-Key': MASTER_KEY, 'Content-Type': 'application/json' }, timeout: 10000 }
+  ).catch((e) => console.warn('[saveReportExample] failed to save example:', e.message));
+}
+
+/**
  * Ask the VPS Claude (Nexaproc gateway) for the report narrative blocks.
+ * Fetches learned examples first for few-shot prompting; saves the result afterwards.
  * @param {object} reportData  Output of buildReportData().
  * @returns {Promise<object>}  Parsed narrative ({} on failure → template falls back).
  */
@@ -165,7 +275,11 @@ async function generateReportNarrative(reportData) {
   if (!MASTER_KEY) {
     throw new Error('NEXAPROC_MASTER_KEY is not set on the server. Cannot authenticate to the AIaaS gateway.');
   }
-  const payload = buildNarrativePrompt(reportData);
+
+  // Fetch previously-learned examples (fail-safe — returns [] on any error)
+  const learnedExamples = await fetchReportExamples();
+
+  const payload = buildNarrativePrompt(reportData, learnedExamples);
   const opts = { headers: { 'X-Nexaproc-Key': MASTER_KEY, 'Content-Type': 'application/json' }, timeout: 180000 };
 
   // One retry ONLY when the single-flight gateway rejects us fast as "busy" (429) —
@@ -176,7 +290,16 @@ async function generateReportNarrative(reportData) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const response = await axios.post(`${GATEWAY_URL}/api/invoke`, { taskID: 'GENERIC_ASK', payload, useJson: true, model: 'haiku' }, opts);
-      return parseGatewayJson(response.data);
+      const narrative = parseGatewayJson(response.data);
+
+      // Fire-and-forget: save this narrative as a learned example for future reports
+      saveReportExample(narrative, {
+        name: reportData.patient?.name || 'Unknown',
+        assessmentDate: reportData.patient?.assessmentDate || '',
+        brainType: reportData.brainType?.name || '',
+      });
+
+      return narrative;
     } catch (err) {
       const status = err.response?.status;
       if (attempt === 0 && status === 429) {
@@ -326,5 +449,7 @@ module.exports = {
   extractReportSource,
   renderHtmlOnVps,
   postLesson,
+  fetchReportExamples,
+  saveReportExample,
   GATEWAY_URL,
 };

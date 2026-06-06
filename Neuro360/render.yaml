@@ -25,7 +25,7 @@ services:
       - key: GEMINI_DAILY_LIMIT
         value: "50"
       - key: NEXAPROC_GATEWAY_URL
-        value: http://76.13.244.21:8787
+        value: http://76.13.244.21/neuro-sidecar
       - key: NEXAPROC_MASTER_KEY
         sync: false
       - key: CLAUDE_REPORT_TOKEN

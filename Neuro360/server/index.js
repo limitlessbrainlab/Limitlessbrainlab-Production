@@ -32,22 +32,36 @@ if (process.env.STRIPE_SECRET_KEY) {
   stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 }
 
-// Email transporter — port 587 (STARTTLS) works on Render; port 465 is blocked
-const emailTransporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  connectionTimeout: 30000,
-  greetingTimeout: 30000,
-  socketTimeout: 30000,
-  tls: {
-    rejectUnauthorized: false
-  }
-});
+// Email transporter — Brevo SMTP relay (works on Render; Gmail SMTP is blocked by cloud providers)
+// Fallback to Gmail if BREVO_SMTP_USER not set
+const emailTransporter = nodemailer.createTransport(
+  process.env.BREVO_SMTP_USER
+    ? {
+        host: 'smtp-relay.brevo.com',
+        port: 587,
+        secure: false,
+        auth: {
+          user: process.env.BREVO_SMTP_USER,
+          pass: process.env.BREVO_SMTP_KEY
+        },
+        connectionTimeout: 30000,
+        greetingTimeout: 30000,
+        socketTimeout: 30000
+      }
+    : {
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS
+        },
+        connectionTimeout: 30000,
+        greetingTimeout: 30000,
+        socketTimeout: 30000,
+        tls: { rejectUnauthorized: false }
+      }
+);
 
 // Verify email transporter on startup
 emailTransporter.verify((error, success) => {

@@ -41,19 +41,23 @@ const setupMiddleware = (app, allowedOrigins) => {
   }));
 
   // CORS Configuration
-  app.use(cors({
+  const corsOptions = {
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
+      // Allow requests with no origin (server-to-server, curl, Postman)
+      if (!origin) return callback(null, true);
+      // Allow any Vercel deployment URL for this project
+      if (/^https:\/\/limitlessbrainlab[^.]*\.vercel\.app$/.test(origin)) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
+      callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
     optionsSuccessStatus: 200,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-  }));
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  };
+  // Handle OPTIONS preflight explicitly before other middleware (rate limiter, etc.)
+  app.options('*', cors(corsOptions));
+  app.use(cors(corsOptions));
 
   // Compression
   app.use(compression());

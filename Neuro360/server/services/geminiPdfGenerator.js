@@ -3029,7 +3029,7 @@ class GeminiPdfGenerator {
     doc.fillColor('#FFFFFF')
        .font('Helvetica')
        .fontSize(10)
-       .text('www.neurosense360.site', 30, footerY + 15, { width: rightMargin - 30, align: 'right', lineBreak: false });
+       .text('limitlessbrainlab-eight.vercel.app', 30, footerY + 15, { width: rightMargin - 30, align: 'right', lineBreak: false });
 
     // Restore Y position
     doc.y = savedY;
@@ -3664,7 +3664,7 @@ class GeminiPdfGenerator {
     doc.fontSize(8)
        .fillColor('#FFFFFF')
        .font('Helvetica')
-       .text('www.neurosense360.site', pageWidth - 160, pageHeight - 30, { width: 140, align: 'right', lineBreak: false });
+       .text('limitlessbrainlab-eight.vercel.app', pageWidth - 160, pageHeight - 30, { width: 140, align: 'right', lineBreak: false });
 
     console.log('   ✅ Cover Page complete');
   }
@@ -4409,7 +4409,7 @@ class GeminiPdfGenerator {
     doc.fillColor('#FFFFFF')
        .font('Helvetica-Bold')
        .fontSize(8)
-       .text('www.neurosense360.site', 30, footerY + 24, { width: rightMargin - 30, align: 'right', lineBreak: false });
+       .text('limitlessbrainlab-eight.vercel.app', 30, footerY + 24, { width: rightMargin - 30, align: 'right', lineBreak: false });
 
     // Restore Y position to prevent affecting next content
     doc.y = savedY;

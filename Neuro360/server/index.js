@@ -1226,7 +1226,7 @@ app.post('/api/create-frequency-checkout', async (req, res) => {
               description: isBundle
                 ? 'Unlock all 6 brainwave frequency packs: Delta, Theta, Alpha, Beta, Gamma, and Solfeggio frequencies for complete brain optimization.'
                 : `Unlock the full ${packName} frequency pack for enhanced brain performance.`,
-              images: ['https://neurosense360.site/IBW%20Logo.png'],
+              images: [`${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/IBW%20Logo.png`],
               metadata: {
                 pack_id: packId,
                 is_bundle: isBundle ? 'true' : 'false'
@@ -1239,8 +1239,8 @@ app.post('/api/create-frequency-checkout', async (req, res) => {
       ],
       mode: 'payment',
       customer_email: customerEmail,
-      success_url: `${process.env.FRONTEND_URL || 'https://neurosense360.site'}/frequencies?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'https://neurosense360.site'}/frequencies?payment=cancelled`,
+      success_url: `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/frequencies?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/frequencies?payment=cancelled`,
       metadata: {
         pack_id: packId,
         customer_email: customerEmail,
@@ -1316,7 +1316,7 @@ app.post('/api/create-meditation-checkout', async (req, res) => {
               description: isBundle
                 ? 'Unlock all 6 guided meditation packs: Morning Awakening, Stress Relief, Focus & Clarity, Deep Sleep, Gratitude & Joy, and Body Healing.'
                 : `Unlock the full ${packName} meditation pack for enhanced mental wellness.`,
-              images: ['https://neurosense360.site/IBW%20Logo.png'],
+              images: [`${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/IBW%20Logo.png`],
               metadata: {
                 pack_id: packId,
                 is_bundle: isBundle ? 'true' : 'false',
@@ -1330,8 +1330,8 @@ app.post('/api/create-meditation-checkout', async (req, res) => {
       ],
       mode: 'payment',
       customer_email: customerEmail,
-      success_url: `${process.env.FRONTEND_URL || 'https://neurosense360.site'}/dashboard/meditations?meditation_payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'https://neurosense360.site'}/dashboard/meditations?meditation_payment=cancelled`,
+      success_url: `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard/meditations?meditation_payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard/meditations?meditation_payment=cancelled`,
       metadata: {
         pack_id: packId,
         customer_email: customerEmail,
@@ -1421,7 +1421,7 @@ app.post('/api/stripe/create-checkout-session', async (req, res) => {
           product_data: {
             name: `Limitless Brain Lab ${tierName} Subscription`,
             description: `Access to ${tierName} features - Monthly subscription`,
-            images: ['https://neurosense360.site/favicon.ico']
+            images: [`${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/favicon.ico`]
           },
           unit_amount: Math.round(price * 100) // Convert to cents
         },
@@ -1657,7 +1657,7 @@ app.post('/api/create-report-checkout', async (req, res) => {
             product_data: {
               name: `${packageName} - ${reports} EEG Reports`,
               description: `Purchase ${reports} EEG brain reports for your clinic`,
-              images: ['https://neurosense360.site/IBW%20Logo.png'],
+              images: [`${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/IBW%20Logo.png`],
               metadata: {
                 package_id: packageId,
                 reports: reports.toString(),
@@ -1671,8 +1671,8 @@ app.post('/api/create-report-checkout', async (req, res) => {
       ],
       mode: 'payment',
       customer_email: customerEmail,
-      success_url: `${process.env.FRONTEND_URL || 'https://neurosense360.site'}/clinic/subscription?payment=success&reports=${reports}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'https://neurosense360.site'}/clinic/subscription?payment=cancelled`,
+      success_url: `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic/subscription?payment=success&reports=${reports}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic/subscription?payment=cancelled`,
       metadata: {
         package_id: packageId,
         customer_email: customerEmail,
@@ -1727,7 +1727,7 @@ app.post('/api/create-coaching-checkout', async (req, res) => {
     const multiplier = currency.toLowerCase() === 'inr' ? 100 : 100;
     const amountInSmallestUnit = Math.round(price * multiplier);
 
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://neurosense360.site';
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
@@ -1739,7 +1739,7 @@ app.post('/api/create-coaching-checkout', async (req, res) => {
             product_data: {
               name: `Brain Coaching Session with ${coachName}`,
               description: '30-minute online brain coaching session',
-              images: ['https://neurosense360.site/IBW%20Logo.png'],
+              images: [`${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/IBW%20Logo.png`],
               metadata: {
                 type: 'coaching_session',
                 coach_id: coachId,
@@ -1821,7 +1821,7 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
     const multiplier = currencyMultipliers[currency] || 100;
     const amountInSmallestUnit = Math.round(amount * multiplier);
 
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://neurosense360.site';
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
 
     // Use custom URLs if provided (for public pages), otherwise default to dashboard
     const finalSuccessUrl = successUrl || `${FRONTEND_URL}/dashboard/about-brain?payment=success&assessment=${assessmentId}&session_id={CHECKOUT_SESSION_ID}`;
@@ -1837,7 +1837,7 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
             product_data: {
               name: `${assessmentName} - Brain Assessment`,
               description: `Unlock your ${assessmentName} to understand your brain health better.`,
-              images: ['https://neurosense360.site/IBW%20Logo.png'],
+              images: [`${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/IBW%20Logo.png`],
               metadata: {
                 assessment_id: assessmentId,
                 type: 'assessment'
@@ -2220,7 +2220,7 @@ app.post('/api/create-frequency-checkout', async (req, res) => {
     const multiplier = currencyMultipliers[currency] || 100;
     const amountInSmallestUnit = Math.round(amount * multiplier);
 
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://neurosense360.site';
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -2231,7 +2231,7 @@ app.post('/api/create-frequency-checkout', async (req, res) => {
             product_data: {
               name: `${packName} Binaural Beats - Frequency Pack`,
               description: `Unlock ${packName} frequency audio for brain optimization.`,
-              images: ['https://neurosense360.site/IBW%20Logo.png'],
+              images: [`${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/IBW%20Logo.png`],
               metadata: { pack_id: packId, type: 'frequency' }
             },
             unit_amount: amountInSmallestUnit,
@@ -2493,7 +2493,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                     ${tier === 'PRO' || tier === 'PREMIUM' ? '<li>Frequencies Library</li><li>Meditations</li><li>Supplements Guide</li>' : ''}
                     ${tier === 'BASIC' || tier === 'PRO' || tier === 'PREMIUM' ? '<li>ANS Reset Protocol</li><li>MOVERS Exercises</li><li>Five Pillars</li>' : ''}
                   </ul>
-                  <a href="https://neurosense360.site/dashboard" style="display: inline-block; background: #323956; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">Go to Dashboard</a>
+                  <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard" style="display: inline-block; background: #323956; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">Go to Dashboard</a>
                 </div>
               `
             };
@@ -2866,7 +2866,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           // Send confirmation email to clinic — reorder vs first purchase
           if (process.env.EMAIL_USER && process.env.EMAIL_PASS && session.customer_email) {
             const isReorder = currentAllowed > 0;
-            const FRONTEND_URL = process.env.FRONTEND_URL || 'https://neurosense360.site';
+            const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
 
             const clinicMailOptions = isReorder
               ? {
@@ -3125,7 +3125,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                         <!-- Access Button -->
                         <tr>
                           <td style="padding: 0 32px 24px;" align="center">
-                            <a href="https://neurosense360.site/${isMeditationPurchase ? 'dashboard' : 'frequencies'}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                            <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/${isMeditationPurchase ? 'dashboard' : 'frequencies'}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                               ${isMeditationPurchase ? '🧘 Access Your Meditations' : '🎵 Access Your Frequencies'}
                             </a>
                           </td>
@@ -3357,7 +3357,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
               </div>
               <p style="color: #555; font-size: 14px;">Your access to all features continues uninterrupted. Thank you for being part of the Limitless Brain Lab community.</p>
               <div style="text-align: center; margin-top: 24px;">
-                <a href="${process.env.FRONTEND_URL || 'https://neurosense360.site'}/dashboard" style="display: inline-block; background: #323956; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">Go to Dashboard</a>
+                <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard" style="display: inline-block; background: #323956; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">Go to Dashboard</a>
               </div>
             </div>
             <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
@@ -3403,7 +3403,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
               </div>
               <p style="color: #555; font-size: 14px;">Common reasons for payment failure include expired card, insufficient funds, or card declined by your bank.</p>
               <div style="text-align: center; margin-top: 24px;">
-                <a href="${process.env.FRONTEND_URL || 'https://neurosense360.site'}/dashboard/subscription" style="display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">Update Payment Method</a>
+                <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard/subscription" style="display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">Update Payment Method</a>
               </div>
             </div>
             <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
@@ -3774,7 +3774,7 @@ app.post('/api/clinic-credentials', async (req, res) => {
                   <!-- Login Button -->
                   <tr>
                     <td style="padding: 0 32px 24px;" align="center">
-                      <a href="https://neurosense360.site/clinic-login" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                      <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic-login" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                         🔐 Login to Your Clinic Portal
                       </a>
                     </td>
@@ -4087,7 +4087,7 @@ app.post('/api/registration-confirmation', async (req, res) => {
                     <!-- CTA Button -->
                     <tr>
                       <td style="padding: 0 32px 24px; text-align: center;">
-                        <a href="${process.env.FRONTEND_URL || 'https://neurosense360.site'}/dashboard" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                        <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                           Go to My Dashboard
                         </a>
                       </td>
@@ -4439,7 +4439,7 @@ app.post('/api/send-24hr-reminder', async (req, res) => {
                   <!-- CTA Button -->
                   <tr>
                     <td style="padding: 0 32px 24px; text-align: center;">
-                      <a href="${process.env.FRONTEND_URL || 'https://neurosense360.site'}/dashboard" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                      <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                         Explore Your Dashboard
                       </a>
                     </td>
@@ -4628,7 +4628,7 @@ app.put('/api/bookings/:id', async (req, res) => {
 
                           <!-- CTA Button -->
                           <div style="text-align: center; margin: 0 0 24px;">
-                            <a href="${process.env.FRONTEND_URL || 'https://neurosense360.site'}/dashboard/brain-coach" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                            <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard/brain-coach" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                               Book Your Next Session
                             </a>
                           </div>
@@ -5099,7 +5099,7 @@ app.post('/api/send-password-email', async (req, res) => {
             </div>
             <p style="color: #999; font-size: 12px;">If you did not make this change, please contact support immediately.</p>
             <div style="text-align: center; margin: 24px 0;">
-              <a href="${process.env.FRONTEND_URL || 'https://neurosense360.site'}/login" style="display: inline-block; background: #323956; color: #fff; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-weight: 600;">Login Now</a>
+              <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/login" style="display: inline-block; background: #323956; color: #fff; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-weight: 600;">Login Now</a>
             </div>
           </div>
         </div>
@@ -5246,7 +5246,7 @@ app.post('/api/send-welcome-email', async (req, res) => {
       console.log('ℹ️ Using default email service for patient welcome email');
     }
 
-    const loginUrl = 'https://neurosense360.site/login';
+    const loginUrl = `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/login`;
 
     const mailOptions = {
       from: fromEmail,
@@ -5383,7 +5383,7 @@ app.post('/api/send-email-update-notification', async (req, res) => {
 
     // Generate system password
     const systemPassword = generateSystemPassword();
-    const loginUrl = 'https://www.neurosense360.site/login';
+    const loginUrl = `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/login`;
 
     const mailOptions = {
       from: fromEmail,
@@ -5497,6 +5497,9 @@ app.post('/api/send-report-email', async (req, res) => {
       });
     }
 
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
+    const loginUrl = `${FRONTEND_URL}/login`;
+
     const reportTitle = `QEEG Analysis Report - ${patientName}`;
     const reportName = reportFileName || 'neurosense-report.pdf';
     // When the Super Admin sends the Claude-generated report, use a distinct
@@ -5541,6 +5544,9 @@ app.post('/api/send-report-email', async (req, res) => {
                   <p style="color:#555;font-size:15px;line-height:1.8;margin:0 0 16px;">Your personalized <strong>Neuro Performance Report</strong> is ready — a complete map of your brainwave activity, cognitive performance, and your dominant brain type, built from your qEEG analysis.</p>
                   <p style="color:#555;font-size:15px;line-height:1.8;margin:0 0 20px;">Inside you'll find your brain-type profile, your seven performance markers, the deep-dive neuro-metrics your clinician will reference, and a personalized 30-day plan.</p>
                   ${attached ? attachedNotice : `<div style="text-align:center;margin:0 0 24px;"><a href="${reportUrl}" style="display:inline-block;background:linear-gradient(135deg,#1e63b4 0%,#0f2a5e 100%);color:#ffffff;text-decoration:none;padding:13px 32px;border-radius:8px;font-weight:600;font-size:14px;">View My Neuro Performance Report</a></div>`}
+                  <div style="text-align:center;margin:0 0 24px;">
+                    <a href="${loginUrl}" style="display:inline-block;background:#ffffff;color:#1e63b4;text-decoration:none;padding:13px 32px;border-radius:8px;font-weight:600;font-size:14px;border:2px solid #1e63b4;">Login</a>
+                  </div>
                   <p style="color:#555;font-size:15px;line-height:1.8;margin:0;">This report is a starting point, not a finish line. If anything sparks a question, we're just a reply away.</p>
                 </td></tr>
                 <tr><td style="background:#f8f9fc;padding:20px 32px;border-top:1px solid #e5e7eb;text-align:center;">
@@ -5580,7 +5586,15 @@ app.post('/api/send-report-email', async (req, res) => {
     const patientMailOptions = {
       from: EMAIL_FROM,
       to: patientEmail,
+      replyTo: process.env.EMAIL_USER,
+      headers: {
+        'List-Unsubscribe': `<mailto:${process.env.EMAIL_USER}?subject=unsubscribe>`,
+        'X-Mailer': 'Limitless Brain Lab Mailer'
+      },
       subject: isClaude ? `Your Neuro Performance Report is Ready` : `Your report is ready — unlock your hidden brain powers`,
+      text: isClaude
+        ? `Hi ${patientName},\n\nYour Neuro Performance Report is ready.\n\nLog in to your dashboard to view it: ${loginUrl}\n\nThe Limitless Brain Lab Team`
+        : `Hi ${patientName},\n\nYour brain report is ready. Log in to access your results: ${loginUrl}\n\nThe Limitless Brain Lab Team`,
       attachments: [...getLogoAttachment(), ...reportAttachment],
       html: isClaude ? claudePatientHtml : `
         <!DOCTYPE html>
@@ -6072,7 +6086,7 @@ app.post('/api/notify-patient-report', async (req, res) => {
     const displayName = patientName || 'there';
     const displayReport = reportType || 'Brain Wellness Report';
     const displayClinic = clinicName || 'your clinic';
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://neurosense360.site';
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
 
     const emailsSent = [];
 
@@ -6185,7 +6199,7 @@ app.post('/api/send-no-credit-email', async (req, res) => {
       return res.status(500).json({ success: false, message: 'Email not configured' });
     }
 
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://neurosense360.site';
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
     const displayName = clinicName || 'Clinic Admin';
     const accountType = clinicType === 'lbl_partner' ? 'Partner' : 'Clinic';
     const dashboardPath = clinicType === 'lbl_partner' ? '/clinic/subscription' : '/clinic/subscription';
@@ -6495,7 +6509,7 @@ app.post('/api/send-partner-welcome-email', async (req, res) => {
               </div>
             </div>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="https://neurosense360.site/clinic" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Access Partner Dashboard →</a>
+              <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Access Partner Dashboard →</a>
             </div>
           </div>
           <div style="background: #f8fafc; padding: 18px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
@@ -6550,7 +6564,7 @@ app.post('/api/send-partner-payment-success', async (req, res) => {
               </table>
             </div>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="https://neurosense360.site/clinic" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Go to Dashboard</a>
+              <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Go to Dashboard</a>
             </div>
           </div>
           <div style="background: #f8fafc; padding: 18px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
@@ -6646,7 +6660,7 @@ app.post('/api/send-partner-no-credit-alert', async (req, res) => {
               <p style="margin: 0; color: #C2410C; font-weight: 600; font-size: 14px;">⚠️ Action Required: Purchase a report package</p>
             </div>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="https://neurosense360.site/clinic/subscription" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Buy More Credits</a>
+              <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic/subscription" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Buy More Credits</a>
             </div>
           </div>
           <div style="background: #f8fafc; padding: 18px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
@@ -6700,7 +6714,7 @@ app.post('/api/send-partner-patient-welcome', async (req, res) => {
               </div>
             </div>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="https://neurosense360.site/login" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Login Now →</a>
+              <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/login" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Login Now →</a>
             </div>
           </div>
           <div style="background: #f8fafc; padding: 18px 30px; text-align: center; border-top: 1px solid #e5e7eb;">

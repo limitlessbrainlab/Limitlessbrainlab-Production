@@ -2080,7 +2080,7 @@ const Landing = () => {
                     <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">Choose the right assessment for your brain health journey</p>
                     <div className="mb-4 sm:mb-6 py-3 sm:py-4 bg-gray-50 rounded-xl sm:rounded-2xl">
                       <span className="text-xs sm:text-sm text-gray-400 block mb-1">Starting from</span>
-                      <span className="text-2xl sm:text-3xl md:text-5xl font-extrabold text-[#323956]">$9.99</span>
+                      <span className="text-2xl sm:text-3xl md:text-5xl font-extrabold text-[#323956]">$29.99</span>
                     </div>
                     <ul className="text-left space-y-2.5 sm:space-y-3 mb-6 sm:mb-8 flex-grow">
                       {['Clinical-grade qEEG analysis', 'Personalized brain report', 'Expert recommendations'].map((t) => (
@@ -2094,7 +2094,7 @@ const Landing = () => {
                     </ul>
                     <button onClick={() => navigate('/neurosense-booking?type=individual')} className="w-full bg-[#323956] hover:bg-[#2a3049] text-white px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl font-semibold transition-all duration-300 hover:scale-[1.02] shadow-md hover:shadow-lg hover:shadow-[#323956]/25 mt-auto text-xs sm:text-sm md:text-base">
                       <span className="flex items-center justify-center gap-2">
-                        Explore Now
+                        Pay &amp; Take Away
                         <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                       </span>
                     </button>

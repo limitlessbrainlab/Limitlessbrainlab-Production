@@ -154,7 +154,7 @@ const PatientDashboard = () => {
   const lockedTabIds = [
     'cognition', 'stress', 'focus-attention', 'burnout-fatigue',
     'emotional-regulation', 'learning', 'creativity',
-    'neurosense-reports', 'care-program'
+    'neurosense-reports'
   ];
   const isTabLocked = (tabId) => lockedTabIds.includes(tabId) && !algorithmResults && !loading;
 
@@ -9245,6 +9245,17 @@ const PatientDashboard = () => {
               { icon: '💊', label: 'Supplements', value: `${ksbProtocol.supplement1}\n${ksbProtocol.supplement2}`, link: getModalityLink('supplement', ksbProtocol.supplement1) },
             ];
           }
+
+          // Always include Yoga Nidra as a dedicated item (free for all patients)
+          const hasYogaNidra = modalities.some(m => m.value && m.value.toLowerCase().includes('yoga nidra'));
+          if (!hasYogaNidra) {
+            modalities.push({
+              icon: '🌙',
+              label: 'Yoga Nidra',
+              value: 'Yoga Nidra\n30–40 min · PM',
+              link: '/dashboard/meditations?type=relaxation'
+            });
+          }
           return (
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
               {/* Protocol header */}
@@ -9637,7 +9648,6 @@ const PatientDashboard = () => {
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-gray-900 dark:text-white break-words">{title}</p>
                         <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                          <span className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full">{reportType}</span>
                           {isResponse && (
                             <span className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">Response Report</span>
                           )}

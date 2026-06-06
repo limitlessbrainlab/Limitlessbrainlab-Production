@@ -285,7 +285,7 @@ class EnhancedAIPdfGenerator {
     this.doc.fontSize(8)
       .fillColor(COLORS.darkGray)
       .font(FONTS.regular)
-      .text('www.neurosense360.site', pageWidth - 160, footerY, { width: 120, align: 'right' });
+      .text('www.limitlessbrainlab-eight.vercel.app', pageWidth - 160, footerY, { width: 120, align: 'right' });
   }
 
   /**

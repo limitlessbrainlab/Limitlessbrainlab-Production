@@ -296,8 +296,7 @@ const allowedOrigins = [
   'http://neurosense360.site',  // Production HTTP
   'http://www.neurosense360.site', // Production HTTP with www
   'https://limitlessbrainlab-eight.vercel.app', // Staging
-  'https://admin.limitlessbrainlab.com',         // Custom admin domain
-  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ];
 
 // Setup all security and utility middleware

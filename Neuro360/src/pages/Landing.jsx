@@ -959,7 +959,7 @@ const Landing = () => {
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  Book Now
+                  Inquire Now
                 </button>
               </div>
             </div>
@@ -1995,19 +1995,17 @@ const Landing = () => {
               Care
             </h2>
 
-            {/* Grid Layout - Image Left, Content Right */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center max-w-7xl mx-auto">
-              {/* Left: Image */}
-              <div className="scroll-fade-left" data-scroll-section="care-image">
+            <div className="flex justify-center max-w-7xl mx-auto">
+              {/* Left: Image — hidden */}
+              {/* <div className="scroll-fade-left" data-scroll-section="care-image">
                 <img
                   src="/care.jpeg"
                   alt="Personalized brain care and optimization"
                   className="w-full rounded-3xl shadow-2xl object-cover"
                 />
-              </div>
+              </div> */}
 
-              {/* Right: Content */}
-              <div className="medical-card bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-10 shadow-lg scroll-fade-right" data-scroll-section="care-content">
+              <div className="medical-card bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-10 shadow-lg scroll-fade-right max-w-2xl w-full" data-scroll-section="care-content">
                 <p className="text-base sm:text-lg leading-relaxed">
                   <span className="font-bold">Build a personalized brain optimization plan tailored to your needs.</span> Leverage our lab tested brainwave frequencies, special sounds and music (mantras), ANS (Autonomic Nervous System) reset protocols, guided meditations, and targeted light and sound therapies. Track your progress, refine your plan, and sustain your gains with ongoing expert support. Available for both <span className="font-semibold">home and clinic based care</span>, depending on your requirements.
                 </p>
@@ -2304,53 +2302,32 @@ const Landing = () => {
             </div>
           </div>
 
-          {/* Ask Ashok Interactive (AI) Section */}
-          <div className="text-center mb-16 relative z-10">
+          {/* Ask Dr Sweta Interactive (AI) Section — hidden */}
+          {/* <div className="text-center mb-16 relative z-10">
             <div className="relative">
-
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#1e3a5f] mb-3 sm:mb-4 bg-white relative z-20">
                 Ask Dr Sweta Interactive (AI)
               </h2>
-
-              {/* Content Box */}
               <div>
                 <div className="relative">
                   <div className="medical-card bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-12 mx-auto max-w-4xl shadow-lg relative z-20">
-                <p className="text-base sm:text-lg md:text-xl text-gray-900 leading-relaxed mb-4 sm:mb-6">
-                  Ask AI trained about your condition and how Limitless Brain Lab can help, in any language.
-                </p>
-
-                <p className="text-xs sm:text-sm text-gray-600 leading-relaxed mb-5 sm:mb-8">
-                  This would be reworded for dr sweta the Ai, "AI generated content may contain errors or inaccuracies, and is not a substitute for professional advice, treatment or therapy. Please check with your Doctor or Therapist before following any advice given. By using this Ai, you agree to the terms and conditions on the website, are over 18, and agree that you are solely responsible. All conversations are anonymous and never shared."
-                </p>
-
-                {/* AI Avatar and Name */}
-                <div className="flex flex-col items-center mb-4 sm:mb-6">
-                  <div className="w-14 h-14 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-gray-200 rounded-full mb-3 sm:mb-4 flex items-center justify-center overflow-hidden">
-                    <svg className="w-14 h-14 sm:w-20 sm:h-20 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-1">Dr Sweta Adatia - Free Version 🤖</h3>
-                  <p className="text-xs sm:text-sm text-gray-600 text-center">Neurologist with a specialization in stroke and migraine - Premium Version</p>
-
-                  {/* Ask Button */}
-                  <div className="flex justify-center mt-4">
-                    <a
-                      href="https://www.limitlessbrainacademy.com/talk/drsweta"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-[#323956] text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-[#252b42] transition-colors"
-                    >
-                      Ask
-                    </a>
-                  </div>
-                </div>
+                    <p className="text-base sm:text-lg md:text-xl text-gray-900 leading-relaxed mb-4 sm:mb-6">
+                      Ask AI trained about your condition and how Limitless Brain Lab can help, in any language.
+                    </p>
+                    <div className="flex flex-col items-center mb-4 sm:mb-6">
+                      <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-1">Dr Sweta Adatia - Free Version 🤖</h3>
+                      <div className="flex justify-center mt-4">
+                        <a href="https://www.limitlessbrainacademy.com/talk/drsweta" target="_blank" rel="noopener noreferrer"
+                          className="bg-[#323956] text-white px-6 py-2 rounded-xl text-sm font-medium hover:bg-[#252b42] transition-colors">
+                          Ask
+                        </a>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
       </section>
 
@@ -2427,7 +2404,7 @@ const Landing = () => {
                   },
                   {
                     icon: (<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>),
-                    title: 'Get Your Report',
+                    title: 'Get your report at home',
                     desc: 'Receive a detailed brain health report with expert recommendations.',
                     color: 'bg-[#c9a227]',
                   },

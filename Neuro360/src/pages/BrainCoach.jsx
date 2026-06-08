@@ -1991,7 +1991,7 @@ const BrainCoach = () => {
                 className="px-5 py-2.5 bg-white text-[#323956] font-semibold rounded-lg hover:bg-blue-50 transition-colors text-sm flex items-center gap-2"
               >
                 <Calendar className="h-4 w-4" />
-                Book Now
+                Inquire Now
               </button>
               <button
                 onClick={() => window.open('https://wa.me/971501382897?text=' + encodeURIComponent('Hi, I would like to request a consultation with a Psychologist from Limitless Brain Lab. Please share the available slots.'), '_blank')}

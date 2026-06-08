@@ -336,8 +336,8 @@ const LBWProjectUpdates = () => {
                   </div>
                 </div>
 
-                {/* Card 4 — Image Left, Text Right */}
-                <div className="relative group rounded-2xl sm:rounded-3xl bg-gradient-to-bl from-[#161622] to-[#1a1a2e] border-0 overflow-hidden hover:border-[#c9a227]/40 transition-all duration-500 shadow-xl">
+                {/* Card 4 — Binaural Beats for ADHD — hidden */}
+                {/* <div className="relative group rounded-2xl sm:rounded-3xl bg-gradient-to-bl from-[#161622] to-[#1a1a2e] border-0 overflow-hidden hover:border-[#c9a227]/40 transition-all duration-500 shadow-xl">
                   <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#c9a227]/8 rounded-full blur-[80px] pointer-events-none" />
                   <div className="flex flex-col md:flex-row items-center">
                     <div className="relative flex items-center justify-center min-h-[220px] sm:min-h-[260px] w-full md:w-1/2 order-2 md:order-1">
@@ -352,7 +352,7 @@ const LBWProjectUpdates = () => {
                       </p>
                     </div>
                   </div>
-                </div>
+                </div> */}
 
               </div>
             </div>

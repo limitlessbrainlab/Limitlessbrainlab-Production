@@ -149,8 +149,8 @@ const Footer = () => {
             <ul className="space-y-3 sm:space-y-3">
               <li key="demo-report"><button onClick={() => setShowDemoReport(true)} className="text-sm sm:text-sm md:text-base hover:text-[#F5D05D] transition-colors text-left">Request Demo Report</button></li>
               <li key="guide"><Link to="/guide-to-brainwaves" className="text-sm sm:text-sm md:text-base hover:text-[#F5D05D] transition-colors">Guide to Brainwaves</Link></li>
-              <li key="brochure"><a href="/assets/neurosense brochure.pdf" download className="text-sm sm:text-sm md:text-base hover:text-[#F5D05D] transition-colors">Download Brochure</a></li>
-              <li key="clinics"><Link to="/technicians" className="text-sm sm:text-sm md:text-base hover:text-[#F5D05D] transition-colors">For Clinics</Link></li>
+              {/* <li key="brochure"><a href="/assets/neurosense brochure.pdf" download className="text-sm sm:text-sm md:text-base hover:text-[#F5D05D] transition-colors">Download Brochure</a></li> */}
+              {/* <li key="clinics"><Link to="/technicians" className="text-sm sm:text-sm md:text-base hover:text-[#F5D05D] transition-colors">For Clinics</Link></li> */}
             </ul>
           </div>
 
@@ -159,7 +159,7 @@ const Footer = () => {
             <h3 className="text-sm sm:text-sm md:text-lg font-semibold text-gray-400 uppercase tracking-wider">Resources</h3>
             <ul className="space-y-3 sm:space-y-3">
               <li key="limitless-brain-lab"><a href="https://www.limitlessbrainacademy.com" target="_blank" rel="noopener noreferrer" className="text-sm sm:text-sm md:text-base hover:text-[#F5D05D] transition-colors">Limitless Brain Academy</a></li>
-              <li key="practice"><Link to="/about-us" className="text-sm sm:text-sm md:text-base hover:text-[#F5D05D] transition-colors">Neuropsychiatry Practice</Link></li>
+              {/* <li key="practice"><Link to="/about-us" className="text-sm sm:text-sm md:text-base hover:text-[#F5D05D] transition-colors">Neuropsychiatry Practice</Link></li> */}
               <li key="faq"><Link to="/faq" className="text-sm sm:text-sm md:text-base hover:text-[#F5D05D] transition-colors">100X Brain Optimisation Program</Link></li>
             </ul>
           </div>

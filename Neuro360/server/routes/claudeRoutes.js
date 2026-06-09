@@ -1,9 +1,10 @@
 const express = require('express');
 const { callClaude } = require('../services/claudeService');
+const { authMiddleware } = require('../middleware/authMiddleware');
 const router = express.Router();
 
 // Test endpoint for Claude API
-router.post('/claude', async (req, res) => {
+router.post('/claude', authMiddleware, async (req, res) => {
   try {
     const { prompt } = req.body;
 

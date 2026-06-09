@@ -252,6 +252,218 @@ const getUserConfirmationHtml = (userName) => `
 </html>
 `;
 
+const getProtectMyBrainEmailHtml = (userName) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.1);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 30px 32px; text-align: center;">
+              <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover;" />
+              <h1 style="color: #ffffff; margin: 14px 0 0; font-size: 24px; font-weight: 700;">Limitless Brain Lab</h1>
+              <p style="color: #F5D05D; margin: 6px 0 0; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600;">Health, Wealth &amp; Happiness for All</p>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 36px 32px 8px;">
+              <h2 style="color: #323956; margin: 0 0 20px; font-size: 20px; font-weight: 600;">Dear ${userName},</h2>
+              <p style="color: #555; font-size: 14px; line-height: 1.8; margin: 0 0 16px;">
+                Thank you for choosing the <strong style="color: #323956;">Protect My Brain Package</strong> from Limitless Brain Lab. We are pleased to support you on your journey toward enhanced brain health and cognitive well-being.
+              </p>
+              <p style="color: #323956; font-size: 15px; font-weight: 700; margin: 0 0 16px;">Your package includes the following components:</p>
+
+              <!-- Package Items -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 20px;">
+                <tr>
+                  <td style="background: #f8f9fc; border-left: 4px solid #F5D05D; border-radius: 0 8px 8px 0; padding: 14px 16px; margin-bottom: 10px; display: block;">
+                    <p style="color: #323956; font-size: 14px; font-weight: 700; margin: 0 0 6px;">1. Digital Brain Assessment</p>
+                    <p style="color: #666; font-size: 13px; line-height: 1.7; margin: 0;">A comprehensive online evaluation designed to assess your attention, focus, memory, and cognitive performance. This assessment can be completed at your convenience.</p>
+                  </td>
+                </tr>
+                <tr><td style="height: 10px;"></td></tr>
+                <tr>
+                  <td style="background: #f8f9fc; border-left: 4px solid #F5D05D; border-radius: 0 8px 8px 0; padding: 14px 16px; display: block;">
+                    <p style="color: #323956; font-size: 14px; font-weight: 700; margin: 0 0 6px;">2. Lifestyle Questionnaire</p>
+                    <p style="color: #666; font-size: 13px; line-height: 1.7; margin: 0;">You will receive a detailed lifestyle questionnaire separately. This will help us better understand factors such as your sleep patterns, nutrition, stress levels, daily routines, and overall well-being.</p>
+                  </td>
+                </tr>
+                <tr><td style="height: 10px;"></td></tr>
+                <tr>
+                  <td style="background: #f8f9fc; border-left: 4px solid #F5D05D; border-radius: 0 8px 8px 0; padding: 14px 16px; display: block;">
+                    <p style="color: #323956; font-size: 14px; font-weight: 700; margin: 0 0 6px;">3. NeuroSense Brain Scan</p>
+                    <p style="color: #666; font-size: 13px; line-height: 1.7; margin: 0;">An advanced brain health assessment that provides deeper insights into your brain function and cognitive wellness.</p>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="color: #555; font-size: 14px; line-height: 1.8; margin: 0 0 16px;">
+                To help you understand the process and outcomes, we have attached sample reports for your reference.
+              </p>
+              <p style="color: #555; font-size: 14px; line-height: 1.8; margin: 0 0 20px;">
+                Once all assessments have been completed, one of our <strong style="color: #323956;">NeuroSense Coaches</strong> will conduct a personalized consultation session to review your results. Based on these findings, you will receive a detailed action plan tailored to your specific needs, goals, and brain health profile.
+              </p>
+
+              <!-- Package Fee -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); border-radius: 10px; margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 16px 20px; text-align: center;">
+                    <p style="color: #F5D05D; margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Package Fee</p>
+                    <p style="color: #ffffff; margin: 6px 0 0; font-size: 22px; font-weight: 700;">INR 15,500</p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Bank Details -->
+              <p style="color: #323956; font-size: 15px; font-weight: 700; margin: 0 0 12px;">Bank Details</p>
+              <table width="100%" cellpadding="0" cellspacing="4" style="background: #f8f9fc; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+                <tr><td style="color: #888; font-size: 12px; padding: 4px 16px;">Account Name</td><td style="color: #323956; font-size: 13px; font-weight: 600; padding: 4px 0;">Chinmaya Brainforia</td></tr>
+                <tr><td style="color: #888; font-size: 12px; padding: 4px 16px;">Account Number</td><td style="color: #323956; font-size: 13px; font-weight: 600; padding: 4px 0;">922020022903427</td></tr>
+                <tr><td style="color: #888; font-size: 12px; padding: 4px 16px;">Bank Name</td><td style="color: #323956; font-size: 13px; font-weight: 600; padding: 4px 0;">Axis Bank</td></tr>
+                <tr><td style="color: #888; font-size: 12px; padding: 4px 16px;">Bank Address</td><td style="color: #323956; font-size: 13px; font-weight: 600; padding: 4px 0;">Jamnagar</td></tr>
+                <tr><td style="color: #888; font-size: 12px; padding: 4px 16px;">IFSC Code</td><td style="color: #323956; font-size: 13px; font-weight: 600; padding: 4px 0;">UTIB0000175</td></tr>
+                <tr><td style="color: #888; font-size: 12px; padding: 4px 16px;">MICR Code</td><td style="color: #323956; font-size: 13px; font-weight: 600; padding: 4px 0;">361211001</td></tr>
+                <tr><td style="color: #888; font-size: 12px; padding: 4px 16px;">Customer ID</td><td style="color: #323956; font-size: 13px; font-weight: 600; padding: 4px 0;">940319994</td></tr>
+              </table>
+
+              <p style="color: #555; font-size: 14px; line-height: 1.8; margin: 0 0 16px;">
+                Should you have any questions or require any assistance during the process, please feel free to reach out to our team.
+              </p>
+              <p style="color: #555; font-size: 14px; line-height: 1.8; margin: 0 0 8px;">
+                We look forward to supporting you on your brain health journey.
+              </p>
+              <p style="color: #555; font-size: 14px; line-height: 1.8; margin: 0 0 4px;">Warm regards,</p>
+              <p style="color: #323956; font-size: 15px; font-weight: 700; margin: 0 0 32px;">Team Limitless Brain Lab</p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background: #f8f9fc; padding: 16px 32px; border-top: 1px solid #e5e7eb; text-align: center;">
+              <p style="color: #aaa; margin: 0; font-size: 11px;">Limitlessbrainlab.com &nbsp;|&nbsp; limitlessbrainlab@gmail.com</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
+const getTreatMyBrainEmailHtml = (userName) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.1);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 30px 32px; text-align: center;">
+              <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover;" />
+              <h1 style="color: #ffffff; margin: 14px 0 0; font-size: 24px; font-weight: 700;">Limitless Brain Lab</h1>
+              <p style="color: #F5D05D; margin: 6px 0 0; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600;">Health, Wealth &amp; Happiness for All</p>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 36px 32px 8px;">
+              <h2 style="color: #323956; margin: 0 0 20px; font-size: 20px; font-weight: 600;">Dear ${userName},</h2>
+              <p style="color: #555; font-size: 14px; line-height: 1.8; margin: 0 0 16px;">
+                Thank you for choosing the <strong style="color: #323956;">Treat My Brain</strong> package. We're delighted to support you on your journey toward better brain health. Here's an overview of what your program includes and what happens next.
+              </p>
+              <p style="color: #323956; font-size: 15px; font-weight: 700; margin: 0 0 16px;">Your package covers:</p>
+
+              <!-- Package Items -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 20px;">
+                <tr>
+                  <td style="background: #f8f9fc; border-left: 4px solid #F5D05D; border-radius: 0 8px 8px 0; padding: 14px 16px; display: block;">
+                    <p style="color: #323956; font-size: 14px; font-weight: 700; margin: 0 0 6px;">1. Digital Brain Assessment</p>
+                    <p style="color: #666; font-size: 13px; line-height: 1.7; margin: 0;">A comprehensive evaluation of your attention and cognition, completed online at your convenience.</p>
+                  </td>
+                </tr>
+                <tr><td style="height: 10px;"></td></tr>
+                <tr>
+                  <td style="background: #f8f9fc; border-left: 4px solid #F5D05D; border-radius: 0 8px 8px 0; padding: 14px 16px; display: block;">
+                    <p style="color: #323956; font-size: 14px; font-weight: 700; margin: 0 0 6px;">2. Lifestyle Questionnaire</p>
+                    <p style="color: #666; font-size: 13px; line-height: 1.7; margin: 0;">This will be sent to you separately to help us understand your daily habits, sleep, nutrition, stress, and overall wellbeing.</p>
+                  </td>
+                </tr>
+                <tr><td style="height: 10px;"></td></tr>
+                <tr>
+                  <td style="background: #f8f9fc; border-left: 4px solid #F5D05D; border-radius: 0 8px 8px 0; padding: 14px 16px; display: block;">
+                    <p style="color: #323956; font-size: 14px; font-weight: 700; margin: 0 0 6px;">3. NeuroSense Brain Scan</p>
+                    <p style="color: #666; font-size: 13px; line-height: 1.7; margin: 0;">An in-depth scan that gives us deeper insight into your brain health.</p>
+                  </td>
+                </tr>
+                <tr><td style="height: 10px;"></td></tr>
+                <tr>
+                  <td style="background: #f8f9fc; border-left: 4px solid #F5D05D; border-radius: 0 8px 8px 0; padding: 14px 16px; display: block;">
+                    <p style="color: #323956; font-size: 14px; font-weight: 700; margin: 0 0 6px;">4. Neurologist Consultation</p>
+                    <p style="color: #666; font-size: 13px; line-height: 1.7; margin: 0;">You will have a dedicated consultation with our neurologist to review your results and discuss your brain health in detail.</p>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="color: #555; font-size: 14px; line-height: 1.8; margin: 0 0 16px;">
+                To give you a sense of what to expect, we've attached two sample reports for your reference: a <strong style="color: #323956;">NeuroSense sample report</strong> and a <strong style="color: #323956;">cognition report sample</strong>.
+              </p>
+              <p style="color: #555; font-size: 14px; line-height: 1.8; margin: 0 0 20px;">
+                Once all the above are completed, we will conduct a <strong style="color: #323956;">personalised coaching session</strong> with you, followed by a detailed plan tailored to your results and goals.
+              </p>
+
+              <!-- Package Fee -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); border-radius: 10px; margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 16px 20px; text-align: center;">
+                    <p style="color: #F5D05D; margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Payment Due</p>
+                    <p style="color: #ffffff; margin: 6px 0 0; font-size: 22px; font-weight: 700;">INR 10,500</p>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="color: #555; font-size: 14px; line-height: 1.8; margin: 0 0 16px;">
+                If you have any questions or would like help getting started, please don't hesitate to reach out. We look forward to working with you.
+              </p>
+              <p style="color: #555; font-size: 14px; line-height: 1.8; margin: 0 0 4px;">Warm regards,</p>
+              <p style="color: #323956; font-size: 15px; font-weight: 700; margin: 0 0 32px;">Team Limitless Brain Lab</p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background: #f8f9fc; padding: 16px 32px; border-top: 1px solid #e5e7eb; text-align: center;">
+              <p style="color: #aaa; margin: 0; font-size: 11px;">Limitlessbrainlab.com &nbsp;|&nbsp; limitlessbrainlab@gmail.com</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
 // ===== MIDDLEWARE SETUP =====
 // Allow multiple origins (development + production)
 const allowedOrigins = [
@@ -339,8 +551,81 @@ app.use('/api/sso', protectedRoutes.optionalAuth, ssoRoutes);
 // Claude API test endpoint - NO AUTH (for testing VPS connection)
 app.use('/api/test', claudeRoutes);
 
-// Claude API routes - Require authentication
-app.use('/api', protectedRoutes.authRequired, claudeRoutes);
+// Contact Form API endpoint - PUBLIC (no auth required)
+app.post('/api/contact', async (req, res) => {
+  try {
+    const { firstName, lastName, email, phone, city, message, source } = req.body;
+
+    if (!firstName || !email || !phone || !city) {
+      return res.status(400).json({
+        success: false,
+        message: 'First name, email, phone, and city are required'
+      });
+    }
+
+    const fullName = `${firstName} ${lastName || ''}`.trim();
+    const isProtectMyBrain = source === 'protect-my-brain';
+    const isTreatMyBrain = source === 'treat-my-brain';
+
+    // Send success response immediately
+    res.json({
+      success: true,
+      message: 'Message received successfully'
+    });
+
+    // Send admin notification email
+    const mailOptions = {
+      from: EMAIL_FROM,
+      to: process.env.EMAIL_TO || process.env.EMAIL_USER,
+      subject: `Customer Inquiry - ${fullName}`,
+      html: getAdminNotificationHtml('Customer Inquiry', [
+        { label: 'Name', value: fullName },
+        { label: 'Email', value: email },
+        { label: 'Phone', value: phone },
+        { label: 'City', value: city },
+        { label: 'Message', value: message || 'No message provided' }
+      ]),
+      attachments: getLogoAttachment()
+    };
+
+    emailTransporter.sendMail(mailOptions)
+      .catch((emailError) => {
+        console.error('Email sending failed:', emailError.message);
+      });
+
+    // Send confirmation email to user
+    const userConfirmation = {
+      from: EMAIL_FROM,
+      to: email,
+      subject: isProtectMyBrain
+        ? `Your Protect My Brain Package - Limitless Brain Lab`
+        : isTreatMyBrain
+          ? `Your Treat My Brain Package - Limitless Brain Lab`
+          : `Thank You for Contacting Us - Limitless Brain Lab`,
+      html: isProtectMyBrain
+        ? getProtectMyBrainEmailHtml(fullName)
+        : isTreatMyBrain
+          ? getTreatMyBrainEmailHtml(fullName)
+          : getUserConfirmationHtml(fullName),
+      attachments: getFullAttachments()
+    };
+    emailTransporter.sendMail(userConfirmation)
+      .catch((err) => console.error('User confirmation email failed:', err.message));
+
+  } catch (error) {
+    console.error('Error processing contact form:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to send message',
+        error: error.message
+      });
+    }
+  }
+});
+
+// Claude API routes - auth handled per-route inside claudeRoutes
+app.use('/api', claudeRoutes);
 
 // EDF Upload Notification Email - triggered after QEEG processing
 app.post('/api/edf-upload-notification', async (req, res) => {
@@ -724,71 +1009,6 @@ app.get('/api/website-payments', async (req, res) => {
   } catch (error) {
     console.error('Error fetching website payments:', error);
     res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// Contact Form API endpoint
-app.post('/api/contact', async (req, res) => {
-  try {
-    const { firstName, lastName, email, phone, city, message } = req.body;
-
-    if (!firstName || !email || !phone || !city) {
-      return res.status(400).json({
-        success: false,
-        message: 'First name, email, phone, and city are required'
-      });
-    }
-
-    const fullName = `${firstName} ${lastName || ''}`.trim();
-
-    // Send success response immediately
-    res.json({
-      success: true,
-      message: 'Message received successfully'
-    });
-
-    // Send email notification asynchronously (non-blocking)
-    const mailOptions = {
-      from: EMAIL_FROM,
-      to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-      subject: `Customer Inquiry - ${fullName}`,
-      html: getAdminNotificationHtml('Customer Inquiry', [
-        { label: 'Name', value: fullName },
-        { label: 'Email', value: email },
-        { label: 'Phone', value: phone },
-        { label: 'City', value: city },
-        { label: 'Message', value: message || 'No message provided' }
-      ]),
-      attachments: getLogoAttachment()
-    };
-
-    // Send email in background (don't await)
-    emailTransporter.sendMail(mailOptions)
-      .catch((emailError) => {
-        console.error('Email sending failed:', emailError.message);
-      });
-
-    // Send confirmation email to user
-    const userConfirmation = {
-      from: EMAIL_FROM,
-      to: email,
-      subject: `Thank You for Contacting Us - Limitless Brain Lab`,
-      html: getUserConfirmationHtml(fullName),
-      attachments: getFullAttachments()
-    };
-    emailTransporter.sendMail(userConfirmation)
-      .catch((err) => console.error('User confirmation email failed:', err.message));
-
-  } catch (error) {
-    console.error('Error processing contact form:', error);
-    // Only send error if response not already sent
-    if (!res.headersSent) {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to send message',
-        error: error.message
-      });
-    }
   }
 });
 

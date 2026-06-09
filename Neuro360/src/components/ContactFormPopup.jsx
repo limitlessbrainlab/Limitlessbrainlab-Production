@@ -124,7 +124,7 @@ const CountryCodeSelect = ({ name, value, onChange, countryCodes: codes }) => {
   );
 };
 
-const ContactFormPopup = ({ isOpen, onClose }) => {
+const ContactFormPopup = ({ isOpen, onClose, source = null }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -185,6 +185,7 @@ const ContactFormPopup = ({ isOpen, onClose }) => {
 
       if (dbError) {
         console.error('Database error:', dbError);
+        throw new Error('Failed to save your message. Please try again.');
       }
 
       // Send email via backend nodemailer API
@@ -199,7 +200,8 @@ const ContactFormPopup = ({ isOpen, onClose }) => {
           email: formData.email,
           phone: fullPhone,
           city: selectedCity,
-          message: formData.message ? formData.message.toUpperCase() : ''
+          message: formData.message ? formData.message.toUpperCase() : '',
+          source
         })
       });
 
@@ -207,6 +209,7 @@ const ContactFormPopup = ({ isOpen, onClose }) => {
 
       if (!response.ok || !result.success) {
         console.error('Email error:', result);
+        throw new Error(result?.message || 'Failed to send message. Please try again.');
       }
 
       setIsSuccess(true);
@@ -229,7 +232,7 @@ const ContactFormPopup = ({ isOpen, onClose }) => {
       }, 3000);
     } catch (error) {
       console.error('Error sending message:', error);
-      toast.error('Failed to send message. Please try again.');
+      toast.error(error.message || 'Failed to send message. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

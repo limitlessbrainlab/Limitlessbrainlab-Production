@@ -650,7 +650,7 @@ const Landing = () => {
                   <div className="flex flex-col gap-4 justify-center mt-8">
                     <h4 className="text-gray-900 text-sm font-bold text-center">Take Expert Advice</h4>
                     {/* Appointment with Neuro Coach */}
-                    <button onClick={() => { setShowProtectBrain(false); openContactForm(); }} className="relative hover:opacity-90 transition-all group block mt-6 w-full text-left cursor-pointer">
+                    <button onClick={() => { setShowProtectBrain(false); openContactForm('protect-my-brain'); }} className="relative hover:opacity-90 transition-all group block mt-6 w-full text-left cursor-pointer">
                       <img src="/Gemini_Generated_Image_4wsbhk4wsbhk4wsb-removebg-preview.png" alt="Neuro Coach" className="absolute -top-6 left-2 h-[60px] w-[45px] sm:h-[80px] sm:w-[60px] object-cover object-top drop-shadow-lg z-10" />
                       <div className="bg-[#1a1a2e] rounded-full flex items-center justify-end px-4 py-3 shadow-lg pl-[50px] sm:pl-[75px]">
                         <p className="text-white text-xs font-bold leading-tight text-right mr-3">Inquire Now</p>
@@ -774,7 +774,7 @@ const Landing = () => {
                   <div className="flex flex-col gap-4 justify-center mt-8">
                     <h4 className="text-gray-900 text-sm font-bold text-center">Take Expert Advice</h4>
                     {/* Appointment with Neurologist */}
-                    <button onClick={() => { setShowFixBrain(false); openContactForm(); }} className="relative hover:opacity-90 transition-all group block mt-6 w-full text-left cursor-pointer">
+                    <button onClick={() => { setShowFixBrain(false); openContactForm('treat-my-brain'); }} className="relative hover:opacity-90 transition-all group block mt-6 w-full text-left cursor-pointer">
                       <img src="/Gemini_Generated_Image_4wsbhk4wsbhk4wsb-removebg-preview.png" alt="Neurologist" className="absolute -top-6 left-2 h-[60px] w-[45px] sm:h-[80px] sm:w-[60px] object-cover object-top drop-shadow-lg z-10" />
                       <div className="bg-[#1a1a2e] rounded-full flex items-center justify-end px-4 py-3 shadow-lg pl-[50px] sm:pl-[75px]">
                         <p className="text-white text-xs font-bold leading-tight text-right mr-3">Appointment with<br/>Neurologist</p>
@@ -914,7 +914,7 @@ const Landing = () => {
                   <div className="flex flex-col gap-4 justify-center mt-8">
                     <h4 className="text-gray-900 text-sm font-bold text-center">Take Expert Advice</h4>
                     {/* Appointment with Neuro Coach */}
-                    <button onClick={() => { setShowProtectHero(false); openContactForm(); }} className="relative hover:opacity-90 transition-all group block mt-6 w-full text-left cursor-pointer">
+                    <button onClick={() => { setShowProtectHero(false); openContactForm('protect-my-brain'); }} className="relative hover:opacity-90 transition-all group block mt-6 w-full text-left cursor-pointer">
                       <img src="/Gemini_Generated_Image_4wsbhk4wsbhk4wsb-removebg-preview.png" alt="Neuro Coach" className="absolute -top-6 left-2 h-[60px] w-[45px] sm:h-[80px] sm:w-[60px] object-cover object-top drop-shadow-lg z-10" />
                       <div className="bg-[#1a1a2e] rounded-full flex items-center justify-end px-4 py-3 shadow-lg pl-[50px] sm:pl-[75px]">
                         <p className="text-white text-xs font-bold leading-tight text-right mr-3">Inquire Now</p>
@@ -1079,7 +1079,7 @@ const Landing = () => {
                   <div className="flex flex-col gap-4 justify-center mt-8">
                     <h4 className="text-gray-900 text-sm font-bold text-center">Take Expert Advice</h4>
                     {/* Appointment with Neurologist */}
-                    <button onClick={() => { setShowFixHero(false); openContactForm(); }} className="relative hover:opacity-90 transition-all group block mt-6 w-full text-left cursor-pointer">
+                    <button onClick={() => { setShowFixHero(false); openContactForm('treat-my-brain'); }} className="relative hover:opacity-90 transition-all group block mt-6 w-full text-left cursor-pointer">
                       <img src="/Gemini_Generated_Image_4wsbhk4wsbhk4wsb-removebg-preview.png" alt="Neurologist" className="absolute -top-6 left-2 h-[60px] w-[45px] sm:h-[80px] sm:w-[60px] object-cover object-top drop-shadow-lg z-10" />
                       <div className="bg-[#1a1a2e] rounded-full flex items-center justify-end px-4 py-3 shadow-lg pl-[50px] sm:pl-[75px]">
                         <p className="text-white text-xs font-bold leading-tight text-right mr-3">Appointment with<br/>Neurologist</p>
@@ -2081,7 +2081,7 @@ const Landing = () => {
                       <span className="text-2xl sm:text-3xl md:text-5xl font-extrabold text-[#323956]">$29.99</span>
                     </div>
                     <ul className="text-left space-y-2.5 sm:space-y-3 mb-6 sm:mb-8 flex-grow">
-                      {['Clinical-grade qEEG analysis', 'Personalized brain report', 'Expert recommendations'].map((t) => (
+                      {['A cognitive report (globally validated)', '25 pages detailed report', 'At the comforts of your home digitally delivered'].map((t) => (
                         <li key={t} className="flex items-center gap-3 text-gray-600 text-sm">
                           <div className="w-5 h-5 rounded-full bg-[#323956]/10 flex items-center justify-center flex-shrink-0">
                             <svg className="w-3 h-3 text-[#323956]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
@@ -2128,7 +2128,7 @@ const Landing = () => {
                     { name: 'Kanak Kejariwal', role: 'Counselling Psychologist', img: '/kanak.jpg' },
                     { name: 'Sanjh Dubey', role: 'Clinical Psychology & Music Therapy', img: '/sanjh-dubey.jpg', pos: 'object-top' },
                     { name: 'Sara Janvekar', role: 'Mantra Therapist', img: '/sara-janvekar.jpg' },
-                    { name: 'Akshitaa Chawla', role: 'Brain Concierge', img: '/akshitaa.jpg', pos: 'object-top' },
+                    { name: 'Akshitaa Chawla', role: 'Diet Concierge', img: '/akshitaa.jpg', pos: 'object-top' },
                   ].concat([
                     { name: 'Ridheema Bagla', role: 'Brain Concierge', img: '/ridheema.jpg' },
                     { name: 'Komal Narang', role: 'Concierge Care', img: '/komal.jpg' },
@@ -2140,7 +2140,7 @@ const Landing = () => {
                     { name: 'Kanak Kejariwal', role: 'Counselling Psychologist', img: '/kanak.jpg' },
                     { name: 'Sanjh Dubey', role: 'Clinical Psychology & Music Therapy', img: '/sanjh-dubey.jpg', pos: 'object-top' },
                     { name: 'Sara Janvekar', role: 'Mantra Therapist', img: '/sara-janvekar.jpg' },
-                    { name: 'Akshitaa Chawla', role: 'Brain Concierge', img: '/akshitaa.jpg', pos: 'object-top' },
+                    { name: 'Akshitaa Chawla', role: 'Diet Concierge', img: '/akshitaa.jpg', pos: 'object-top' },
                   ]).map((member, index) => (
                     <div key={index} className="group text-center flex-shrink-0 min-w-[120px] w-[120px] sm:min-w-[180px] sm:w-[180px] lg:min-w-[220px] lg:w-[220px]">
                       <div className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full mx-auto mb-3 sm:mb-4 overflow-hidden border-3 border-gray-200 group-hover:border-[#c9a227] transition-all duration-300 shadow-md group-hover:shadow-xl bg-gradient-to-br from-[#323956] to-[#4a5280]">

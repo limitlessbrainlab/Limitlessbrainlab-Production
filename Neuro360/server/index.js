@@ -7,6 +7,7 @@ const nodemailer = require('nodemailer');
 const compression = require('compression');
 const qeegRoutes = require('./routes/qeegRoutes');
 const claudeReportRoutes = require('./routes/claudeReportRoutes');
+const patientDocumentRoutes = require('./routes/patientDocumentRoutes');
 const ssoRoutes = require('./routes/ssoRoutes');
 const claudeRoutes = require('./routes/claudeRoutes');
 const { createClient } = require('@supabase/supabase-js');
@@ -572,6 +573,10 @@ app.get('/api/health', (req, res) => {
 // Supabase token). Mounted BEFORE /api/qeeg so this specific path wins and is
 // not gated by the hourly Supabase-only authRequired middleware.
 app.use('/api/qeeg/claude-report', claudeReportRoutes);
+
+// Patient documents (private patients_documents bucket) - has its own static
+// token auth (PATIENT_DOCS_TOKEN); uploads/reads/deletes via service-role key.
+app.use('/api/patient-documents', patientDocumentRoutes);
 
 // QEEG routes - Require authentication
 app.use('/api/qeeg', protectedRoutes.authRequired, qeegRoutes);

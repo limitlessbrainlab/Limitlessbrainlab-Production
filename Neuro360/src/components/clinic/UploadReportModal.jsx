@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { logUploadAttempt, logUploadError } from '../../utils/uploadErrorChecker';
 import SubscriptionPopup from '../admin/SubscriptionPopup';
 import { supabase } from '../../lib/supabaseClient';
+import { uploadPatientDocument } from '../../services/patientDocuments';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 
 const UploadReportModal = ({ clinicId, patient, onUpload, onClose }) => {
@@ -238,52 +239,22 @@ const UploadReportModal = ({ clinicId, patient, onUpload, onClose }) => {
 
       setUploadProgress(30);
 
-      // Upload file to patients_documents bucket
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('patients_documents')
-        .upload(filePath, file, {
-          contentType: file.type || 'application/octet-stream',
-          upsert: true
-        });
-
-      if (uploadError) {
-        throw new Error(`Storage upload failed: ${uploadError.message}`);
-      }
+      // Upload file to the PRIVATE patients_documents bucket via the backend
+      // (service-role key). Returns the storage path; no public URL.
+      const uploadData = await uploadPatientDocument(file, filePath);
 
       setUploadProgress(60);
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('patients_documents')
-        .getPublicUrl(uploadData.path);
-
 
       setUploadProgress(80);
 
       // Handle second file upload for EEG type
       let uploadData2 = null;
-      let urlData2 = null;
       if (data.reportType === 'EEG' && data.reportFile2 && data.reportFile2[0]) {
         const file2 = data.reportFile2[0];
         const sanitizedFileName2 = file2.name.replace(/[^a-zA-Z0-9._-]/g, '_');
         const filePath2 = `${sanitizedClinic}/${sanitizedPatient}/${docType}_EyesClosed_${sanitizedFileName2}`;
 
-        const { data: upload2, error: uploadError2 } = await supabase.storage
-          .from('patients_documents')
-          .upload(filePath2, file2, {
-            contentType: file2.type || 'application/octet-stream',
-            upsert: true
-          });
-
-        if (uploadError2) {
-          throw new Error(`EEG Report file upload failed: ${uploadError2.message}`);
-        }
-
-        uploadData2 = upload2;
-        const { data: url2 } = supabase.storage
-          .from('patients_documents')
-          .getPublicUrl(upload2.path);
-        urlData2 = url2;
+        uploadData2 = await uploadPatientDocument(file2, filePath2);
       }
 
       setUploadProgress(70);
@@ -302,7 +273,8 @@ const UploadReportModal = ({ clinicId, patient, onUpload, onClose }) => {
 
       const newFileEntry = {
         path: uploadData.path,
-        url: urlData.publicUrl,
+        bucket: uploadData.bucket,
+        url: '',
         fileName: sanitizedFileName,
         originalName: file.name,
         size: file.size,
@@ -320,12 +292,13 @@ const UploadReportModal = ({ clinicId, patient, onUpload, onClose }) => {
       fileEntries[fileKey1] = newFileEntry;
 
       // Add second file entry for EEG
-      if (uploadData2 && urlData2) {
+      if (uploadData2) {
         const file2 = data.reportFile2[0];
         const fileKey2 = `uploaded_${docType}_report_${Date.now() + 1}`;
         fileEntries[fileKey2] = {
           path: uploadData2.path,
-          url: urlData2.publicUrl,
+          bucket: uploadData2.bucket,
+          url: '',
           fileName: file2.name.replace(/[^a-zA-Z0-9._-]/g, '_'),
           originalName: file2.name,
           size: file2.size,

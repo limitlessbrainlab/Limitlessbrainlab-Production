@@ -23,6 +23,7 @@ import toast from 'react-hot-toast';
 import DatabaseService from '../../services/databaseService';
 import StorageService from '../../services/storageService';
 import { supabase } from '../../lib/supabaseClient';
+import { uploadPatientDocument, getPatientDocSignedUrl, deletePatientDocument } from '../../services/patientDocuments';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import UploadReportModal from './UploadReportModal';
 import ClinicalReportView from './ClinicalReportView';
@@ -1073,10 +1074,9 @@ const ClinicalDocumentationForm = ({ patientId, patientName, patientData, clinic
           for (const [key, fileInfo] of Object.entries(data.file_urls)) {
             if (fileInfo && fileInfo.path) {
               try {
-                const { data: signedData, error } = await supabaseClient.storage
-                  .from('patients_documents')
-                  .createSignedUrl(fileInfo.path, 60);
-                if (!error && signedData?.signedUrl) {
+                // Validate via a backend-minted signed URL (bucket is private)
+                const signedUrl = await getPatientDocSignedUrl(fileInfo.bucket || 'patients_documents', fileInfo.path, 60);
+                if (signedUrl) {
                   validatedUrls[key] = fileInfo;
                 } else {
                   hasInvalid = true;
@@ -1118,13 +1118,31 @@ const ClinicalDocumentationForm = ({ patientId, patientName, patientData, clinic
     }
   };
 
+  // Open a saved private file via a short-lived signed URL (no public URLs).
+  const handleViewSavedFile = async (fileInfo) => {
+    try {
+      let url = null;
+      if (fileInfo?.path) {
+        url = await getPatientDocSignedUrl(fileInfo.bucket || 'patients_documents', fileInfo.path);
+      }
+      if (!url) url = fileInfo?.url; // legacy fallback
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } else {
+        toast.error('Unable to open file. It may no longer exist.');
+      }
+    } catch (err) {
+      console.error('Error opening file:', err);
+      toast.error('Failed to open file');
+    }
+  };
+
   const handleRemoveSavedFile = async (fileKey) => {
     try {
       const fileInfo = savedFileUrls[fileKey];
-      // Delete from storage bucket if path exists
+      // Delete from storage bucket if path exists (via backend service-role key)
       if (fileInfo?.path) {
-        const supabase = DatabaseService.supabaseService.supabase;
-        await supabase.storage.from('patients_documents').remove([fileInfo.path]);
+        await deletePatientDocument(fileInfo.bucket || 'patients_documents', fileInfo.path);
       }
       // Remove from local state
       const updatedUrls = { ...savedFileUrls };
@@ -1152,7 +1170,7 @@ const ClinicalDocumentationForm = ({ patientId, patientName, patientData, clinic
     }
     setSaving(true);
     try {
-      // Upload files to patients_documents bucket
+      // Upload files to the PRIVATE patients_documents bucket via the backend
       let fileUrls = {};
       const supabase = DatabaseService.supabaseService.supabase;
 
@@ -1164,10 +1182,10 @@ const ClinicalDocumentationForm = ({ patientId, patientName, patientData, clinic
             const sanitizedPatient = (patientName || 'unknown_patient').replace(/[^a-zA-Z0-9._-]/g, '_');
             const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
 
-            // If updating existing file, delete old one first then upload new
+            // If updating existing file at a different path, delete the old one
             if (savedFileUrls[key]?.path) {
               try {
-                await supabase.storage.from('patients_documents').remove([savedFileUrls[key].path]);
+                await deletePatientDocument(savedFileUrls[key].bucket || 'patients_documents', savedFileUrls[key].path);
               } catch (delErr) {
                 console.warn(`Could not delete old file for ${key}:`, delErr);
               }
@@ -1175,27 +1193,13 @@ const ClinicalDocumentationForm = ({ patientId, patientName, patientData, clinic
 
             const filePath = `${sanitizedClinic}/${sanitizedPatient}/${key}_${sanitizedFileName}`;
 
-
-            // Upload to patients_documents bucket (upsert to replace if same path exists)
-            const { data: uploadData, error: uploadError } = await supabase.storage
-              .from('patients_documents')
-              .upload(filePath, file, {
-                contentType: file.type || 'application/octet-stream',
-                upsert: true
-              });
-
-            if (uploadError) {
-              throw new Error(uploadError.message);
-            }
-
-            // Get public URL
-            const { data: urlData } = supabase.storage
-              .from('patients_documents')
-              .getPublicUrl(uploadData.path);
+            // Upload via backend (service-role key). Returns storage path only.
+            const uploadData = await uploadPatientDocument(file, filePath);
 
             fileUrls[key] = {
               path: uploadData.path,
-              url: urlData.publicUrl,
+              bucket: uploadData.bucket,
+              url: '',
               fileName: sanitizedFileName,
               originalName: file.name,
               size: file.size,
@@ -1351,8 +1355,8 @@ const ClinicalDocumentationForm = ({ patientId, patientName, patientData, clinic
                 <div className="flex items-center gap-2 ml-6 bg-green-50 border border-green-200 rounded px-3 py-1.5">
                   <svg className="h-4 w-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   <span className="text-xs text-green-700 font-medium truncate">{savedFileUrls[key].originalName || savedFileUrls[key].fileName || 'Saved document'}</span>
-                  {savedFileUrls[key].url && (
-                    <a href={savedFileUrls[key].url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800 underline flex-shrink-0">View</a>
+                  {(savedFileUrls[key].path || savedFileUrls[key].url) && (
+                    <button type="button" onClick={() => handleViewSavedFile(savedFileUrls[key])} className="text-xs text-blue-600 hover:text-blue-800 underline flex-shrink-0">View</button>
                   )}
                   <button onClick={() => handleRemoveSavedFile(key)} className="text-red-400 hover:text-red-600 flex-shrink-0 ml-1" title="Remove file">
                     <X className="h-3.5 w-3.5" />
@@ -1569,7 +1573,7 @@ const ClinicalDocumentationForm = ({ patientId, patientName, patientData, clinic
                   <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded px-2 py-1">
                     <svg className="h-3.5 w-3.5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     <span className="text-xs text-green-700 truncate">{savedFileUrls.eyesOpenEdf.originalName || savedFileUrls.eyesOpenEdf.fileName || 'Saved EDF'}</span>
-                    {savedFileUrls.eyesOpenEdf.url && <a href={savedFileUrls.eyesOpenEdf.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800 underline flex-shrink-0">View</a>}
+                    {(savedFileUrls.eyesOpenEdf.path || savedFileUrls.eyesOpenEdf.url) && <button type="button" onClick={() => handleViewSavedFile(savedFileUrls.eyesOpenEdf)} className="text-xs text-blue-600 hover:text-blue-800 underline flex-shrink-0">View</button>}
                     <button onClick={() => handleRemoveSavedFile('eyesOpenEdf')} className="text-red-400 hover:text-red-600 flex-shrink-0 ml-1" title="Remove"><X className="h-3.5 w-3.5" /></button>
                   </div>
                 )}
@@ -1589,7 +1593,7 @@ const ClinicalDocumentationForm = ({ patientId, patientName, patientData, clinic
                   <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded px-2 py-1">
                     <svg className="h-3.5 w-3.5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     <span className="text-xs text-green-700 truncate">{savedFileUrls.eyesClosedEdf.originalName || savedFileUrls.eyesClosedEdf.fileName || 'Saved EDF'}</span>
-                    {savedFileUrls.eyesClosedEdf.url && <a href={savedFileUrls.eyesClosedEdf.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:text-blue-800 underline flex-shrink-0">View</a>}
+                    {(savedFileUrls.eyesClosedEdf.path || savedFileUrls.eyesClosedEdf.url) && <button type="button" onClick={() => handleViewSavedFile(savedFileUrls.eyesClosedEdf)} className="text-xs text-blue-600 hover:text-blue-800 underline flex-shrink-0">View</button>}
                     <button onClick={() => handleRemoveSavedFile('eyesClosedEdf')} className="text-red-400 hover:text-red-600 flex-shrink-0 ml-1" title="Remove"><X className="h-3.5 w-3.5" /></button>
                   </div>
                 )}

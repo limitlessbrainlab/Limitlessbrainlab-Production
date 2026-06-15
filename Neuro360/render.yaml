@@ -30,10 +30,14 @@ services:
         sync: false
       - key: CLAUDE_REPORT_TOKEN
         sync: false
+      # Gates the /api/patient-documents endpoints (private patients_documents
+      # bucket). Min 16 chars; must equal the frontend's VITE_PATIENT_DOCS_TOKEN.
+      - key: PATIENT_DOCS_TOKEN
+        sync: false
       - key: OPENAI_API_KEY
         sync: false
       - key: SUPABASE_URL
-        value: https://wqykofpjpaytjuqsessf.supabase.co
+        value: https://puzdgwtprcpaaxxwkwtk.supabase.co
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: FRONTEND_URL
@@ -100,12 +104,15 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_SUPABASE_URL
-        value: https://wqykofpjpaytjuqsessf.supabase.co
+        value: https://puzdgwtprcpaaxxwkwtk.supabase.co
       - key: VITE_SUPABASE_ANON_KEY
         sync: false
       - key: VITE_API_URL
         sync: false
       - key: VITE_CLAUDE_REPORT_TOKEN
+        sync: false
+      # Must equal the backend's PATIENT_DOCS_TOKEN (patient-document uploads).
+      - key: VITE_PATIENT_DOCS_TOKEN
         sync: false
       - key: VITE_RAZORPAY_KEY_ID
         sync: false

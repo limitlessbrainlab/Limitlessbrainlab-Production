@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import DatabaseService from '../../services/databaseService';
 import StorageService from '../../services/storageService';
 import { supabase } from '../../lib/supabaseClient';
+import { uploadPatientDocument } from '../../services/patientDocuments';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 
 const ClinicalReportForm = ({ patient, onClose, onSave }) => {
@@ -294,37 +295,16 @@ const ClinicalReportForm = ({ patient, onClose, onSave }) => {
           const filePath = `${sanitizedClinicName}/${sanitizedPatientName}/${fileObj.type}/${sanitizedFileName}`;
 
 
-          // Upload to Supabase Storage - patients_documents bucket (upsert to replace existing)
-          const { data, error } = await supabase.storage
-            .from('patients_documents')
-            .upload(filePath, fileObj.file, {
-              contentType: fileObj.file.type || 'application/octet-stream',
-              upsert: true,
-              metadata: {
-                clinicId: clinicId,
-                patientUid: patientUid,
-                documentType: fileObj.type,
-                originalName: fileObj.file.name,
-                uploadedAt: new Date().toISOString()
-              }
-            });
-
-          if (error) {
-            console.error('Upload error:', error);
-            throw new Error(`Upload failed: ${error.message}`);
-          }
-
-          // Get public URL
-          const { data: urlData } = supabase.storage
-            .from('patients_documents')
-            .getPublicUrl(data.path);
+          // Upload to the PRIVATE patients_documents bucket via the backend
+          // (service-role key). Returns the storage path; no public URL.
+          const data = await uploadPatientDocument(fileObj.file, filePath);
 
           newUploadedDocuments.push({
             type: fileObj.type,
             fileName: fileObj.file.name,
-            url: urlData.publicUrl,
+            url: '',
             path: data.path,
-            bucket: 'patients_documents',
+            bucket: data.bucket,
             uploadedAt: new Date().toISOString()
           });
 

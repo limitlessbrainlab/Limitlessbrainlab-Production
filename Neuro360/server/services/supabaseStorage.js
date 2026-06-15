@@ -29,7 +29,7 @@ class SupabaseStorage {
    * @param {string} destinationPath - Path within the bucket (optional)
    * @returns {Promise<{success: boolean, url: string, path: string}>}
    */
-  static async uploadFile(filePath, bucketName = 'neurosense-reports', destinationPath = null) {
+  static async uploadFile(filePath, bucketName = 'neurosense-reports', destinationPath = null, contentType = 'application/pdf') {
     try {
       console.log('📤 Uploading file to Supabase storage...');
       console.log('   Local file:', filePath);
@@ -53,7 +53,7 @@ class SupabaseStorage {
       const { data, error } = await supabase.storage
         .from(bucketName)
         .upload(storagePath, fileBuffer, {
-          contentType: 'application/pdf',
+          contentType: contentType || 'application/octet-stream',
           upsert: true // Overwrite if file exists
         });
 
@@ -116,6 +116,30 @@ class SupabaseStorage {
       console.error('❌ Error deleting file from Supabase:', error);
       throw error;
     }
+  }
+
+  /**
+   * Create a short-lived signed URL for a private file.
+   * @param {string} bucketName - Name of the bucket
+   * @param {string} filePath - Path within the bucket
+   * @param {number} expiresIn - Seconds the URL stays valid (default 300)
+   * @returns {Promise<{success: boolean, signedUrl: string}>}
+   */
+  static async getSignedUrl(bucketName, filePath, expiresIn = 300) {
+    if (!supabase) {
+      throw new Error('Supabase client not initialized - check environment variables');
+    }
+
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .createSignedUrl(filePath, expiresIn);
+
+    if (error) {
+      console.error('❌ Supabase signed-url error:', error);
+      throw new Error(`Failed to create signed URL: ${error.message}`);
+    }
+
+    return { success: true, signedUrl: data?.signedUrl || null };
   }
 
   /**

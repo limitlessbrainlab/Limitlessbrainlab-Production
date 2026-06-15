@@ -385,12 +385,9 @@ const getReportEmailHtml = ({ isClinic, patientName, clinicName, reportUrl, logi
 
               <p style="color: #555; font-size: 14px; line-height: 1.7; margin: 0 0 20px;">Please login to your portal to view and download your full report.</p>
 
-              <!-- Buttons -->
-              <div style="text-align: center; margin: 0 0 10px;">
-                <a href="${reportUrl}" style="display: inline-block; background: linear-gradient(135deg, #0f2a5e 0%, #1e63b4 100%); color: #ffffff; text-decoration: none; padding: 13px 34px; border-radius: 8px; font-weight: 600; font-size: 15px;">Download Report (PDF)</a>
-              </div>
+              <!-- Login button -->
               <div style="text-align: center; margin: 0 0 24px;">
-                <a href="${loginUrl}" style="display: inline-block; background: #ffffff; color: #1e63b4; text-decoration: none; padding: 12px 34px; border-radius: 8px; font-weight: 600; font-size: 15px; border: 2px solid #1e63b4;">Login to Portal →</a>
+                <a href="${loginUrl}" style="display: inline-block; background: linear-gradient(135deg, #0f2a5e 0%, #1e63b4 100%); color: #ffffff; text-decoration: none; padding: 13px 36px; border-radius: 8px; font-weight: 600; font-size: 15px;">Login to Portal →</a>
               </div>
 
               <p style="color: #555; font-size: 14px; margin: 0 0 4px;">Best regards,</p>

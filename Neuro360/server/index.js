@@ -335,6 +335,74 @@ const getReportReceivedHtml = (patientName, clinicName) => `
 </html>
 `;
 
+// Shared template for the Neuro Performance Report email (patient + clinic).
+// Delivers the report as a download LINK (no PDF attachment) plus a Login button.
+const getReportEmailHtml = ({ isClinic, patientName, clinicName, reportUrl, loginUrl }) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.1);">
+
+          <!-- Banner -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #1e63b4 0%, #0f2a5e 100%); padding: 30px 32px; text-align: center;">
+              <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover;" />
+              <h1 style="color: #ffffff; margin: 14px 0 0; font-size: 26px; font-weight: 700;">Neuro Performance Report</h1>
+              <p style="color: #9ec2f0; margin: 8px 0 0; font-size: 13px; letter-spacing: 1px; font-weight: 600;">Patient Brain-Type Profile &amp; Review</p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding: 36px 32px 8px;">
+              <h2 style="color: #15315f; margin: 0 0 20px; font-size: 20px; font-weight: 600;">${isClinic ? `Hello ${clinicName || 'Team'},` : `Hi ${patientName || 'there'},`}</h2>
+              <p style="color: #555; font-size: 15px; line-height: 1.8; margin: 0 0 18px;">
+                ${isClinic
+                  ? `The <strong>Neuro Performance Report</strong> for <strong>${patientName || 'your patient'}</strong> is ready for clinical review. The patient has also received a copy.`
+                  : `Your personalized <strong>Neuro Performance Report</strong> is ready — a complete map of your brain-type profile, performance markers, and neuro-metrics from your qEEG analysis.`}
+              </p>
+
+              <!-- Download Report link -->
+              <div style="text-align: center; margin: 0 0 16px;">
+                <a href="${reportUrl}" style="display: inline-block; background: linear-gradient(135deg, #1e63b4 0%, #0f2a5e 100%); color: #ffffff; text-decoration: none; padding: 14px 34px; border-radius: 8px; font-weight: 600; font-size: 15px;">Download Report (PDF)</a>
+              </div>
+
+              <!-- Login button -->
+              <div style="text-align: center; margin: 0 0 24px;">
+                <a href="${loginUrl}" style="display: inline-block; background: #ffffff; color: #1e63b4; text-decoration: none; padding: 13px 34px; border-radius: 8px; font-weight: 600; font-size: 15px; border: 2px solid #1e63b4;">Login to Portal</a>
+              </div>
+
+              <p style="color: #888; font-size: 13px; line-height: 1.7; margin: 0 0 8px;">
+                If the buttons don't work, copy this report link into your browser:<br>
+                <a href="${reportUrl}" style="color: #1e63b4; word-break: break-all;">${reportUrl}</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background: #f8f9fc; padding: 20px 32px; border-top: 1px solid #e5e7eb; text-align: center;">
+              <p style="color: #555; margin: 0 0 6px; font-size: 15px; font-weight: 600;">Best regards,</p>
+              <p style="color: #15315f; margin: 0 0 10px; font-size: 15px; font-weight: 700;">The Limitless Brain Lab Team</p>
+              <p style="color: #aaa; margin: 0; font-size: 11px;">Limitlessbrainlab.com &nbsp;|&nbsp; limitlessbrainlab@gmail.com</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
 const getProtectMyBrainEmailHtml = (userName) => `
 <!DOCTYPE html>
 <html>
@@ -5782,7 +5850,7 @@ app.post('/api/send-email-update-notification', async (req, res) => {
 // Send QEEG Report Email to Clinic and Patient
 app.post('/api/send-report-email', async (req, res) => {
   try {
-    const { patientName, patientEmail, clinicName, clinicEmail, reportUrl, reportFileName } = req.body;
+    const { patientName, patientEmail, clinicName, clinicEmail, reportUrl } = req.body;
 
     if (!patientEmail || !clinicEmail || !reportUrl) {
       return res.status(400).json({
@@ -5801,87 +5869,10 @@ app.post('/api/send-report-email', async (req, res) => {
     const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
     const loginUrl = `${FRONTEND_URL}/login`;
 
-    const reportTitle = `QEEG Analysis Report - ${patientName}`;
-    const reportName = reportFileName || 'neurosense-report.pdf';
-    // When the Super Admin sends the Claude-generated report, use a distinct
-    // "Brain Type & Performance Report" template instead of the NeuroSense one.
-    const isClaude = (req.body.reportType === 'claude');
-
-    // Attach the actual report PDF to the email (download it from reportUrl).
-    // Degrades to link-only if the fetch fails so the email still sends.
-    let reportAttachment = [];
-    try {
-      const pdfRes = await fetch(reportUrl);
-      if (pdfRes.ok) {
-        const buf = Buffer.from(await pdfRes.arrayBuffer());
-        reportAttachment = [{ filename: reportName, content: buf, contentType: 'application/pdf' }];
-      } else {
-        console.warn('send-report-email: could not fetch report PDF, sending link only. status', pdfRes.status);
-      }
-    } catch (e) {
-      console.warn('send-report-email: report PDF fetch failed, sending link only:', e.message);
-    }
-
-    // Security: when the PDF is attached, do NOT put the public Supabase link in
-    // the email body. Only fall back to a link if the attachment could not be built.
-    const attached = reportAttachment.length > 0;
-    const attachedNotice = `<div style="background:#eef6ff;border:1px solid #cfe2ff;border-radius:8px;padding:14px 18px;margin:0 0 24px;text-align:center;"><p style="color:#15315f;margin:0;font-size:14px;font-weight:600;">📎 Your report is attached to this email as a PDF.</p></div>`;
-
-    const claudePatientHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-        <body style="margin:0;padding:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:#f4f7fa;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f7fa;padding:40px 20px;">
-            <tr><td align="center">
-              <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.1);">
-                <tr><td style="background:linear-gradient(135deg,#1e63b4 0%,#0f2a5e 100%);padding:24px 32px;text-align:center;">
-                  <img src="cid:company-logo" alt="Limitless Brain Lab" style="width:90px;height:90px;border-radius:50%;object-fit:cover;margin-bottom:10px;" />
-                  <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:700;">Neurosense Performance Report</h1>
-                  <p style="color:#9ec2f0;margin:6px 0 0;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;">Personalized 12-Page Neuro-Profile</p>
-                </td></tr>
-                <tr><td style="padding:36px 32px;">
-                  <h2 style="color:#15315f;margin:0 0 20px;font-size:22px;font-weight:600;">Hi ${patientName},</h2>
-                  <p style="color:#555;font-size:15px;line-height:1.8;margin:0 0 16px;">Your personalized <strong>Neurosense Performance Report</strong> is ready — a complete map of your brainwave activity, cognitive performance, and your dominant brain type, built from your qEEG analysis.</p>
-                  <p style="color:#555;font-size:15px;line-height:1.8;margin:0 0 20px;">Inside you'll find your brain-type profile, your seven performance markers, the deep-dive neuro-metrics your clinician will reference, and a personalized 30-day plan.</p>
-                  ${attached ? attachedNotice : `<div style="text-align:center;margin:0 0 24px;"><a href="${reportUrl}" style="display:inline-block;background:linear-gradient(135deg,#1e63b4 0%,#0f2a5e 100%);color:#ffffff;text-decoration:none;padding:13px 32px;border-radius:8px;font-weight:600;font-size:14px;">View My Neurosense Performance Report</a></div>`}
-                  <div style="text-align:center;margin:0 0 24px;">
-                    <a href="${loginUrl}" style="display:inline-block;background:#ffffff;color:#1e63b4;text-decoration:none;padding:13px 32px;border-radius:8px;font-weight:600;font-size:14px;border:2px solid #1e63b4;">Login</a>
-                  </div>
-                  <p style="color:#555;font-size:15px;line-height:1.8;margin:0;">This report is a starting point, not a finish line. If anything sparks a question, we're just a reply away.</p>
-                </td></tr>
-                <tr><td style="background:#f8f9fc;padding:20px 32px;border-top:1px solid #e5e7eb;text-align:center;">
-                  <p style="color:#555;margin:0 0 8px;font-size:15px;font-weight:600;">To unlocking what's possible,</p>
-                  <p style="color:#15315f;margin:0;font-size:15px;font-weight:700;">The Limitless Brain Lab Team</p>
-                </td></tr>
-              </table>
-            </td></tr>
-          </table>
-        </body></html>`;
-
-    const claudeClinicHtml = `
-        <!DOCTYPE html>
-        <html><head><meta charset="utf-8"></head>
-        <body style="margin:0;padding:20px;font-family:Arial,sans-serif;background-color:#f4f7fa;">
-          <div style="max-width:600px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.1);">
-            <div style="background:linear-gradient(135deg,#1e63b4 0%,#0f2a5e 100%);padding:25px;text-align:center;">
-              <img src="cid:company-logo" alt="Limitless Brain Lab" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:10px;" />
-              <h1 style="color:white;margin:0;font-size:24px;">Neurosense Performance Report</h1>
-              <p style="color:#9ec2f0;margin:8px 0 0;font-size:14px;">Patient Brain-Type Profile &amp; Review</p>
-            </div>
-            <div style="padding:30px;">
-              <p style="color:#333;font-size:16px;margin:0 0 20px;">Hello <strong>${clinicName}</strong>,</p>
-              <p style="color:#666;font-size:14px;line-height:1.6;margin:0 0 20px;">The <strong>Neurosense Performance Report</strong> for <strong>${patientName}</strong> is ready for clinical review. The patient has also received a copy.</p>
-              <div style="background:#f8f9fc;border-radius:10px;padding:20px;margin:20px 0;">
-                <h3 style="color:#15315f;margin:0 0 15px;font-size:16px;">📋 Report Information</h3>
-                <div style="background:white;border-radius:8px;padding:15px;margin-bottom:10px;border-left:4px solid #1e63b4;"><p style="color:#888;margin:0;font-size:11px;text-transform:uppercase;">Patient Name</p><p style="color:#15315f;margin:4px 0 0;font-size:15px;font-weight:600;">${patientName}</p></div>
-                <div style="background:white;border-radius:8px;padding:15px;border-left:4px solid #2dbf9c;"><p style="color:#888;margin:0;font-size:11px;text-transform:uppercase;">Report Type</p><p style="color:#15315f;margin:4px 0 0;font-size:15px;font-weight:600;">Neurosense Performance Report (12-page)</p></div>
-              </div>
-              ${attached ? attachedNotice : `<div style="text-align:center;margin:25px 0;"><a href="${reportUrl}" style="display:inline-block;background:linear-gradient(135deg,#1e63b4 0%,#0f2a5e 100%);color:white;text-decoration:none;padding:12px 30px;border-radius:8px;font-weight:600;font-size:14px;">📥 Download Report</a></div>`}
-            </div>
-            <div style="background:#f8f9fc;padding:15px;text-align:center;border-top:1px solid #e5e7eb;"><p style="color:#888;margin:0;font-size:11px;">© ${new Date().getFullYear()} Limitless Brain Lab | Brain &amp; Mental Wellness</p></div>
-          </div>
-        </body></html>`;
+    // Report is delivered as a download LINK (no PDF attachment). Both patient
+    // and clinic get the same Neuro Performance Report template.
+    const reportHtmlPatient = getReportEmailHtml({ isClinic: false, patientName, clinicName, reportUrl, loginUrl });
+    const reportHtmlClinic = getReportEmailHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl });
 
     // Email to Patient
     const patientMailOptions = {
@@ -5892,145 +5883,20 @@ app.post('/api/send-report-email', async (req, res) => {
         'List-Unsubscribe': `<mailto:${process.env.EMAIL_USER}?subject=unsubscribe>`,
         'X-Mailer': 'Limitless Brain Lab Mailer'
       },
-      subject: isClaude ? `Your Neurosense Performance Report is Ready` : `Your report is ready — unlock your hidden brain powers`,
-      text: isClaude
-        ? `Hi ${patientName},\n\nYour Neurosense Performance Report is ready.\n\nLog in to your dashboard to view it: ${loginUrl}\n\nThe Limitless Brain Lab Team`
-        : `Hi ${patientName},\n\nYour brain report is ready. Log in to access your results: ${loginUrl}\n\nThe Limitless Brain Lab Team`,
-      attachments: [...getLogoAttachment(), ...reportAttachment],
-      html: isClaude ? claudePatientHtml : `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f7fa; padding: 40px 20px;">
-            <tr>
-              <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.1);">
-                  <!-- Header -->
-                  <tr>
-                    <td style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 24px 32px; text-align: center;">
-                      <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; margin-bottom: 10px;" />
-                      <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700;">Limitless Brain Lab</h1>
-                      <p style="color: #F5D05D; margin: 6px 0 0; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600;">Your Report Is Ready</p>
-                    </td>
-                  </tr>
-
-                  <!-- Main Content -->
-                  <tr>
-                    <td style="padding: 36px 32px;">
-                      <h2 style="color: #323956; margin: 0 0 20px; font-size: 22px; font-weight: 600;">Hi ${patientName},</h2>
-                      <p style="color: #555; font-size: 15px; line-height: 1.8; margin: 0 0 16px;">
-                        Great news — your report is ready.
-                      </p>
-                      <p style="color: #555; font-size: 15px; line-height: 1.8; margin: 0 0 20px;">
-                        Log in to your dashboard now to access your personalised results and start exploring the hidden powers of your brain. What you'll find inside is a deeper look at how your mind works, where your strengths lie, and the untapped potential waiting to be unlocked.
-                      </p>
-
-                      <!-- CTA Button / attachment notice -->
-                      ${attached ? attachedNotice : `<div style="text-align: center; margin: 0 0 24px;">
-                        <a href="${reportUrl}" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                          View My Report
-                        </a>
-                      </div>`}
-
-                      <!-- Next Steps -->
-                      <div style="background: #f8f9fc; border-radius: 12px; padding: 20px; margin: 0 0 24px;">
-                        <h3 style="color: #323956; margin: 0 0 15px; font-size: 15px; font-weight: 600;">Here's what to do next:</h3>
-                        <ul style="color: #555; margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.8;">
-                          <li>Open your report and take your time with it</li>
-                          <li>Review the key insights and recommendations</li>
-                          <li>Decide which next step feels right for you — whether that's booking a coach or exploring more on your own</li>
-                        </ul>
-                      </div>
-
-                      <p style="color: #555; font-size: 15px; line-height: 1.8; margin: 0;">
-                        This is where the real journey begins. Your brain has more to offer than you might realise, and this report is your map. If anything in your report sparks a question or you'd like guidance interpreting it, we're just a reply away.
-                      </p>
-                    </td>
-                  </tr>
-
-                  <!-- Footer -->
-                  <tr>
-                    <td style="background: #f8f9fc; padding: 20px 32px; border-top: 1px solid #e5e7eb; text-align: center;">
-                      <p style="color: #555; margin: 0 0 8px; font-size: 15px; font-weight: 600;">To unlocking what's possible,</p>
-                      <p style="color: #323956; margin: 0; font-size: 15px; font-weight: 700;">The Limitless Brain Lab Team</p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-        </html>
-      `
+      subject: `Your Neuro Performance Report is Ready`,
+      text: `Hi ${patientName},\n\nYour Neuro Performance Report is ready.\n\nDownload your report (PDF): ${reportUrl}\nLog in to your portal: ${loginUrl}\n\nThe Limitless Brain Lab Team`,
+      attachments: getLogoAttachment(),
+      html: reportHtmlPatient
     };
 
     // Email to Clinic
     const clinicMailOptions = {
       from: EMAIL_FROM,
       to: clinicEmail,
-      subject: isClaude ? `Neurosense Performance Report — ${patientName}` : `QEEG Report Ready for Review - ${patientName}`,
-      attachments: [...getLogoAttachment(), ...reportAttachment],
-      html: isClaude ? claudeClinicHtml : `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-        </head>
-        <body style="margin: 0; padding: 20px; font-family: Arial, sans-serif; background-color: #f4f7fa;">
-          <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-            <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 25px; text-align: center;">
-              <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin-bottom: 10px;" />
-              <h1 style="color: white; margin: 0; font-size: 24px;">QEEG Report Ready</h1>
-              <p style="color: #F5D05D; margin: 8px 0 0; font-size: 14px;">Patient Analysis & Review</p>
-            </div>
-
-            <div style="padding: 30px;">
-              <p style="color: #333; font-size: 16px; margin: 0 0 20px;">
-                Hello <strong>${clinicName}</strong>,
-              </p>
-
-              <p style="color: #666; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
-                The QEEG analysis report for <strong>${patientName}</strong> has been completed and is ready for clinical review. The patient has also received a copy for their records.
-              </p>
-
-              <div style="background: #f8f9fc; border-radius: 10px; padding: 20px; margin: 20px 0;">
-                <h3 style="color: #323956; margin: 0 0 15px; font-size: 16px;">📋 Report Information</h3>
-                <div style="background: white; border-radius: 8px; padding: 15px; margin-bottom: 10px; border-left: 4px solid #10b981;">
-                  <p style="color: #888; margin: 0; font-size: 11px; text-transform: uppercase;">Patient Name</p>
-                  <p style="color: #323956; margin: 4px 0 0; font-size: 15px; font-weight: 600;">${patientName}</p>
-                </div>
-                <div style="background: white; border-radius: 8px; padding: 15px; border-left: 4px solid #f59e0b;">
-                  <p style="color: #888; margin: 0; font-size: 11px; text-transform: uppercase;">Report File</p>
-                  <p style="color: #323956; margin: 4px 0 0; font-size: 15px; font-weight: 600;">${reportName}</p>
-                </div>
-              </div>
-
-              ${attached ? attachedNotice : `<div style="text-align: center; margin: 25px 0;">
-                <a href="${reportUrl}" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: white; text-decoration: none; padding: 12px 30px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                  📥 Download Report
-                </a>
-              </div>`}
-
-              <div style="background: #fef3c7; border-radius: 8px; padding: 12px 15px; margin-top: 20px;">
-                <p style="color: #92400e; margin: 0; font-size: 12px;">
-                  ✅ <strong>Action Required:</strong> Review the report and prepare clinical recommendations for the patient consultation.
-                </p>
-              </div>
-            </div>
-
-            <div style="background: #f8f9fc; padding: 15px; text-align: center; border-top: 1px solid #e5e7eb;">
-              <p style="color: #888; margin: 0; font-size: 11px;">
-                © ${new Date().getFullYear()} Limitless Brain Lab | Brain & Mental Wellness
-              </p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `
+      subject: `Neuro Performance Report — ${patientName}`,
+      text: `Hello ${clinicName},\n\nThe Neuro Performance Report for ${patientName} is ready for clinical review.\n\nDownload the report (PDF): ${reportUrl}\nLog in to your portal: ${loginUrl}\n\nThe Limitless Brain Lab Team`,
+      attachments: getLogoAttachment(),
+      html: reportHtmlClinic
     };
 
     // Send both emails in parallel

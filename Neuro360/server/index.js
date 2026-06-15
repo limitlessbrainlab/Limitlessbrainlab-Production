@@ -284,6 +284,57 @@ const getUserConfirmationHtml = (userName) => `
 </html>
 `;
 
+const getReportReceivedHtml = (patientName, clinicName) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f7fa; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.1);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 30px 32px; text-align: center;">
+              <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover;" />
+              <h1 style="color: #ffffff; margin: 14px 0 0; font-size: 24px; font-weight: 700;">Limitless Brain Lab</h1>
+              <p style="color: #F5D05D; margin: 6px 0 0; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600;">Health, Wealth &amp; Happiness for All</p>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 36px 32px 24px;">
+              <h2 style="color: #323956; margin: 0 0 20px; font-size: 20px; font-weight: 600;">Dear ${patientName || 'Patient'},</h2>
+              <p style="color: #555; font-size: 14px; line-height: 1.8; margin: 0 0 18px;">
+                We have successfully received your report${clinicName ? ` from <strong style="color: #323956;">${clinicName}</strong>` : ''}, and our analysis has now started.
+              </p>
+              <p style="color: #555; font-size: 14px; line-height: 1.8; margin: 0 0 24px;">
+                You will be notified by email as soon as your report is ready. No action is needed from your side right now.
+              </p>
+              <p style="color: #323956; font-size: 15px; font-weight: 700; margin: 0;">Team Limitless Brain Lab</p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background: #f8f9fc; padding: 16px 32px; border-top: 1px solid #e5e7eb; text-align: center;">
+              <p style="color: #aaa; margin: 0; font-size: 11px;">Limitlessbrainlab.com &nbsp;|&nbsp; limitlessbrainlab@gmail.com</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
 const getProtectMyBrainEmailHtml = (userName) => `
 <!DOCTYPE html>
 <html>
@@ -688,6 +739,32 @@ app.post('/api/edf-upload-notification', async (req, res) => {
   } catch (error) {
     console.error('EDF notification email error:', error.message);
     res.status(500).json({ success: false, message: 'Failed to send EDF notification' });
+  }
+});
+
+// Report Received Notification - emails the PATIENT that their report was
+// received and analysis has started (triggered on report upload by the clinic).
+app.post('/api/send-report-received', async (req, res) => {
+  try {
+    const { patientEmail, patientName, clinicName } = req.body;
+
+    if (!patientEmail) {
+      return res.status(400).json({ success: false, message: 'patientEmail is required' });
+    }
+
+    const mailOptions = {
+      from: EMAIL_FROM,
+      to: patientEmail,
+      subject: 'We have received your report - Limitless Brain Lab',
+      html: getReportReceivedHtml(patientName, clinicName),
+      attachments: getLogoAttachment()
+    };
+
+    await emailTransporter.sendMail(mailOptions);
+    res.json({ success: true, message: 'Report received notification sent' });
+  } catch (error) {
+    console.error('Report received email error:', error.message);
+    res.status(500).json({ success: false, message: 'Failed to send report received notification' });
   }
 });
 

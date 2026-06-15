@@ -338,20 +338,34 @@ const UploadReportModal = ({ clinicId, patient, onUpload, onClose }) => {
 
       setUploadProgress(100);
 
-      // Send notification email to admin about EDF report upload
+      // Send notifications about the uploaded report (non-blocking).
       try {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const baseUrl = apiUrl.replace(/\/api\/?$/, '');
-        fetch(`${baseUrl}/api/contact`, {
+
+        // 1) Admin notification (correct endpoint + fields).
+        fetch(`${baseUrl}/api/edf-upload-notification`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: user?.name || 'Clinic',
-            email: user?.email || 'noreply@neurosense360.com',
-            subject: `New EDF Report Uploaded - ${patientName}`,
-            message: `A new report has been uploaded.\n\nClinic: ${clinicId}\nPatient: ${patientName}\nReport Type: ${data.reportType}\nUploaded at: ${new Date().toLocaleString()}`
+            patientName,
+            patientId: patient?.id,
+            clinicName,
+            processedAt: new Date().toISOString()
           })
         }).catch(() => {});
+
+        // 2) Patient "report received / analysis started" email — only for EEG
+        // report uploads (the case that triggers analysis), and only if we have
+        // the patient's email.
+        const patientEmail = patient?.email;
+        if (data.reportType === 'EEG' && patientEmail) {
+          fetch(`${baseUrl}/api/send-report-received`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ patientEmail, patientName, clinicName })
+          }).catch(() => {});
+        }
       } catch (emailErr) {
         // Non-blocking — don't fail upload if email fails
       }

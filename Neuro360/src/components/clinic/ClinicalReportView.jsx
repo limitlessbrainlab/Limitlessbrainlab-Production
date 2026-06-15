@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, FileText, Users, Activity, Pill, Heart, Home, Download, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import { getPatientDocSignedUrl } from '../../services/patientDocuments';
 import toast from 'react-hot-toast';
 
 const ClinicalReportView = ({ patient, onClose }) => {
@@ -121,16 +122,15 @@ const ClinicalReportView = ({ patient, onClose }) => {
 
   const handleDownload = async (doc) => {
     try {
-      let downloadUrl = doc.url;
-
-      // If no direct URL, try to get signed URL from bucket
-      if (!downloadUrl && doc.filePath && doc.bucket) {
-        const { data: signedData, error } = await supabase.storage
-          .from(doc.bucket)
-          .createSignedUrl(doc.filePath, 300);
-        if (!error && signedData?.signedUrl) {
-          downloadUrl = signedData.signedUrl;
-        }
+      // patients_documents is private — always mint a short-lived signed URL
+      // server-side. Fall back to any stored (legacy public) url only if there
+      // is no storage path to sign.
+      let downloadUrl = null;
+      if (doc.filePath) {
+        downloadUrl = await getPatientDocSignedUrl(doc.bucket || 'patients_documents', doc.filePath);
+      }
+      if (!downloadUrl) {
+        downloadUrl = doc.url;
       }
 
       if (downloadUrl) {

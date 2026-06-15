@@ -171,7 +171,8 @@ const ContactFormPopup = ({ isOpen, onClose, source = null }) => {
     const selectedCity = formData.city === 'OTHER' ? formData.customCity.trim().toUpperCase() : formData.city;
 
     try {
-      // Save to Supabase database
+      // Save to Supabase database — this is the source of truth for capturing
+      // the lead. If this succeeds, the inquiry is recorded.
       const { error: dbError } = await supabase
         .from('contact_inquiries')
         .insert([
@@ -189,28 +190,33 @@ const ContactFormPopup = ({ isOpen, onClose, source = null }) => {
         throw new Error('Failed to save your message. Please try again.');
       }
 
-      // Send email via backend nodemailer API
-      const response = await fetch(`${API_BASE_URL}/contact`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          firstName: formData.firstName.toUpperCase(),
-          lastName: formData.lastName.toUpperCase(),
-          email: formData.email,
-          phone: fullPhone,
-          city: selectedCity,
-          message: formData.message ? formData.message.toUpperCase() : '',
-          source
-        })
-      });
+      // Send email notification via backend nodemailer API. This is best-effort:
+      // the inquiry is already saved above, so a failure here (backend down,
+      // network blip, non-JSON response) must NOT tell the user their message
+      // failed — the backend itself sends email fire-and-forget.
+      try {
+        const response = await fetch(`${API_BASE_URL}/contact`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            firstName: formData.firstName.toUpperCase(),
+            lastName: formData.lastName.toUpperCase(),
+            email: formData.email,
+            phone: fullPhone,
+            city: selectedCity,
+            message: formData.message ? formData.message.toUpperCase() : '',
+            source
+          })
+        });
 
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        console.error('Email error:', result);
-        throw new Error(result?.message || 'Failed to send message. Please try again.');
+        if (!response.ok) {
+          const result = await response.json().catch(() => null);
+          console.error('Email notification failed:', result || `HTTP ${response.status}`);
+        }
+      } catch (emailError) {
+        console.error('Email notification request failed:', emailError);
       }
 
       setIsSuccess(true);

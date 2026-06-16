@@ -406,38 +406,62 @@ ${pdfText}`;
 }
 
 /**
- * Send a fully-rendered HTML string to the VPS gateway for PDF rendering.
- * The VPS uses headless Chromium — no Puppeteer needed on the Render backend.
+ * Render an HTML string to a PDF Buffer using the Puppeteer Chrome installed on
+ * THIS backend at build time (`npx puppeteer browsers install chrome`, cached in
+ * PUPPETEER_CACHE_DIR). Used as the fallback when the VPS render endpoint is
+ * down. The 12-page report template is authored for A4 portrait, margin 0, with
+ * printBackground (see templates/brainReport12Page.js).
+ * @param {string} html  Complete HTML document string.
+ * @returns {Promise<Buffer>}  PDF bytes.
+ */
+async function renderHtmlLocally(html) {
+  const puppeteer = require('puppeteer');
+  const browser = await puppeteer.launch({
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'load', timeout: 60000 });
+    const pdf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+    });
+    return Buffer.from(pdf);
+  } finally {
+    await browser.close();
+  }
+}
+
+/**
+ * Render a fully-built HTML string to a PDF, VPS-first with a local fallback.
+ * Primary: the VPS gateway's headless Chromium (keeps this free-tier backend
+ * light). Fallback: if the VPS render is unavailable (e.g. its Chromium worker
+ * is down → nginx 502), render locally with this backend's bundled Puppeteer so
+ * a VPS outage doesn't break report generation.
  * @param {string} html  Complete HTML document string.
  * @returns {Promise<Buffer>}  PDF bytes.
  */
 async function renderHtmlOnVps(html) {
-  if (!MASTER_KEY) {
-    throw new Error('NEXAPROC_MASTER_KEY is not set on the server. Cannot render PDF on VPS.');
-  }
-  const opts = {
-    headers: { 'X-Nexaproc-Key': MASTER_KEY, 'Content-Type': 'application/json' },
-    timeout: 60000,
-    maxContentLength: Infinity,
-    maxBodyLength: Infinity,
-    responseType: 'arraybuffer',
-  };
-  for (let attempt = 0; attempt < 2; attempt++) {
+  if (MASTER_KEY) {
+    const opts = {
+      headers: { 'X-Nexaproc-Key': MASTER_KEY, 'Content-Type': 'application/json' },
+      timeout: 60000,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+      responseType: 'arraybuffer',
+    };
     try {
       const response = await axios.post(`${GATEWAY_URL}/api/html-to-pdf`, { html }, opts);
       return Buffer.from(response.data);
     } catch (err) {
-      const status = err.response?.status;
-      // Retry once on transient failures (PM2 restart ~5s, brief network blip).
-      // Skip retry on 4xx — a bad request won't succeed on retry.
-      const isTransient = !status || status >= 500;
-      if (attempt === 0 && isTransient) {
-        console.warn(`[renderHtmlOnVps] attempt 1 failed (${err.message}), retrying in 15s…`);
-        await new Promise((r) => setTimeout(r, 15000));
-        continue;
-      }
-      throw err;
+      console.warn(`[renderHtmlOnVps] VPS render failed (${err.response?.status || ''} ${err.message}); falling back to local Puppeteer render.`);
     }
+  }
+  try {
+    return await renderHtmlLocally(html);
+  } catch (localErr) {
+    throw new Error(`PDF render failed (VPS unavailable and local Puppeteer render failed: ${localErr.message}).`);
   }
 }
 

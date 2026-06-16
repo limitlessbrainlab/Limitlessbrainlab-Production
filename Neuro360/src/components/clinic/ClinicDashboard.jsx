@@ -77,47 +77,26 @@ const PendingSubscriptionGate = ({ user, clinic, onPaymentSuccess }) => {
     const sessionId = urlParams.get('session_id');
 
     if (payment === 'success' && reports) {
+      // Wait for the user (clinicId) to hydrate before stripping the URL params,
+      // otherwise the credit update never runs. Credits are applied on the backend.
+      if (!user?.clinicId) return;
+
       toast.success(`Successfully purchased ${reports} report credits!`);
       window.history.replaceState({}, document.title, window.location.pathname);
 
-      if (user?.clinicId) {
-        const { data: clinicData } = await supabase
-          .from('clinics')
-          .select('reports_allowed')
-          .eq('id', user.clinicId)
-          .single();
-
-        const newAllowed = (clinicData?.reports_allowed || 0) + parseInt(reports, 10);
-
-        await Promise.all([
-          supabase.from('clinics').update({ subscription_status: 'active', is_active: true, reports_allowed: newAllowed, updated_at: new Date().toISOString() }).eq('id', user.clinicId),
-          supabase.from('organizations').update({ subscription_status: 'active', reports_allowed: newAllowed, updated_at: new Date().toISOString() }).eq('id', user.clinicId)
-        ]);
-
-        // Save payment record
-        const pendingPayment = JSON.parse(localStorage.getItem('pending_payment') || '{}');
-        localStorage.removeItem('pending_payment');
-
-        const { data: existing } = await supabase.from('payments').select('id').eq('stripe_session_id', sessionId).limit(1);
-        if (!existing || existing.length === 0) {
-          await supabase.from('payments').insert({
-            clinic_id: user.clinicId,
-            amount: pendingPayment.amount || 0,
-            currency: pendingPayment.currency || 'INR',
-            status: 'completed',
-            type: 'subscription',
-            package_name: pendingPayment.packageName || `${reports} EEG Reports`,
-            reports_allowed: parseInt(reports, 10),
-            payment_method: 'stripe',
-            payment_id: sessionId || `session_${Date.now()}`,
-            stripe_payment_id: sessionId || null,
-            stripe_session_id: sessionId || null,
-            created_at: new Date().toISOString()
-          });
-        }
-
-        if (onPaymentSuccess) onPaymentSuccess();
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        await fetch(`${API_URL}/confirm-report-credits`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId })
+        });
+      } catch (e) {
+        console.error('confirm-report-credits failed:', e);
       }
+      localStorage.removeItem('pending_payment');
+
+      if (onPaymentSuccess) onPaymentSuccess();
     } else if (payment === 'cancelled') {
       toast.error('Payment was cancelled');
       window.history.replaceState({}, document.title, window.location.pathname);

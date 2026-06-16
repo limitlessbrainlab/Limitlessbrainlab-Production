@@ -2156,6 +2156,65 @@ app.post('/api/create-report-checkout', async (req, res) => {
   }
 });
 
+// Authoritative, idempotent crediting of clinic report packs.
+// Called by the clinic frontend on payment success AND mirrored by the Stripe
+// webhook. Verifies the session is actually paid via Stripe, then increments
+// reports_allowed server-side (service-role key bypasses RLS). The
+// claimNotificationOnce guard (keyed by session id) ensures credits are added
+// exactly once no matter how many callers fire (two dashboard components +
+// webhook + retries).
+async function applyReportCredits(sessionId) {
+  if (!sessionId) return { ok: false, status: 400, message: 'sessionId required' };
+  if (!stripe) return { ok: false, status: 500, message: 'Stripe not configured' };
+  if (!supabase) return { ok: false, status: 500, message: 'Database not configured' };
+
+  const session = await stripe.checkout.sessions.retrieve(sessionId);
+  if (session.payment_status !== 'paid' || session.metadata?.type !== 'clinic_report') {
+    return { ok: false, status: 400, message: 'Session is not a paid clinic report purchase' };
+  }
+  const clinicId = session.metadata?.clinic_id;
+  const reports = parseInt(session.metadata?.reports || '0', 10);
+  if (!clinicId || !reports) {
+    return { ok: false, status: 400, message: 'Session missing clinic_id / reports metadata' };
+  }
+
+  // Idempotent: only the first caller for this session actually adds credits.
+  const firstTime = await claimNotificationOnce(`clinic_report:${sessionId}:credits`);
+  if (!firstTime) {
+    const { data } = await supabase.from('clinics').select('reports_allowed').eq('id', clinicId).single();
+    return { ok: true, alreadyApplied: true, reportsAllowed: data?.reports_allowed ?? null, added: 0 };
+  }
+
+  const { data: clinicData } = await supabase.from('clinics').select('reports_allowed').eq('id', clinicId).single();
+  const newAllowed = (clinicData?.reports_allowed || 0) + reports;
+
+  const { error: updErr } = await supabase.from('clinics')
+    .update({ reports_allowed: newAllowed, subscription_status: 'active', is_active: true, updated_at: new Date().toISOString() })
+    .eq('id', clinicId);
+  if (updErr) {
+    console.error('applyReportCredits clinics update error:', updErr.message);
+    return { ok: false, status: 500, message: updErr.message };
+  }
+  await supabase.from('organizations')
+    .update({ reports_allowed: newAllowed, subscription_status: 'active', updated_at: new Date().toISOString() })
+    .eq('id', clinicId)
+    .catch(err => console.warn('applyReportCredits organizations update skipped:', err.message));
+
+  console.log(`SUCCESS: applyReportCredits clinic ${clinicId} reports_allowed -> ${newAllowed} (+${reports})`);
+  return { ok: true, reportsAllowed: newAllowed, added: reports };
+}
+
+app.post('/api/confirm-report-credits', async (req, res) => {
+  try {
+    const result = await applyReportCredits(req.body?.sessionId);
+    if (!result.ok) return res.status(result.status || 400).json({ success: false, message: result.message });
+    return res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('confirm-report-credits error:', error.message);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Create Stripe Checkout for Brain Coaching Session
 app.post('/api/create-coaching-checkout', async (req, res) => {
   try {
@@ -3253,49 +3312,31 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           const packageId = session.metadata?.package_id;
           const clinicTypeFromMeta = session.metadata?.clinic_type || 'lbl_partner';
           const customerName = session.metadata?.customer_name || '';
+          let currentAllowed = 0; // prior allowance, used to pick reorder vs first-purchase email
 
           console.log(`PAYMENT: Clinic report purchase - clinicId: ${clinicId}, reports: ${reports}, amount: ${session.amount_total / 100}`);
 
           if (clinicId) {
-            // 1. Update clinic's reports_allowed and subscription_status in clinics table
-            const { data: clinicData, error: fetchError } = await supabase
-              .from('clinics')
-              .select('reports_allowed')
-              .eq('id', clinicId)
-              .single();
+            // Capture the allowance BEFORE crediting (for the reorder-vs-first email below).
+            try {
+              const { data: priorClinic } = await supabase.from('clinics').select('reports_allowed').eq('id', clinicId).single();
+              currentAllowed = priorClinic?.reports_allowed || 0;
+            } catch (_) {}
 
-            const currentAllowed = clinicData?.reports_allowed || 0;
-            const newAllowed = currentAllowed + reports;
-
-            // Update both clinics and organizations tables - reset reports_used on renewal
-            const { error: updateError } = await supabase
-              .from('clinics')
-              .update({
-                reports_allowed: newAllowed,
-                reports_used: 0,
-                subscription_status: 'active',
-                is_active: true,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', clinicId);
-
-            if (updateError) {
-              console.error('Error updating clinics table:', updateError);
-            } else {
-              console.log(`SUCCESS: Clinic ${clinicId} reports updated: ${currentAllowed} -> ${newAllowed}`);
+            // 1. Add report credits (idempotent + service-role). Shared with the
+            // /api/confirm-report-credits frontend path; only one of them actually
+            // applies the credits for a given session. Does NOT reset reports_used
+            // (buying a pack adds to the allowance, it must not wipe prior usage).
+            try {
+              const credit = await applyReportCredits(session.id);
+              if (credit.ok) {
+                console.log(`SUCCESS: Clinic ${clinicId} reports_allowed now ${credit.reportsAllowed}${credit.alreadyApplied ? ' (already applied)' : ` (+${credit.added})`}`);
+              } else {
+                console.error('Webhook applyReportCredits failed:', credit.message);
+              }
+            } catch (creditErr) {
+              console.error('Webhook applyReportCredits threw:', creditErr.message);
             }
-
-            // Also update organizations table for SubscriptionTab stats
-            await supabase
-              .from('organizations')
-              .update({
-                reports_allowed: newAllowed,
-                reports_used: 0,
-                subscription_status: 'active',
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', clinicId)
-              .catch(err => console.warn('organizations update skipped:', err.message));
 
             // 2. Save to payments table for SuperAdmin Payment History
             const { error: paymentError } = await supabase

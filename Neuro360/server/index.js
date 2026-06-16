@@ -5221,6 +5221,18 @@ app.post('/api/bookings', async (req, res) => {
 
     if (error) throw error;
 
+    // Notify the super admin portal of the new booking (shows in the notification bell)
+    await supabase.from('admin_notifications').insert({
+      type: 'info',
+      category: 'booking',
+      title: 'New Coaching Booking',
+      message: `${bookingData.patient_name || bookingData.patient_email} booked a session with ${bookingData.coach_name || 'a coach'}.`,
+      patient_name: bookingData.patient_name || bookingData.patient_email,
+      action: 'view_booking',
+      action_data: { patient_email: bookingData.patient_email, coach_name: bookingData.coach_name },
+      is_read: false
+    }).then(({ error: ne }) => { if (ne) console.error('Booking notification insert error:', ne); });
+
     res.json({ success: true, booking: data });
   } catch (error) {
     console.error('Error creating booking:', error);
@@ -6085,12 +6097,13 @@ app.post('/api/send-coaching-link', async (req, res) => {
     }
 
     const scheduleLink = calendlyUrl || COMMON_CALENDLY;
-    const hasCalendly = true;
+    // Calendly removed from the booking flow — the team emails the session link manually.
+    const hasCalendly = false;
 
     const mailOptions = {
       from: EMAIL_FROM,
       to: patientEmail,
-      subject: `Your Brain Coaching Session with ${coachName} - Schedule Now`,
+      subject: `Your Brain Coaching Session with ${coachName} - Booking Confirmed`,
       attachments: getLogoAttachment(),
       html: `
         <!DOCTYPE html>
@@ -6110,8 +6123,8 @@ app.post('/api/send-coaching-link', async (req, res) => {
               </p>
 
               <p style="color: #666; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
-                Your payment for a brain coaching session with <strong>${coachName}</strong> has been received successfully.
-                ${hasCalendly ? 'Please click the button below to schedule your session at a convenient time.' : 'Our team will contact you shortly to schedule your session.'}
+                Thank you for your booking! Your payment for a brain coaching session with <strong>${coachName}</strong> has been received successfully.
+                ${hasCalendly ? 'Please click the button below to schedule your session at a convenient time.' : 'Our team will email you the session link shortly.'}
               </p>
 
               ${hasCalendly ? `
@@ -6130,7 +6143,7 @@ app.post('/api/send-coaching-link', async (req, res) => {
               ` : `
               <div style="background: #fefce8; border-radius: 8px; padding: 15px; margin: 20px 0; border-left: 4px solid #eab308;">
                 <p style="color: #854d0e; margin: 0; font-size: 13px;">
-                  The coach will reach out to you within 24 hours to schedule your session.
+                  Our team will email you the session link shortly. Thank you for your booking!
                 </p>
               </div>
               `}
@@ -6174,14 +6187,14 @@ app.post('/api/send-coaching-link', async (req, res) => {
               <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 25px; text-align: center;">
                 <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin-bottom: 10px;" />
                 <h1 style="color: white; margin: 0; font-size: 22px;">New Session Booked!</h1>
-                <p style="color: #F5D05D; margin: 8px 0 0; font-size: 14px;">A patient has paid and scheduled with you</p>
+                <p style="color: #F5D05D; margin: 8px 0 0; font-size: 14px;">A patient has booked and paid for a session with you</p>
               </div>
               <div style="padding: 30px;">
                 <p style="color: #333; font-size: 16px; margin: 0 0 20px;">
                   Hello <strong>${coachName}</strong>,
                 </p>
                 <p style="color: #666; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
-                  <strong>${patientName || 'A patient'}</strong> (${patientEmail}) has successfully paid for a brain coaching session with you and scheduled a time via Calendly.
+                  <strong>${patientName || 'A patient'}</strong> (${patientEmail}) has successfully booked and paid for a brain coaching session with you.
                 </p>
                 <div style="background: #f0f9ff; border-radius: 8px; padding: 15px; margin: 20px 0; border-left: 4px solid #3b82f6;">
                   <p style="color: #1e40af; margin: 0; font-size: 13px; font-weight: 600;">Patient Details</p>
@@ -6189,7 +6202,7 @@ app.post('/api/send-coaching-link', async (req, res) => {
                   <p style="color: #1e40af; margin: 4px 0 0; font-size: 13px;">Email: <strong>${patientEmail}</strong></p>
                 </div>
                 <p style="color: #666; font-size: 13px; line-height: 1.6;">
-                  Please check your Calendly calendar for the confirmed session time. The patient will receive a calendar invite from Calendly.
+                  Our team will share the session link with the patient. Please coordinate the session timing as needed.
                 </p>
               </div>
               <div style="background: #f8f9fc; padding: 15px; text-align: center; border-top: 1px solid #e5e7eb;">

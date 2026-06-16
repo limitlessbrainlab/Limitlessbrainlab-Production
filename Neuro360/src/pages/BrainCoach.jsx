@@ -61,64 +61,16 @@ const BrainCoach = () => {
   // Payment success state
   const [showCoachPaymentSuccess, setShowCoachPaymentSuccess] = useState(false);
   const [coachPaymentDetails, setCoachPaymentDetails] = useState(null);
-  const [paidCalendlyUrl, setPaidCalendlyUrl] = useState(null);
-
-  // Calendly widget modal state
-  const [showCalendlyModal, setShowCalendlyModal] = useState(false);
-  const [calendlyIframeUrl, setCalendlyIframeUrl] = useState('');
-  const calendlyContainerRef = useRef(null);
-
-  const openCalendlyPopup = (url) => {
-    if (!url) return;
-    setCalendlyIframeUrl(url);
-    setShowCalendlyModal(true);
-  };
-
-  // Initialize Calendly inline widget when modal opens
-  // Using initInlineWidget (not plain iframe) so that calendly.event_scheduled postMessage fires
-  useEffect(() => {
-    if (!showCalendlyModal || !calendlyIframeUrl) return;
-
-    const init = () => {
-      if (!calendlyContainerRef.current) return;
-      calendlyContainerRef.current.innerHTML = '';
-      window.Calendly.initInlineWidget({
-        url: calendlyIframeUrl,
-        parentElement: calendlyContainerRef.current,
-        prefill: { name: user?.name || '', email: user?.email || '' }
-      });
-    };
-
-    if (window.Calendly) {
-      init();
-    } else {
-      if (!document.querySelector('link[href*="calendly.com/assets/external/widget.css"]')) {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = 'https://assets.calendly.com/assets/external/widget.css';
-        document.head.appendChild(link);
-      }
-      const script = document.createElement('script');
-      script.src = 'https://assets.calendly.com/assets/external/widget.js';
-      script.async = true;
-      script.onload = init;
-      document.head.appendChild(script);
-    }
-  }, [showCalendlyModal, calendlyIframeUrl, user?.name, user?.email]);
 
   useEffect(() => {
     if (!user?.email) return;
 
     const payment = searchParams.get('payment');
     const coachName = searchParams.get('coach');
-    const calendlyUrl = searchParams.get('calendly');
     const sessionId = searchParams.get('session_id');
     const coachEmail = searchParams.get('coachEmail');
 
     if (payment === 'success') {
-      const decodedCalendly = calendlyUrl ? decodeURIComponent(calendlyUrl) : CALENDLY_LINK;
-      setPaidCalendlyUrl(decodedCalendly);
-
       // Show success popup
       setCoachPaymentDetails({
         coachName: coachName ? decodeURIComponent(coachName) : 'Brain Coach',
@@ -189,13 +141,30 @@ const BrainCoach = () => {
             })
           }).catch(() => {});
 
+          // Record the booking (Calendly no longer creates it) so it shows in the bookings list
+          await fetch(`${API_URL}/bookings`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              patient_email: user.email.toLowerCase(),
+              patient_name: patientRecord?.full_name || patientRecord?.name || user.name || 'Patient',
+              coach_name: coachName ? decodeURIComponent(coachName) : 'Brain Coach',
+              coach_email: coachEmail ? decodeURIComponent(coachEmail) : null,
+              event_name: 'Brain Coaching Session - 30 min',
+              start_time: new Date().toISOString(),
+              end_time: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+              duration_minutes: 30,
+              status: 'scheduled',
+              location: 'Online',
+              notes: 'Booked via payment — session link to be shared by admin'
+            })
+          }).catch(() => {});
+
           // Send confirmation email to patient, and notify coach
           await fetch(`${API_URL}/send-coaching-link`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               patientName: user?.name || 'Patient', patientEmail: user?.email,
               coachName: coachName ? decodeURIComponent(coachName) : 'Brain Coach',
-              calendlyUrl: decodedCalendly || '',
               coachEmail: coachEmail ? decodeURIComponent(coachEmail) : null,
               sessionId: sessionId || ''
             })
@@ -903,59 +872,22 @@ const BrainCoach = () => {
   const [paymentCoach, setPaymentCoach] = useState(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  // Tracks which coach is waiting for Calendly → payment flow
-  const [pendingCalendlyCoach, setPendingCalendlyCoach] = useState(null);
-
-  // Listen for Calendly event_scheduled postMessage
-  useEffect(() => {
-    const onCalendlyMessage = (e) => {
-      // Calendly may send data as object or JSON string
-      let payload = e.data;
-      if (typeof payload === 'string') {
-        try { payload = JSON.parse(payload); } catch { return; }
-      }
-      if (payload?.event !== 'calendly.event_scheduled') return;
-      setShowCalendlyModal(false);
-      setCalendlyIframeUrl('');
-
-      if (!pendingCalendlyCoach) return;
-
-      if (pendingCalendlyCoach._useFreeCredit) {
-        // Free credit: proceed directly (no payment)
-        proceedToCalendly(pendingCalendlyCoach, true);
-      } else {
-        // New booking: show payment modal after Calendly
-        setPaymentCoach(pendingCalendlyCoach);
-        setShowPaymentModal(true);
-      }
-      setPendingCalendlyCoach(null);
-    };
-
-    window.addEventListener('message', onCalendlyMessage);
-    return () => window.removeEventListener('message', onCalendlyMessage);
-  }, [pendingCalendlyCoach]);
-
-  // Handle Schedule button - opens Calendly first, payment after
+  // Handle Schedule button - books directly (no calendar); admin emails the session link
   const handleScheduleBooking = (coach) => {
     if (hasUserPaidForCoach(coach)) {
-      toast.success('You have already paid. Opening Calendly...', { icon: '✅' });
-      if (true) {
-        openCalendlyPopup(CALENDLY_LINK);
-      } else {
-        const phone = (coach.whatsapp || coach.phone || '').replace(/[^0-9]/g, '');
-        if (phone) window.open(`https://wa.me/${phone}`, '_blank');
-      }
+      toast.success('You have already booked this coach. Our team will email you the session link.', { icon: '✅' });
       return;
     }
 
-    // Open Calendly first; payment (or free credit) happens after booking confirmation
-    const url = CALENDLY_LINK;
+    // Free credit: book directly without payment
     if (coachingCredits > 0) {
-      setPendingCalendlyCoach({ ...coach, _useFreeCredit: true });
-    } else {
-      setPendingCalendlyCoach(coach);
+      proceedToBooking({ ...coach, _useFreeCredit: true }, true);
+      return;
     }
-    openCalendlyPopup(url);
+
+    // Paid: open the payment modal
+    setPaymentCoach(coach);
+    setShowPaymentModal(true);
   };
 
   // Process payment via Stripe
@@ -992,7 +924,6 @@ const BrainCoach = () => {
         const returnParams = new URLSearchParams({
           payment: 'success',
           coach: paymentCoach.name,
-          ...({ calendly: CALENDLY_LINK }),
           ...(paymentCoach.email ? { coachEmail: paymentCoach.email } : {})
         });
         localStorage.setItem('paymentReturnUrl', `/dashboard/brain-coach?${returnParams.toString()}`);
@@ -1008,8 +939,9 @@ const BrainCoach = () => {
     }
   };
 
-  // Proceed to Calendly after payment or using free credit
-  const proceedToCalendly = async (coach, useFreeCredit = false) => {
+  // Record a booking (no calendar). Admin emails the session link to the patient.
+  // Used for the free-credit flow; the paid flow is handled in the payment-success callback.
+  const proceedToBooking = async (coach, useFreeCredit = false) => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -1037,12 +969,14 @@ const BrainCoach = () => {
         coach_name: coach.name,
         coach_email: coach.email || null,
         event_name: 'Brain Coaching Session - 30 min',
-        start_time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-        end_time: new Date(Date.now() + 24 * 60 * 60 * 1000 + 30 * 60 * 1000).toISOString(),
+        start_time: new Date().toISOString(),
+        end_time: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         duration_minutes: 30,
         status: 'scheduled',
         location: 'Online',
-        notes: useFreeCredit ? 'Booked using free credit' : 'Booked via payment'
+        notes: useFreeCredit
+          ? 'Booked using free credit — session link to be shared by admin'
+          : 'Booked — session link to be shared by admin'
       };
       if (isValidUUID) {
         bookingData.coach_id = coach.id;
@@ -1058,27 +992,46 @@ const BrainCoach = () => {
         console.error('Booking save failed:', bookingResult);
       }
 
+      // Notify admin of the new booking
+      await fetch(`${API_URL}/send-assessment-email`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerEmail: user?.email,
+          customerName: user?.name || 'Patient',
+          assessmentName: `Brain Coaching Session - ${coach.name}`,
+          assessmentLink: 'no_link',
+          amountPaid: useFreeCredit ? '0.00' : '2500.00', currency: 'INR',
+          source: 'patient_dashboard',
+          adminOnly: true
+        })
+      }).catch(() => {});
+
+      // Send confirmation email to patient, and notify coach
+      await fetch(`${API_URL}/send-coaching-link`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientName: user?.name || 'Patient', patientEmail: user?.email,
+          coachName: coach.name,
+          coachEmail: coach.email || null
+        })
+      }).catch(() => {});
+
       // Refresh paid coaches list
       fetchPaidCoaches();
 
-      // Open Calendly popup
-      if (true) {
-        toast.success('Select your preferred time slot...', { duration: 3000, icon: '📅' });
-        openCalendlyPopup(CALENDLY_LINK);
-      } else {
-        const phone = (coach.whatsapp || coach.phone || '').replace(/[^0-9]/g, '');
-        if (phone) {
-          const message = encodeURIComponent(
-            `Hi ${coach.name}, I found you on NeuroSense. I would like to schedule a consultation session.`
-          );
-          window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
-        }
-      }
+      // Show booking confirmation popup
+      setCoachPaymentDetails({
+        coachName: coach.name,
+        amount: useFreeCredit ? 'Free credit' : '₹2,500',
+        email: user?.email || '',
+        date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        transactionId: 'N/A'
+      });
+      setShowCoachPaymentSuccess(true);
     } catch (error) {
       console.error('Error:', error);
-      if (true) {
-        openCalendlyPopup(CALENDLY_LINK);
-      }
+      toast.error('Something went wrong while saving your booking. Please contact support.');
     }
   };
 
@@ -1692,7 +1645,7 @@ const BrainCoach = () => {
                 </li>
                 <li className="flex items-center text-[11px] text-gray-700 dark:text-gray-300">
                   <CheckCircle className="w-3.5 h-3.5 text-green-500 mr-2 flex-shrink-0" />
-                  <span>Online video call via Calendly</span>
+                  <span>Online video call</span>
                 </li>
                 <li className="flex items-center text-[11px] text-gray-700 dark:text-gray-300">
                   <CheckCircle className="w-3.5 h-3.5 text-green-500 mr-2 flex-shrink-0" />
@@ -2191,8 +2144,8 @@ const BrainCoach = () => {
               <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
                 <CheckCircle className="h-9 w-9 text-white" />
               </div>
-              <h3 className="text-xl font-bold text-white">Payment Successful!</h3>
-              <p className="text-green-100 text-sm mt-1">Your coaching session is ready to schedule</p>
+              <h3 className="text-xl font-bold text-white">Booking Confirmed!</h3>
+              <p className="text-green-100 text-sm mt-1">Thank you! Our team will email you the session link shortly</p>
             </div>
             <div className="p-5 space-y-3">
               <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
@@ -2218,16 +2171,11 @@ const BrainCoach = () => {
             </div>
             <div className="px-5 pb-5">
               <button
-                onClick={() => {
-                  setShowCoachPaymentSuccess(false);
-                  if (paidCalendlyUrl) {
-                    openCalendlyPopup(paidCalendlyUrl);
-                  }
-                }}
+                onClick={() => setShowCoachPaymentSuccess(false)}
                 className="w-full py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-2"
               >
-                <Calendar className="h-4 w-4" />
-                Schedule Your Session
+                <CheckCircle className="h-4 w-4" />
+                Done
               </button>
             </div>
           </div>
@@ -2235,52 +2183,6 @@ const BrainCoach = () => {
       )}
 
       {showPaymentModal && <PaymentModal />}
-
-      {/* Calendly iframe Modal */}
-      {showCalendlyModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-[95vw] max-w-[960px] h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800 rounded-t-2xl flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-blue-600" />
-                <span className="font-semibold text-gray-800 dark:text-white">Schedule Your Session</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {/* Shown after user books — fallback if postMessage doesn't fire */}
-                {pendingCalendlyCoach && (
-                  <button
-                    onClick={() => {
-                      setShowCalendlyModal(false);
-                      setCalendlyIframeUrl('');
-                      if (pendingCalendlyCoach._useFreeCredit) {
-                        proceedToCalendly(pendingCalendlyCoach, true);
-                      } else {
-                        setPaymentCoach(pendingCalendlyCoach);
-                        setShowPaymentModal(true);
-                      }
-                      setPendingCalendlyCoach(null);
-                    }}
-                    className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                  >
-                    <CheckCircle className="h-3.5 w-3.5" />
-                    Scheduled? Pay Now
-                  </button>
-                )}
-                <button
-                  onClick={() => { setShowCalendlyModal(false); setCalendlyIframeUrl(''); setPendingCalendlyCoach(null); }}
-                  className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
-                >
-                  <X className="h-5 w-5 text-gray-500" />
-                </button>
-              </div>
-            </div>
-            <div
-              ref={calendlyContainerRef}
-              style={{ flex: 1, minHeight: 0, width: '100%', height: '100%' }}
-            />
-          </div>
-        </div>
-      )}
 
       {/* Booking Modal */}
       {showBookingModal && selectedCoach && (

@@ -56,9 +56,11 @@ const MyBookings = ({ limit, showTitle = true, compact = false }) => {
         }
 
         // Additional client-side filtering for past bookings
+        // Pending-schedule bookings have a placeholder (past) start_time but aren't really past.
         if (filter === 'past') {
           filteredBookings = filteredBookings.filter(b =>
-            new Date(b.start_time) < new Date() || b.status === 'completed' || b.status === 'cancelled'
+            !isPendingSchedule(b) &&
+            (new Date(b.start_time) < new Date() || b.status === 'completed' || b.status === 'cancelled')
           );
         }
 
@@ -77,8 +79,17 @@ const MyBookings = ({ limit, showTitle = true, compact = false }) => {
     }
   };
 
-  const getStatusBadge = (status, startTime) => {
+  const getStatusBadge = (status, startTime, pending = false) => {
     const isPast = new Date(startTime) < new Date();
+
+    if (pending && status === 'scheduled') {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+          <Clock className="w-3 h-3 mr-1" />
+          Awaiting link
+        </span>
+      );
+    }
 
     if (status === 'cancelled') {
       return (
@@ -139,6 +150,12 @@ const MyBookings = ({ limit, showTitle = true, compact = false }) => {
     return new Date(startTime) > new Date();
   };
 
+  // Booking made via the new flow (no calendar): time/link will be shared by the admin later.
+  // Its stored start_time is a placeholder, so don't treat it as a real scheduled time.
+  const isPendingSchedule = (booking) =>
+    booking.status === 'scheduled' &&
+    !booking.meeting_url && !booking.calendly_event_url && !booking.calendly_reschedule_url;
+
   if (loading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
@@ -187,7 +204,8 @@ const MyBookings = ({ limit, showTitle = true, compact = false }) => {
                 const diffMs = startDate - now;
                 const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
                 const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                const isSoon = diffMs > 0 && diffHours < 24;
+                const pending = isPendingSchedule(booking);
+                const isSoon = !pending && diffMs > 0 && diffHours < 24;
                 const isToday = startDate.toDateString() === now.toDateString();
 
                 return (
@@ -213,15 +231,24 @@ const MyBookings = ({ limit, showTitle = true, compact = false }) => {
                           ? 'bg-gradient-to-b from-blue-500 to-indigo-600 text-white shadow-lg'
                           : 'bg-[#323956] text-white'
                       }`}>
-                        <span className="text-[10px] font-medium uppercase leading-none">
-                          {startDate.toLocaleDateString('en-US', { month: 'short' })}
-                        </span>
-                        <span className="text-xl font-bold leading-tight">
-                          {startDate.getDate()}
-                        </span>
-                        <span className="text-[9px] uppercase leading-none opacity-80">
-                          {startDate.toLocaleDateString('en-US', { weekday: 'short' })}
-                        </span>
+                        {pending ? (
+                          <>
+                            <Clock className="w-5 h-5" />
+                            <span className="text-[9px] font-medium uppercase leading-none mt-1">TBD</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-[10px] font-medium uppercase leading-none">
+                              {startDate.toLocaleDateString('en-US', { month: 'short' })}
+                            </span>
+                            <span className="text-xl font-bold leading-tight">
+                              {startDate.getDate()}
+                            </span>
+                            <span className="text-[9px] uppercase leading-none opacity-80">
+                              {startDate.toLocaleDateString('en-US', { weekday: 'short' })}
+                            </span>
+                          </>
+                        )}
                       </div>
 
                       <div className="flex-1 min-w-0">
@@ -233,7 +260,7 @@ const MyBookings = ({ limit, showTitle = true, compact = false }) => {
                               {booking.coach_name || 'Brain Coach'}
                             </p>
                           </div>
-                          {getStatusBadge(booking.status, booking.start_time)}
+                          {getStatusBadge(booking.status, booking.start_time, pending)}
                         </div>
 
                         {/* Event Name */}
@@ -249,7 +276,7 @@ const MyBookings = ({ limit, showTitle = true, compact = false }) => {
                               : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                           }`}>
                             <Clock className="w-3 h-3 mr-1" />
-                            {formatTime(booking.start_time)}
+                            {pending ? 'Time to be confirmed' : formatTime(booking.start_time)}
                           </span>
                           <span className="flex items-center bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-lg">
                             {booking.duration_minutes || 30} min
@@ -264,7 +291,13 @@ const MyBookings = ({ limit, showTitle = true, compact = false }) => {
                         </div>
 
                         {/* Action Buttons */}
-                        {isUpcoming(booking.start_time) && booking.status === 'scheduled' && (
+                        {pending ? (
+                          <div className="mt-2.5">
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400 italic">
+                              Our team will email you the session link
+                            </span>
+                          </div>
+                        ) : isUpcoming(booking.start_time) && booking.status === 'scheduled' && (
                           <div className="flex items-center gap-2 mt-2.5">
                             {booking.meeting_url ? (
                               <a
@@ -372,7 +405,9 @@ const MyBookings = ({ limit, showTitle = true, compact = false }) => {
         </div>
       ) : (
         <div className="divide-y divide-gray-100 dark:divide-gray-700">
-          {bookings.map((booking) => (
+          {bookings.map((booking) => {
+            const pending = isPendingSchedule(booking);
+            return (
             <div
               key={booking.id}
               className="p-4 sm:p-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
@@ -387,19 +422,28 @@ const MyBookings = ({ limit, showTitle = true, compact = false }) => {
                       <h3 className="font-semibold text-gray-900 dark:text-white">
                         {booking.coach_name || 'Brain Coach'}
                       </h3>
-                      {getStatusBadge(booking.status, booking.start_time)}
+                      {getStatusBadge(booking.status, booking.start_time, pending)}
                     </div>
                     <p className="text-sm text-gray-500 mt-1">{booking.event_name || 'Brain Coaching Session'}</p>
 
                     <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
-                      <span className="flex items-center">
-                        <Calendar className="w-4 h-4 mr-1" />
-                        {formatDate(booking.start_time)}
-                      </span>
-                      <span className="flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
-                        {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
-                      </span>
+                      {pending ? (
+                        <span className="flex items-center">
+                          <Clock className="w-4 h-4 mr-1" />
+                          Session time to be confirmed
+                        </span>
+                      ) : (
+                        <>
+                          <span className="flex items-center">
+                            <Calendar className="w-4 h-4 mr-1" />
+                            {formatDate(booking.start_time)}
+                          </span>
+                          <span className="flex items-center">
+                            <Clock className="w-4 h-4 mr-1" />
+                            {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
+                          </span>
+                        </>
+                      )}
                       <span className="flex items-center">
                         {booking.location === 'Online' ? (
                           <Video className="w-4 h-4 mr-1" />
@@ -413,7 +457,11 @@ const MyBookings = ({ limit, showTitle = true, compact = false }) => {
                 </div>
 
                 <div className="flex items-center space-x-2 sm:flex-shrink-0">
-                  {isUpcoming(booking.start_time) && booking.status === 'scheduled' && (
+                  {pending ? (
+                    <span className="text-sm text-gray-500 dark:text-gray-400 italic">
+                      Our team will email you the session link
+                    </span>
+                  ) : isUpcoming(booking.start_time) && booking.status === 'scheduled' && (
                     <>
                       {booking.meeting_url && (
                         <a
@@ -451,7 +499,8 @@ const MyBookings = ({ limit, showTitle = true, compact = false }) => {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

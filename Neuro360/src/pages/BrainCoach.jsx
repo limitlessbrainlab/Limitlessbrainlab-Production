@@ -179,6 +179,10 @@ const BrainCoach = () => {
               assessmentName: `Brain Coaching Session - ${coachName ? decodeURIComponent(coachName) : 'Coach'}`,
               assessmentLink: 'no_link', amountPaid: '2500.00', currency: 'INR',
               transactionId: sessionId || '', source: 'patient_dashboard',
+              // Admin notification only (patient gets the Calendly "Schedule Now" email below);
+              // dedupeKey ensures the admin isn't also emailed by the Stripe webhook for this session.
+              adminOnly: true,
+              dedupeKey: sessionId ? `coaching:${sessionId}:admin` : undefined,
               clinicName, clinicId: clinicId || '',
               patientPhone: patientRecord?.phone || '', patientDob: patientRecord?.date_of_birth || '',
               patientGender: patientRecord?.gender || '', patientUid: patientRecord?.external_id || ''
@@ -192,7 +196,8 @@ const BrainCoach = () => {
               patientName: user?.name || 'Patient', patientEmail: user?.email,
               coachName: coachName ? decodeURIComponent(coachName) : 'Brain Coach',
               calendlyUrl: decodedCalendly || '',
-              coachEmail: coachEmail ? decodeURIComponent(coachEmail) : null
+              coachEmail: coachEmail ? decodeURIComponent(coachEmail) : null,
+              sessionId: sessionId || ''
             })
           }).catch(() => {});
 

@@ -27,6 +27,27 @@ if (supabaseUrl && supabaseServiceKey) {
 } else {
 }
 
+// Notification de-duplication. Claims a key the first time and returns true (send);
+// returns false if the key was already claimed (skip). Backed by the
+// sent_notifications table (unique dedupe_key) so it is atomic across both the
+// frontend success handler and the Stripe webhook, and across server instances.
+// Fail-open: on a missing key or any DB error we send rather than risk dropping
+// a real notification.
+async function claimNotificationOnce(key) {
+  if (!key) return true;
+  if (!supabase) return true;
+  try {
+    const { error } = await supabase.from('sent_notifications').insert({ dedupe_key: key });
+    if (!error) return true;                  // first time -> send
+    if (error.code === '23505') return false; // duplicate key -> skip
+    console.warn('claimNotificationOnce error (sending anyway):', error.message);
+    return true;
+  } catch (e) {
+    console.warn('claimNotificationOnce exception (sending anyway):', e.message);
+    return true;
+  }
+}
+
 // Initialize Stripe (conditionally)
 let stripe = null;
 if (process.env.STRIPE_SECRET_KEY) {
@@ -83,17 +104,73 @@ const htmlToPlainText = (html) =>
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-const rawSendMail = emailTransporter.sendMail.bind(emailTransporter);
-emailTransporter.sendMail = (mailOptions, ...rest) => {
+// Shared brand footer appended to EVERY outgoing email (signature, academy link, WhatsApp, socials).
+// The marker comment `lbl-email-footer` makes injection idempotent.
+function getEmailFooterHtml() {
+  const sig = fs.existsSync(SIGNATURE_PATH)
+    ? `<img src="cid:${SIGNATURE_CID}" alt="Dr Sweta Adatia" width="190" style="display:block; width:190px; max-width:60%; height:auto; margin:8px 0 16px;" />`
+    : '';
+  return `
+  <!-- lbl-email-footer -->
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f7fa; padding:0 20px 40px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+          <tr>
+            <td style="padding:28px 32px; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+              <p style="margin:0; color:#1a1f36; font-size:15px; font-weight:700; line-height:1.5;">Team<br/>Limitless Brain Lab</p>
+              <p style="margin:14px 0 0; color:#555; font-size:14px; font-style:italic;">&ldquo;A healthy brain is the foundation of a limitless life.&rdquo;</p>
+              ${sig}
+              <p style="margin:0 0 16px; color:#323956; font-size:14px;">Access all the brain health courses &nbsp;<a href="https://www.limitlessbrainacademy.com" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">www.limitlessbrainacademy.com</a></p>
+              <p style="margin:0 0 12px; color:#323956; font-size:14px;">&#128222; &nbsp;WhatsApp: <a href="https://wa.me/971501382897" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">+971 50 138 2897</a></p>
+              <p style="margin:0 0 10px; color:#323956; font-size:14px;">Social Media:</p>
+              <table cellpadding="0" cellspacing="0"><tr>
+                <td style="padding-right:14px;"><a href="https://www.instagram.com/drsweta.adatia/?hl=en" target="_blank"><img src="https://img.icons8.com/fluency/48/instagram-new.png" alt="Instagram" width="30" height="30" style="display:block; border:0;"/></a></td>
+                <td style="padding-right:14px;"><a href="https://www.facebook.com/sweta.adatia" target="_blank"><img src="https://img.icons8.com/fluency/48/facebook-new.png" alt="Facebook" width="30" height="30" style="display:block; border:0;"/></a></td>
+                <td style="padding-right:14px;"><a href="https://www.linkedin.com/in/drswetaadatia/" target="_blank"><img src="https://img.icons8.com/fluency/48/linkedin.png" alt="LinkedIn" width="30" height="30" style="display:block; border:0;"/></a></td>
+                <td><a href="https://www.youtube.com/@drsweta.adatia" target="_blank"><img src="https://img.icons8.com/fluency/48/youtube-play.png" alt="YouTube" width="30" height="30" style="display:block; border:0;"/></a></td>
+              </tr></table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>`;
+}
+
+// Enhance every outgoing email: append the brand footer (once), ensure the signature
+// attachment the footer references is present, and keep the existing plain-text + reply-to behaviour.
+function enhanceMailOptions(mailOptions) {
   const enhanced = { ...mailOptions };
+  if (enhanced.html && !enhanced.html.includes('lbl-email-footer')) {
+    const footer = getEmailFooterHtml();
+    enhanced.html = enhanced.html.includes('</body>')
+      ? enhanced.html.replace('</body>', `${footer}\n</body>`)
+      : `${enhanced.html}${footer}`;
+    if (fs.existsSync(SIGNATURE_PATH)) {
+      const atts = Array.isArray(enhanced.attachments) ? [...enhanced.attachments] : [];
+      if (!atts.some(a => a && a.cid === SIGNATURE_CID)) {
+        atts.push({ filename: 'signature.png', path: SIGNATURE_PATH, cid: SIGNATURE_CID });
+      }
+      enhanced.attachments = atts;
+    }
+  }
   if (enhanced.html && !enhanced.text) {
     enhanced.text = htmlToPlainText(enhanced.html);
   }
   if (!enhanced.replyTo && process.env.EMAIL_REPLY_TO) {
     enhanced.replyTo = process.env.EMAIL_REPLY_TO;
   }
-  return rawSendMail(enhanced, ...rest);
-};
+  return enhanced;
+}
+
+// Patch any nodemailer transporter so every email it sends gets the shared footer/enhancements.
+function patchSendMail(t) {
+  const raw = t.sendMail.bind(t);
+  t.sendMail = (opts, ...rest) => raw(enhanceMailOptions(opts), ...rest);
+  return t;
+}
+patchSendMail(emailTransporter);
 
 // Verify email transporter on startup
 emailTransporter.verify((error, success) => {
@@ -2263,7 +2340,7 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
 // Send assessment JotForm link email after successful purchase
 app.post('/api/send-assessment-email', async (req, res) => {
   try {
-    let { customerEmail, customerName, assessmentName, assessmentLink, amountPaid, currency, transactionId, source, clinicName, clinicId, patientPhone, patientDob, patientGender, patientUid } = req.body;
+    let { customerEmail, customerName, assessmentName, assessmentLink, amountPaid, currency, transactionId, source, clinicName, clinicId, patientPhone, patientDob, patientGender, patientUid, adminOnly, dedupeKey } = req.body;
 
     if (!customerEmail) {
       return res.status(400).json({ success: false, message: 'Email is required' });
@@ -2461,7 +2538,7 @@ app.post('/api/send-assessment-email', async (req, res) => {
       `
     };
 
-    if (!skipCustomerEmail) {
+    if (!skipCustomerEmail && !adminOnly) {
       await emailTransporter.sendMail(mailOptions);
       console.log('SUCCESS: Assessment email sent to', customerEmail);
     }
@@ -2562,8 +2639,12 @@ app.post('/api/send-assessment-email', async (req, res) => {
         `
       };
 
-      await emailTransporter.sendMail(adminNotificationMail);
-      console.log('SUCCESS: Admin payment notification sent to limitlessbrainlab@gmail.com');
+      if (await claimNotificationOnce(dedupeKey)) {
+        await emailTransporter.sendMail(adminNotificationMail);
+        console.log('SUCCESS: Admin payment notification sent to limitlessbrainlab@gmail.com');
+      } else {
+        console.log('Admin payment notification skipped (already sent):', dedupeKey);
+      }
     } catch (adminErr) {
       console.warn('Admin notification email failed:', adminErr.message);
     }
@@ -3630,8 +3711,10 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             `
           };
 
-          emailTransporter.sendMail(mailOptions)
-            .catch(err => console.error('Coaching email failed:', err.message));
+          if (await claimNotificationOnce(`coaching:${session.id}:patient`)) {
+            emailTransporter.sendMail(mailOptions)
+              .catch(err => console.error('Coaching email failed:', err.message));
+          }
         }
 
         // Notify coach about new session booking
@@ -3675,8 +3758,10 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             `
           };
 
-          emailTransporter.sendMail(coachMailOptions)
-            .catch(err => console.error('Coach coaching email failed:', err.message));
+          if (await claimNotificationOnce(`coaching:${session.id}:coach`)) {
+            emailTransporter.sendMail(coachMailOptions)
+              .catch(err => console.error('Coach coaching email failed:', err.message));
+          }
         }
 
         // Notify admin (Limitless Brain Lab) about coaching session purchase
@@ -3698,8 +3783,10 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             `
           };
 
-          emailTransporter.sendMail(adminCoachMailOptions)
-            .catch(err => console.error('Admin coaching email failed:', err.message));
+          if (await claimNotificationOnce(`coaching:${session.id}:admin`)) {
+            emailTransporter.sendMail(adminCoachMailOptions)
+              .catch(err => console.error('Admin coaching email failed:', err.message));
+          }
         }
       }
 
@@ -5598,7 +5685,7 @@ app.post('/api/send-welcome-email', async (req, res) => {
 
     if (clinicSmtpEmail && clinicSmtpPassword) {
       try {
-        transporter = nodemailer.createTransport({
+        transporter = patchSendMail(nodemailer.createTransport({
           host: 'smtp.gmail.com',
           port: 465,
           secure: true,
@@ -5610,7 +5697,7 @@ app.post('/api/send-welcome-email', async (req, res) => {
           greetingTimeout: 60000,
           socketTimeout: 120000,
           tls: { rejectUnauthorized: false, minVersion: 'TLSv1.2' }
-        });
+        }));
         fromEmail = clinicSmtpEmail;
         console.log('✅ Using clinic SMTP:', clinicSmtpEmail);
       } catch (smtpError) {
@@ -5737,7 +5824,7 @@ app.post('/api/send-email-update-notification', async (req, res) => {
 
     if (clinicSmtpEmail && clinicSmtpPassword) {
       try {
-        transporter = nodemailer.createTransport({
+        transporter = patchSendMail(nodemailer.createTransport({
           host: 'smtp.gmail.com',
           port: 465,
           secure: true,
@@ -5749,7 +5836,7 @@ app.post('/api/send-email-update-notification', async (req, res) => {
           greetingTimeout: 60000,
           socketTimeout: 120000,
           tls: { rejectUnauthorized: false, minVersion: 'TLSv1.2' }
-        });
+        }));
         fromEmail = clinicSmtpEmail;
         console.log('✅ Using clinic SMTP:', clinicSmtpEmail);
       } catch (smtpError) {
@@ -5934,7 +6021,7 @@ app.post('/api/send-report-email', async (req, res) => {
 app.post('/api/send-coaching-link', async (req, res) => {
   try {
     const COMMON_CALENDLY = 'https://calendly.com/admin-bettroi/30min';
-    const { patientName, patientEmail, coachName, calendlyUrl, coachEmail } = req.body;
+    const { patientName, patientEmail, coachName, calendlyUrl, coachEmail, sessionId } = req.body;
 
     if (!patientEmail || !coachName) {
       return res.status(400).json({
@@ -6020,7 +6107,9 @@ app.post('/api/send-coaching-link', async (req, res) => {
       `
     };
 
-    await emailTransporter.sendMail(mailOptions);
+    if (await claimNotificationOnce(sessionId ? `coaching:${sessionId}:patient` : null)) {
+      await emailTransporter.sendMail(mailOptions);
+    }
 
     // Notify coach if their email was provided
     if (coachEmail) {
@@ -6066,7 +6155,9 @@ app.post('/api/send-coaching-link', async (req, res) => {
           </html>
         `
       };
-      await emailTransporter.sendMail(coachMailOptions).catch(err => console.error('Coach notification email failed:', err.message));
+      if (await claimNotificationOnce(sessionId ? `coaching:${sessionId}:coach` : null)) {
+        await emailTransporter.sendMail(coachMailOptions).catch(err => console.error('Coach notification email failed:', err.message));
+      }
     }
 
     res.json({

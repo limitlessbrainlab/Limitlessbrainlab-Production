@@ -876,7 +876,7 @@ app.post('/api/edf-upload-notification', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-      subject: `📊 New EDF Report Processed - ${patientName || 'Unknown Patient'}`,
+      subject: `New EDF Report Processed - ${patientName || 'Unknown Patient'}`,
       html: getAdminNotificationHtml('EDF Report Upload & Processing', [
         { label: 'Patient Name', value: patientName || 'Not provided' },
         { label: 'Patient ID', value: patientId || 'Not provided' },
@@ -1298,14 +1298,14 @@ app.post('/api/feedback', async (req, res) => {
     });
 
     // Get star rating display
-    const starDisplay = rating ? '⭐'.repeat(rating) + '☆'.repeat(5 - rating) : 'Not rated';
+    const starDisplay = rating ? `${rating} / 5` : 'Not rated';
     const categoryDisplay = category || 'General';
 
     // Send email notification asynchronously
     const mailOptions = {
       from: EMAIL_FROM,
       to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-      subject: `📝 Patient Feedback - ${categoryDisplay} ${rating ? `(${rating}/5 Stars)` : ''}`,
+      subject: `Patient Feedback - ${categoryDisplay} ${rating ? `(${rating}/5 Stars)` : ''}`,
       attachments: getLogoAttachment(),
       html: `
         <!DOCTYPE html>
@@ -1407,7 +1407,7 @@ app.post('/api/feedback', async (req, res) => {
                   <tr>
                     <td style="padding: 0 32px 24px;">
                       <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px; padding: 20px;">
-                        <p style="color: #92400e; margin: 0 0 8px; font-size: 14px; font-weight: 600;">💬 Feedback Message</p>
+                        <p style="color: #92400e; margin: 0 0 8px; font-size: 14px; font-weight: 600;">Feedback Message</p>
                         <p style="color: #78350f; margin: 0; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">
                           ${message}
                         </p>
@@ -1419,7 +1419,7 @@ app.post('/api/feedback', async (req, res) => {
                   <tr>
                     <td style="background: #f8f9fc; padding: 20px 32px; border-top: 1px solid #e5e7eb;">
                       <p style="color: #888; margin: 0; font-size: 12px;">
-                        ✨ This feedback was received from <strong style="color: #323956;">Limitless Brain Lab</strong> Patient Dashboard
+                        This feedback was received from <strong style="color: #323956;">Limitless Brain Lab</strong> Patient Dashboard
                       </p>
                       <p style="color: #aaa; margin: 6px 0 0; font-size: 11px;">
                         ${new Date().toLocaleString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} at ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
@@ -2937,7 +2937,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             const mailOptions = {
               from: EMAIL_FROM,
               to: session.customer_email,
-              subject: `🎉 Welcome to Limitless Brain Lab ${tier}!`,
+              subject: `Welcome to Limitless Brain Lab ${tier}!`,
               attachments: getLogoAttachment(),
               html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -2968,7 +2968,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             const adminSubMailOptions = {
               from: EMAIL_FROM,
               to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-              subject: `💰 New Subscription Purchase: ${tier}`,
+              subject: `New Subscription Purchase: ${tier}`,
               html: `
                 <div style="font-family: Arial, sans-serif; max-width: 500px;">
                   <h2 style="color: #323956;">New Subscription Purchase</h2>
@@ -3107,7 +3107,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             const assessmentMailOptions = {
               from: EMAIL_FROM,
               to: session.customer_email,
-              subject: `🧠 Your ${assessmentName} is Ready! - Limitless Brain Lab`,
+              subject: `Your ${assessmentName} is Ready! - Limitless Brain Lab`,
               attachments: getLogoAttachment(),
               html: `
                 <!DOCTYPE html>
@@ -3229,7 +3229,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             const adminMailOptions = {
               from: EMAIL_FROM,
               to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-              subject: `💰 New Assessment Purchase: ${assessmentName}`,
+              subject: `New Assessment Purchase: ${assessmentName}`,
               html: `
                 <div style="font-family: Arial, sans-serif; max-width: 500px;">
                   <h2 style="color: #323956;">New Assessment Purchase</h2>
@@ -3331,7 +3331,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
               ? {
                   from: EMAIL_FROM,
                   to: session.customer_email,
-                  subject: `🔄 Package Reorder Successful - ${reports} EEG Reports Added!`,
+                  subject: `Package Reorder Successful - ${reports} EEG Reports Added!`,
                   attachments: getLogoAttachment(),
                   html: `
                     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
@@ -3373,7 +3373,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
               : {
                   from: EMAIL_FROM,
                   to: session.customer_email,
-                  subject: `✅ Payment Successful - ${reports} EEG Reports Added!`,
+                  subject: `Payment Successful - ${reports} EEG Reports Added!`,
                   attachments: getLogoAttachment(),
                   html: `
                     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -3385,7 +3385,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                         <p style="color: #333;">Hi ${customerName || 'Clinic Admin'},</p>
                         <p style="color: #555;">Your payment of <strong>${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</strong> has been processed successfully.</p>
                         <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin: 16px 0;">
-                          <p style="margin: 0; color: #166534; font-weight: 600;">✅ ${reports} EEG Report Credits have been added to your account.</p>
+                          <p style="margin: 0; color: #166534; font-weight: 600;">${reports} EEG Report Credits have been added to your account.</p>
                         </div>
                         <p style="color: #555; font-size: 13px;">You can now access your clinic dashboard and start generating reports.</p>
                         <div style="text-align: center; margin: 24px 0;">
@@ -3404,7 +3404,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             const adminClinicMailOptions = {
               from: EMAIL_FROM,
               to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-              subject: `💰 New Clinic Report Purchase: ${reports} Reports`,
+              subject: `New Clinic Report Purchase: ${reports} Reports`,
               html: `
                 <div style="font-family: Arial, sans-serif; max-width: 500px;">
                   <h2 style="color: #323956;">New Clinic Report Purchase</h2>
@@ -3515,7 +3515,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           const mailOptions = {
             from: EMAIL_FROM,
             to: session.customer_email,
-            subject: `${isMeditationPurchase ? '🧘' : '🎵'} Your ${packName} is Ready! - Limitless Brain Lab`,
+            subject: `Your ${packName} is Ready! - Limitless Brain Lab`,
             attachments: getLogoAttachment(),
             html: `
               <!DOCTYPE html>
@@ -3585,7 +3585,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                         <tr>
                           <td style="padding: 0 32px 24px;" align="center">
                             <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/${isMeditationPurchase ? 'dashboard' : 'frequencies'}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                              ${isMeditationPurchase ? '🧘 Access Your Meditations' : '🎵 Access Your Frequencies'}
+                              ${isMeditationPurchase ? 'Access Your Meditations' : 'Access Your Frequencies'}
                             </a>
                           </td>
                         </tr>
@@ -3621,7 +3621,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             const adminFreqMailOptions = {
               from: EMAIL_FROM,
               to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-              subject: `💰 New ${itemType} Purchase: ${itemName}`,
+              subject: `New ${itemType} Purchase: ${itemName}`,
               html: `
                 <div style="font-family: Arial, sans-serif; max-width: 500px;">
                   <h2 style="color: #323956;">New ${itemType} Purchase</h2>
@@ -3769,7 +3769,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           const adminCoachMailOptions = {
             from: EMAIL_FROM,
             to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-            subject: `💰 New Coaching Session Purchase: ${coachName}`,
+            subject: `New Coaching Session Purchase: ${coachName}`,
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 500px;">
                 <h2 style="color: #323956;">New Coaching Session Purchase</h2>
@@ -3807,7 +3807,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       const renewalMail = {
         from: process.env.EMAIL_USER,
         to: customerEmail,
-        subject: `✅ Subscription Renewed Successfully - Limitless Brain Lab`,
+        subject: `Subscription Renewed Successfully - Limitless Brain Lab`,
         attachments: [{ filename: 'logo.png', path: LOGO_PATH, cid: LOGO_CID }],
         html: `
           <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
@@ -3852,7 +3852,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       const failedMail = {
         from: process.env.EMAIL_USER,
         to: customerEmail,
-        subject: `⚠️ Payment Failed - Action Required - Limitless Brain Lab`,
+        subject: `Payment Failed - Action Required - Limitless Brain Lab`,
         attachments: [{ filename: 'logo.png', path: LOGO_PATH, cid: LOGO_CID }],
         html: `
           <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
@@ -4184,7 +4184,7 @@ app.post('/api/clinic-credentials', async (req, res) => {
                   <!-- Welcome Message -->
                   <tr>
                     <td style="padding: 32px 32px 16px;">
-                      <h2 style="color: #323956; margin: 0 0 8px; font-size: 24px;">Welcome, ${contactPerson || clinicName || 'Clinic Admin'}! 🎉</h2>
+                      <h2 style="color: #323956; margin: 0 0 8px; font-size: 24px;">Welcome, ${contactPerson || clinicName || 'Clinic Admin'}! </h2>
                       <p style="color: #666; margin: 0 0 12px; font-size: 14px; line-height: 1.6;">
                         Thank you for registering with <strong>Limitless Brain Lab</strong>! We are thrilled to have you onboard and look forward to a long-term association filled with health, happiness, and growth.
                       </p>
@@ -4240,7 +4240,7 @@ app.post('/api/clinic-credentials', async (req, res) => {
                   <tr>
                     <td style="padding: 0 32px 24px;" align="center">
                       <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic-login" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                        🔐 Login to Your Clinic Portal
+                        Login to Your Clinic Portal
                       </a>
                     </td>
                   </tr>
@@ -4250,7 +4250,7 @@ app.post('/api/clinic-credentials', async (req, res) => {
                     <td style="padding: 0 32px 24px;">
                       <div style="background: #fef3c7; border-radius: 8px; padding: 16px; border-left: 4px solid #f59e0b;">
                         <p style="color: #92400e; margin: 0; font-size: 13px; line-height: 1.5;">
-                          <strong>⚠️ Security Note:</strong> Please change your password after your first login. Keep your credentials secure and do not share them with anyone.
+                          <strong>Security Note:</strong> Please change your password after your first login. Keep your credentials secure and do not share them with anyone.
                         </p>
                       </div>
                     </td>
@@ -4260,7 +4260,7 @@ app.post('/api/clinic-credentials', async (req, res) => {
                   <tr>
                     <td style="background: #f8f9fc; padding: 20px 32px; border-top: 1px solid #e5e7eb;">
                       <p style="color: #888; margin: 0; font-size: 12px;">
-                        ✨ Thank you for choosing <strong style="color: #323956;">Limitless Brain Lab</strong>
+                        Thank you for choosing <strong style="color: #323956;">Limitless Brain Lab</strong>
                       </p>
                       <p style="color: #aaa; margin: 6px 0 0; font-size: 11px;">
                         If you did not request this, please contact support immediately.
@@ -4398,7 +4398,7 @@ app.post('/api/registration-confirmation', async (req, res) => {
       mailOptions = {
         from: EMAIL_FROM,
         to: email,
-        subject: `✅ Registration Successful - Welcome to Limitless Brain Lab!`,
+        subject: `Registration Successful - Welcome to Limitless Brain Lab!`,
         html: `
           <!DOCTYPE html>
           <html>
@@ -4442,7 +4442,7 @@ app.post('/api/registration-confirmation', async (req, res) => {
                         <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;">
                           <span style="font-size: 40px; line-height: 80px;">✓</span>
                         </div>
-                        <h2 style="color: #323956; margin: 0 0 8px; font-size: 26px;">Welcome, ${displayName}! 🎉</h2>
+                        <h2 style="color: #323956; margin: 0 0 8px; font-size: 26px;">Welcome, ${displayName}! </h2>
                         <p style="color: #666; margin: 0; font-size: 15px; line-height: 1.6;">
                           Your clinic registration has been successfully completed.
                         </p>
@@ -4453,7 +4453,7 @@ app.post('/api/registration-confirmation', async (req, res) => {
                     <tr>
                       <td style="padding: 0 32px 24px;">
                         <div style="background: #f0fdf4; border-radius: 12px; padding: 20px; border: 1px solid #bbf7d0;">
-                          <h3 style="color: #166534; margin: 0 0 12px; font-size: 16px;">📋 What's Next?</h3>
+                          <h3 style="color: #166534; margin: 0 0 12px; font-size: 16px;">What's Next?</h3>
                           <ul style="color: #166534; margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.8;">
                             <li>Your account is being reviewed by our admin team</li>
                             <li>You'll receive login credentials once approved</li>
@@ -4478,7 +4478,7 @@ app.post('/api/registration-confirmation', async (req, res) => {
                     <tr>
                       <td style="background: #f8f9fc; padding: 20px 32px; border-top: 1px solid #e5e7eb;">
                         <p style="color: #888; margin: 0; font-size: 12px;">
-                          ✨ Thank you for choosing <strong style="color: #323956;">Limitless Brain Lab</strong>
+                          Thank you for choosing <strong style="color: #323956;">Limitless Brain Lab</strong>
                         </p>
                         <p style="color: #aaa; margin: 6px 0 0; font-size: 11px;">
                           ${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -5293,7 +5293,7 @@ app.post('/api/send-otp', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: email,
-      subject: '🔐 Email Verification OTP - Limitless Brain Lab',
+      subject: 'Email Verification OTP - Limitless Brain Lab',
       attachments: getLogoAttachment(),
       html: `
         <!DOCTYPE html>
@@ -5716,7 +5716,7 @@ app.post('/api/send-welcome-email', async (req, res) => {
     const mailOptions = {
       from: fromEmail,
       to: email,
-      subject: '🎉 Welcome to Limitless Brain Lab - Your Login Credentials',
+      subject: 'Welcome to Limitless Brain Lab - Your Login Credentials',
       attachments: getLogoAttachment(),
       html: `
         <!DOCTYPE html>
@@ -5743,7 +5743,7 @@ app.post('/api/send-welcome-email', async (req, res) => {
               </p>
 
               <div style="background: #f8f9fc; border-radius: 10px; padding: 20px; margin: 20px 0;">
-                <h3 style="color: #323956; margin: 0 0 15px; font-size: 16px;">🔐 Your Login Credentials</h3>
+                <h3 style="color: #323956; margin: 0 0 15px; font-size: 16px;">Your Login Credentials</h3>
 
                 <div style="background: white; border-radius: 8px; padding: 12px 15px; margin-bottom: 10px; border-left: 4px solid #3b82f6;">
                   <p style="color: #888; margin: 0; font-size: 11px; text-transform: uppercase;">Email</p>
@@ -5764,7 +5764,7 @@ app.post('/api/send-welcome-email', async (req, res) => {
 
               <div style="background: #fef3c7; border-radius: 8px; padding: 12px 15px; margin-top: 20px;">
                 <p style="color: #92400e; margin: 0; font-size: 12px;">
-                  ⚠️ <strong>Security Tip:</strong> Please change your password after first login and keep your credentials safe.
+                  <strong>Security Tip:</strong> Please change your password after first login and keep your credentials safe.
                 </p>
               </div>
             </div>
@@ -5879,7 +5879,7 @@ app.post('/api/send-email-update-notification', async (req, res) => {
               </p>
 
               <div style="background: #f8f9fc; border-radius: 10px; padding: 20px; margin: 20px 0;">
-                <h3 style="color: #323956; margin: 0 0 15px; font-size: 16px;">📧 Updated Information</h3>
+                <h3 style="color: #323956; margin: 0 0 15px; font-size: 16px;">Updated Information</h3>
 
                 <div style="background: white; border-radius: 8px; padding: 12px 15px; margin-bottom: 10px; border-left: 4px solid #3b82f6;">
                   <p style="color: #888; margin: 0; font-size: 11px; text-transform: uppercase;">Updated Email ID</p>
@@ -5900,7 +5900,7 @@ app.post('/api/send-email-update-notification', async (req, res) => {
 
               <div style="background: #fef3c7; border-radius: 8px; padding: 12px 15px; margin-top: 20px;">
                 <p style="color: #92400e; margin: 0; font-size: 12px;">
-                  ⚠️ <strong>Security Tip:</strong> Please change your password after first login and keep your credentials safe.
+                  <strong>Security Tip:</strong> Please change your password after first login and keep your credentials safe.
                 </p>
               </div>
 
@@ -6261,7 +6261,7 @@ app.post('/api/request-demo-report', async (req, res) => {
     await emailTransporter.sendMail({
       from: EMAIL_FROM,
       to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-      subject: `📄 Demo Report Request - ${email}`,
+      subject: `Demo Report Request - ${email}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -6325,7 +6325,7 @@ app.post('/api/request-demo-report', async (req, res) => {
                   <tr>
                     <td style="background: #f8f9fc; padding: 20px 32px; border-top: 1px solid #e5e7eb;">
                       <p style="color: #888; margin: 0; font-size: 12px;">
-                        ✨ This inquiry was received from <strong style="color: #323956;">Limitless Brain Lab</strong> - Demo Report Request Form
+                        This inquiry was received from <strong style="color: #323956;">Limitless Brain Lab</strong> - Demo Report Request Form
                       </p>
                       <p style="color: #aaa; margin: 6px 0 0; font-size: 11px;">
                         ${new Date().toLocaleString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} at ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
@@ -6488,7 +6488,7 @@ app.post('/api/send-no-credit-email', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: clinicEmail,
-      subject: `⚠️ No Report Credits Remaining - Action Required - Limitless Brain Lab`,
+      subject: `No Report Credits Remaining - Action Required - Limitless Brain Lab`,
       attachments: getLogoAttachment(),
       html: `
         <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
@@ -6500,7 +6500,7 @@ app.post('/api/send-no-credit-email', async (req, res) => {
             <p style="color: #333; font-size: 15px; line-height: 1.6;">Dear <strong>${displayName}</strong>,</p>
             <p style="color: #555; font-size: 15px; line-height: 1.6;">You have <strong>0 report credits</strong> remaining in your ${accountType} account. You will not be able to add new patients until you purchase a new package.</p>
             <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 12px; padding: 16px 20px; margin: 20px 0;">
-              <p style="margin: 0; color: #c2410c; font-weight: 600; font-size: 14px;">⚠️ Action Required: Purchase a report package to continue adding patients.</p>
+              <p style="margin: 0; color: #c2410c; font-weight: 600; font-size: 14px;">Action Required: Purchase a report package to continue adding patients.</p>
             </div>
             <p style="color: #555; font-size: 14px; line-height: 1.6;">To purchase more credits, visit your Subscription tab in the dashboard and choose a package that suits your needs.</p>
             <div style="text-align: center; margin: 28px 0;">
@@ -6563,7 +6563,7 @@ app.post('/api/check-email-exists', async (req, res) => {
         success: true,
         exists: true,
         type: 'patient',
-        message: `⚠️ Email already registered as a patient`
+        message: `Email already registered as a patient`
       });
     }
 
@@ -6574,7 +6574,7 @@ app.post('/api/check-email-exists', async (req, res) => {
         success: true,
         exists: true,
         type: 'clinic',
-        message: `⚠️ Email already registered as a ${clinicType}`
+        message: `Email already registered as a ${clinicType}`
       });
     }
 
@@ -6582,7 +6582,7 @@ app.post('/api/check-email-exists', async (req, res) => {
     return res.json({
       success: true,
       exists: false,
-      message: '✅ Email is available for registration'
+      message: 'Email is available for registration'
     });
 
   } catch (error) {
@@ -6766,7 +6766,7 @@ app.post('/api/send-partner-welcome-email', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: email,
-      subject: '🎉 Welcome to Limitless Brain Lab - Partner Account Activated',
+      subject: 'Welcome to Limitless Brain Lab - Partner Account Activated',
       attachments: getLogoAttachment(),
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
@@ -6779,7 +6779,7 @@ app.post('/api/send-partner-welcome-email', async (req, res) => {
             <p style="color: #333; font-size: 15px; margin: 0 0 15px;">Hello <strong>${partnerName}</strong>,</p>
             <p style="color: #555; font-size: 14px; line-height: 1.6; margin: 0 0 25px;">Thank you for partnering with Limitless Brain Lab!</p>
             <div style="background: #f0f7ff; border-radius: 10px; padding: 20px; margin: 25px 0; border: 1px solid #d4e9ff;">
-              <h3 style="color: #333; margin: 0 0 18px; font-size: 15px; font-weight: 700;">🔐 Your Login Credentials</h3>
+              <h3 style="color: #333; margin: 0 0 18px; font-size: 15px; font-weight: 700;">Your Login Credentials</h3>
               <div style="background: white; border-radius: 8px; padding: 13px 15px; margin-bottom: 10px; border-left: 4px solid #2E5BA8;">
                 <p style="color: #888; margin: 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Email</p>
                 <p style="color: #1E3A5F; margin: 5px 0 0; font-size: 14px; font-weight: 600;">${email}</p>
@@ -6821,7 +6821,7 @@ app.post('/api/send-partner-payment-success', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: partnerEmail,
-      subject: isReorder ? `🔄 Package Reorder Successful - ${reports} EEG Reports Added!` : `✅ Payment Successful - ${reports} EEG Reports Added!`,
+      subject: isReorder ? `Package Reorder Successful - ${reports} EEG Reports Added!` : `Payment Successful - ${reports} EEG Reports Added!`,
       attachments: getLogoAttachment(),
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
@@ -6888,14 +6888,14 @@ app.post('/api/send-partner-report-notification', async (req, res) => {
             <p style="color: #333; font-size: 15px; margin: 0 0 15px;">Hello <strong>${partnerName}</strong>,</p>
             <p style="color: #555; font-size: 14px; line-height: 1.6; margin: 0 0 25px;">The QEEG analysis report for <strong>${patientName}</strong> is ready for clinical review.</p>
             <div style="background: #f0f7ff; border-radius: 10px; padding: 18px 20px; margin: 25px 0; border: 1px solid #d4e9ff;">
-              <h3 style="color: #333; margin: 0 0 15px; font-size: 14px; font-weight: 700;">📋 Report Information</h3>
+              <h3 style="color: #333; margin: 0 0 15px; font-size: 14px; font-weight: 700;">Report Information</h3>
               <div style="background: white; border-radius: 8px; padding: 13px 15px; border-left: 4px solid #2E5BA8;">
                 <p style="color: #888; margin: 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Report File</p>
                 <p style="color: #333; margin: 5px 0 0; font-size: 14px; font-weight: 600;">${reportFileName || 'report.pdf'}</p>
               </div>
             </div>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${reportUrl}" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">📥 Download Report</a>
+              <a href="${reportUrl}" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Download Report</a>
             </div>
           </div>
           <div style="background: #f8fafc; padding: 18px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
@@ -6926,7 +6926,7 @@ app.post('/api/send-partner-no-credit-alert', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: partnerEmail,
-      subject: `⚠️ No Report Credits Remaining - Action Required`,
+      subject: `No Report Credits Remaining - Action Required`,
       attachments: getLogoAttachment(),
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
@@ -6938,7 +6938,7 @@ app.post('/api/send-partner-no-credit-alert', async (req, res) => {
             <p style="color: #333; font-size: 15px; margin: 0 0 15px;">Dear <strong>${partnerName}</strong>,</p>
             <p style="color: #555; font-size: 14px; line-height: 1.6; margin: 0 0 25px;">You have <strong>0 report credits</strong> remaining. Purchase a new package to continue generating QEEG reports.</p>
             <div style="background: #FFF7ED; border: 1px solid #FED7AA; border-radius: 12px; padding: 16px 20px; margin: 25px 0;">
-              <p style="margin: 0; color: #C2410C; font-weight: 600; font-size: 14px;">⚠️ Action Required: Purchase a report package</p>
+              <p style="margin: 0; color: #C2410C; font-weight: 600; font-size: 14px;">Action Required: Purchase a report package</p>
             </div>
             <div style="text-align: center; margin: 30px 0;">
               <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic/subscription" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Buy More Credits</a>
@@ -6972,7 +6972,7 @@ app.post('/api/send-partner-patient-welcome', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: email,
-      subject: '🎉 Welcome to Limitless Brain Lab - Your Login Credentials',
+      subject: 'Welcome to Limitless Brain Lab - Your Login Credentials',
       attachments: getLogoAttachment(),
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
@@ -6984,7 +6984,7 @@ app.post('/api/send-partner-patient-welcome', async (req, res) => {
             <p style="color: #333; font-size: 15px; margin: 0 0 15px;">Hello <strong>${patientName}</strong>,</p>
             <p style="color: #555; font-size: 14px; line-height: 1.6; margin: 0 0 25px;">Your account has been created by <strong>${partnerName}</strong>. Welcome to the Limitless Brain Lab community!</p>
             <div style="background: #f0f7ff; border-radius: 10px; padding: 20px; margin: 25px 0; border: 1px solid #d4e9ff;">
-              <h3 style="color: #333; margin: 0 0 18px; font-size: 15px; font-weight: 700;">🔐 Your Login Credentials</h3>
+              <h3 style="color: #333; margin: 0 0 18px; font-size: 15px; font-weight: 700;">Your Login Credentials</h3>
               <div style="background: white; border-radius: 8px; padding: 13px 15px; margin-bottom: 10px; border-left: 4px solid #2E5BA8;">
                 <p style="color: #888; margin: 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Email</p>
                 <p style="color: #1E3A5F; margin: 5px 0 0; font-size: 14px; font-weight: 600;">${email}</p>

@@ -518,6 +518,9 @@ const ClinicManagement = ({ onUpdate }) => {
 
       const hashedPassword = data.editPassword ? await hashPassword(data.editPassword) : undefined;
 
+      // Check if email has changed
+      const emailChanged = selectedClinic?.email !== data.email;
+
       // Keep country code and phone separate
       const updateData = {
         name: data.name,
@@ -538,6 +541,15 @@ const ClinicManagement = ({ onUpdate }) => {
 
 
       await DatabaseService.update('clinics', selectedClinic.id, updateData);
+
+      // Send "email updated" notification to the new address if the email changed
+      if (emailChanged && data.email) {
+        fetch(`${getBaseUrl()}/api/send-partner-email-update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ partnerName: data.name, newEmail: data.email })
+        }).catch(err => console.error('Failed to send clinic email update notification:', err));
+      }
 
       if (hashedPassword) {
         // Send new credentials to clinic email

@@ -93,7 +93,7 @@ const DataAccess = () => {
       toast.success(`${type.toUpperCase()} report generated and downloaded`);
 
       // Refresh file list
-      loadRealData();
+      loadFiles(patientId);
 
     } catch (error) {
       console.error('Report generation error:', error);

@@ -25,6 +25,17 @@ const AdminDashboard = ({ analytics = {}, onRefresh }) => {
 
   useEffect(() => {
     loadRealTimeData();
+    // Near-real-time: new clinic registrations and payments land in the DB via
+    // the backend (signup + Stripe webhook). Refresh periodically and whenever
+    // the admin returns to the tab so they reflect in the portal without a
+    // manual reload. 30s is conservative to avoid Supabase request overload.
+    const interval = setInterval(loadRealTimeData, 30000);
+    const onFocus = () => loadRealTimeData();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   const loadRealTimeData = async () => {

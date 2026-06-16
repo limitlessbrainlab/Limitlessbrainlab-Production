@@ -84,6 +84,12 @@ const emailTransporter = nodemailer.createTransport(
       }
 );
 
+// True when an SMTP transport is actually configured — Brevo (primary) OR Gmail
+// (fallback). Email-send sites must gate on THIS, not on EMAIL_USER/EMAIL_PASS
+// alone: production uses Brevo, so gating on the Gmail-only vars silently
+// suppressed payment/credits/confirmation emails when EMAIL_USER was unset.
+const mailerConfigured = !!(process.env.BREVO_SMTP_USER || process.env.EMAIL_USER);
+
 // Deliverability: HTML-only mail scores worse with spam filters, so derive a
 // plain-text alternative for every outbound mail, and set Reply-To so replies
 // to the noreply sender still reach a monitored inbox.
@@ -1995,7 +2001,7 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
       }
 
       // Send confirmation email to user after successful payment
-      if (process.env.EMAIL_USER && process.env.EMAIL_PASS && customerEmail) {
+      if (mailerConfigured && customerEmail) {
         let emailSubject = '';
         let assessmentLink = '';
         let productName = '';
@@ -2992,7 +2998,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           await savePatientPayment(session.customer_email, 'subscription', `${tier} Subscription`, session.amount_total / 100, session.currency?.toUpperCase());
 
           // Send confirmation email
-          if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+          if (mailerConfigured) {
             const mailOptions = {
               from: EMAIL_FROM,
               to: session.customer_email,
@@ -3162,7 +3168,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           }).catch(err => console.warn('payments table insert skipped:', err.message));
 
           // Send assessment link email to customer
-          if (process.env.EMAIL_USER && process.env.EMAIL_PASS && assessmentLink) {
+          if (mailerConfigured && assessmentLink) {
             const assessmentMailOptions = {
               from: EMAIL_FROM,
               to: session.customer_email,
@@ -3284,7 +3290,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           }
 
           // Also notify admin about the purchase
-          if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+          if (mailerConfigured) {
             const adminMailOptions = {
               from: EMAIL_FROM,
               to: process.env.EMAIL_TO || process.env.EMAIL_USER,
@@ -3364,7 +3370,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           }
 
           // Send confirmation email to clinic — reorder vs first purchase
-          if (process.env.EMAIL_USER && process.env.EMAIL_PASS && session.customer_email) {
+          if (mailerConfigured && session.customer_email) {
             const isReorder = currentAllowed > 0;
             const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
 
@@ -3395,7 +3401,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                             </tr>
                             <tr style="border-top: 1px solid #bbf7d0;">
                               <td style="color: #333; font-size: 15px; font-weight: 700; padding: 8px 0;">New Total Balance</td>
-                              <td style="color: #166534; font-weight: 700; font-size: 15px; text-align: right;">${newAllowed} Reports</td>
+                              <td style="color: #166534; font-weight: 700; font-size: 15px; text-align: right;">${currentAllowed + reports} Reports</td>
                             </tr>
                           </table>
                         </div>
@@ -3548,7 +3554,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           }
 
           // Send confirmation email
-          if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+          if (mailerConfigured) {
             const packName = session.metadata.is_bundle === 'true'
               ? (isMeditationPurchase ? 'Complete Meditation Bundle' : 'Complete Frequency Bundle')
               : session.metadata.pack_id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -3653,7 +3659,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         }
 
           // Notify admin (Limitless Brain Lab) about frequency/meditation purchase
-          if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+          if (mailerConfigured) {
             const itemType = isMeditationPurchase ? 'Meditation' : 'Frequency';
             const itemName = session.metadata.is_bundle === 'true'
               ? (isMeditationPurchase ? 'Complete Meditation Bundle' : 'Complete Frequency Bundle')
@@ -3806,7 +3812,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         }
 
         // Notify admin (Limitless Brain Lab) about coaching session purchase
-        if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        if (mailerConfigured) {
           const adminCoachMailOptions = {
             from: EMAIL_FROM,
             to: process.env.EMAIL_TO || process.env.EMAIL_USER,
@@ -3844,7 +3850,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
     console.log(`✅ Subscription renewal successful for ${customerEmail} - ${currency} ${amountPaid}`);
 
-    if (process.env.EMAIL_USER && process.env.EMAIL_PASS && customerEmail) {
+    if (mailerConfigured && customerEmail) {
       const renewalMail = {
         from: process.env.EMAIL_USER,
         to: customerEmail,
@@ -3889,7 +3895,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
     console.log(`❌ Payment failed for ${customerEmail} - ${currency} ${amountDue}`);
 
-    if (process.env.EMAIL_USER && process.env.EMAIL_PASS && customerEmail) {
+    if (mailerConfigured && customerEmail) {
       const failedMail = {
         from: process.env.EMAIL_USER,
         to: customerEmail,

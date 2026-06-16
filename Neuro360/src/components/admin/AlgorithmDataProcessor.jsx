@@ -364,6 +364,40 @@ const AlgorithmDataProcessor = () => {
     loadPatients();
   };
 
+  // Switching the Report Mode radio must start a fresh report: clear the uploaded
+  // files, processing results, and any already-generated NeuroSense/Performance
+  // report so the SA re-uploads and regenerates for the newly selected mode,
+  // instead of reusing the previous run's data.
+  const handleReportModeChange = (mode) => {
+    if (mode === reportMode) return; // no-op when unchanged
+    if (isProcessing || isGeneratingClaudeReport) {
+      toast.error('Please wait for the current process to finish before switching report mode.');
+      return;
+    }
+    setReportMode(mode);
+    // Reset uploads + processing
+    setEyesOpenFile(null);
+    setEyesClosedFile(null);
+    setEyesOpenUrl(null);
+    setEyesClosedUrl(null);
+    setResults(null);
+    setProcessingComplete(false);
+    setConsoleLog([]);
+    setProgress(0);
+    setIsSaved(false);
+    setIsSaving(false);
+    setPdfUrl(null);
+    setSavedResultId(null);
+    setReportSent(false);
+    // Reset NeuroSense Performance (Claude) report state
+    setClaudeReportSent(false);
+    setClaudeReportUrl(null);
+    setClaudeReportError(null);
+    setClaudeReportFileName('');
+    setClaudeProgress(0);
+    setClaudeStages([]);
+  };
+
   // Helper function to get patient name (handles different field names)
   const getPatientName = (patient) => {
     return patient?.fullName || patient?.full_name || patient?.name || patient?.email || 'Unknown Patient';
@@ -2337,7 +2371,7 @@ const AlgorithmDataProcessor = () => {
                   name="reportMode"
                   value="neurosense"
                   checked={reportMode === 'neurosense'}
-                  onChange={() => setReportMode('neurosense')}
+                  onChange={() => handleReportModeChange('neurosense')}
                   className="mt-1 h-4 w-4 text-primary focus:ring-primary border-gray-300 dark:border-gray-600"
                 />
                 <span>
@@ -2351,7 +2385,7 @@ const AlgorithmDataProcessor = () => {
                   name="reportMode"
                   value="claude"
                   checked={reportMode === 'claude'}
-                  onChange={() => setReportMode('claude')}
+                  onChange={() => handleReportModeChange('claude')}
                   className="mt-1 h-4 w-4 text-primary focus:ring-primary border-gray-300 dark:border-gray-600"
                 />
                 <span>

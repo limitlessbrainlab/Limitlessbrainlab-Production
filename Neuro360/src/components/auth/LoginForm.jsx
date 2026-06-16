@@ -86,12 +86,16 @@ const LoginForm = () => {
           }
         }
 
-        // Check if there's a payment return URL (user was redirected from Stripe)
+        // Check if there's a payment return URL (user was redirected from Stripe).
+        // Payment/coach flows are patient-only, so only honor this for patients —
+        // otherwise a stale paymentReturnUrl sends an admin/clinic user to a patient page.
         const paymentReturnUrl = localStorage.getItem('paymentReturnUrl');
-        if (paymentReturnUrl) {
+        if (paymentReturnUrl && userRole === 'patient') {
           localStorage.removeItem('paymentReturnUrl');
           navigate(paymentReturnUrl, { replace: true });
         } else {
+          // Clear any stale return URL so it can't hijack a later navigation
+          localStorage.removeItem('paymentReturnUrl');
           navigate(redirectPath, { replace: true });
         }
       } else {

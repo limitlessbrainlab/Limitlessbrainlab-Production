@@ -368,20 +368,31 @@ Here is the report text:
 ${pdfText}`;
 
   // The gateway is single-flight (one CLI call at a time) and shared with other
-  // products, so a momentary "busy" (429) is common. Extract is the FIRST call and
-  // has NO fallback — if it fails the whole report fails — so ride out transient
-  // contention with a few quick retries (429 is rejected instantly, so this only
-  // waits for the other call to free the gateway). Do not retry slow 504/timeouts.
+  // products, so a "busy" (429) is common. Extract is the FIRST call and has NO
+  // fallback — if it fails the whole report fails. A real report can hold the
+  // gateway for minutes, so a short retry window isn't enough: ride out the
+  // contention with backoff for up to ~2 minutes (429 is rejected instantly, so
+  // this only spends time waiting for the other call to free the gateway). The
+  // SSE heartbeat keeps the client stream alive meanwhile. Do not retry slow
+  // 504/timeouts. On final 429 give a clear, actionable message (not the raw
+  // "Request failed with status code 429").
   const opts = { headers: { 'X-Nexaproc-Key': MASTER_KEY, 'Content-Type': 'application/json' }, timeout: 180000 };
+  const MAX_BUSY_WAIT_MS = 120000;
   let response;
+  let waitedMs = 0;
   for (let attempt = 0; ; attempt++) {
     try {
       response = await axios.post(`${GATEWAY_URL}/api/invoke`, { taskID: 'GENERIC_ASK', payload, useJson: true, model: 'haiku' }, opts);
       break;
     } catch (err) {
-      if (err.response?.status === 429 && attempt < 4) {
-        await new Promise((r) => setTimeout(r, 5000));
-        continue;
+      if (err.response?.status === 429) {
+        if (waitedMs < MAX_BUSY_WAIT_MS) {
+          const delay = Math.min(5000 + attempt * 5000, 20000);
+          await new Promise((r) => setTimeout(r, delay));
+          waitedMs += delay;
+          continue;
+        }
+        throw new Error('The report service is busy generating another report right now. Please wait a minute and try again.');
       }
       throw err;
     }

@@ -243,7 +243,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
       // Check in patients table
       const existingPatient = patients.find(p => p.email?.toLowerCase() === sanitizedEmail);
       if (existingPatient) {
-        toast.error(`❌ Email already registered as patient: ${existingPatient.full_name}`);
+        toast.error('❌ Email already exists');
         return;
       }
 
@@ -251,12 +251,12 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
       try {
         const { data: existingClinic } = await supabase
           .from('clinics')
-          .select('id, name')
+          .select('id')
           .eq('email', sanitizedEmail)
           .limit(1);
 
         if (existingClinic && existingClinic.length > 0) {
-          toast.error(`❌ Email already registered as clinic: ${existingClinic[0].name}`);
+          toast.error('❌ Email already exists');
           return;
         }
       } catch (clinicCheckError) {

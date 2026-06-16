@@ -150,6 +150,8 @@ const PatientDashboard = () => {
   const [paymentSuccessDetails, setPaymentSuccessDetails] = useState(null);
   // Ref for auto-scrolling to locked popup
   const lockedPopupRef = useRef(null);
+  // Marks that the clinical history form was just saved, so onClose doesn't re-open the popup
+  const justSavedClinicalRef = useRef(false);
 
   // Tabs that require a completed NeuroSense report to access
   const lockedTabIds = [
@@ -10169,12 +10171,16 @@ const PatientDashboard = () => {
         existingReport={clinicalReport}
         onClose={() => {
           setShowClinicalReportForm(false);
-          // Re-show popup if clinical report is still not filled
-          if (!clinicalReport && activeTab === 'profile') {
+          // Re-show popup if the form was closed WITHOUT saving and is still not filled.
+          // Skip when a save just happened — `clinicalReport` here is the stale closure value
+          // (still null) and would wrongly re-open the popup right after a successful submit.
+          if (!justSavedClinicalRef.current && !clinicalReport && activeTab === 'profile') {
             setTimeout(() => setShowClinicalHistoryPopup(true), 300);
           }
+          justSavedClinicalRef.current = false;
         }}
         onSave={async () => {
+          justSavedClinicalRef.current = true; // prevent onClose from re-opening the popup
           setShowClinicalReportForm(false);
           setShowClinicalHistoryPopup(false); // Close popup permanently after saving
           // Refresh clinical report data using user.id (UUID), not patientUid

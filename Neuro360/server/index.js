@@ -6667,28 +6667,28 @@ app.post('/api/clinic/add-patient', async (req, res) => {
     // Check if email already exists in patients table
     const { data: existingPatient, error: patientCheckError } = await supabase
       .from('patients')
-      .select('id, patient_name')
+      .select('id')
       .eq('email', normalizedEmail)
       .limit(1);
 
     if (existingPatient && existingPatient.length > 0) {
       return res.status(400).json({
         success: false,
-        message: `Email already registered as patient: ${existingPatient[0].patient_name}`
+        message: 'Email already exists'
       });
     }
 
     // Check if email already exists in clinics table
     const { data: existingClinic, error: clinicCheckError } = await supabase
       .from('clinics')
-      .select('id, name')
+      .select('id')
       .eq('email', normalizedEmail)
       .limit(1);
 
     if (existingClinic && existingClinic.length > 0) {
       return res.status(400).json({
         success: false,
-        message: `Email already registered as clinic: ${existingClinic[0].name}`
+        message: 'Email already exists'
       });
     }
 
@@ -6747,28 +6747,28 @@ app.post('/api/partner/add-patient', async (req, res) => {
     // Check if email already exists in patients table
     const { data: existingPatient, error: patientCheckError } = await supabase
       .from('patients')
-      .select('id, patient_name')
+      .select('id')
       .eq('email', normalizedEmail)
       .limit(1);
 
     if (existingPatient && existingPatient.length > 0) {
       return res.status(400).json({
         success: false,
-        message: `Email already registered as patient: ${existingPatient[0].patient_name}`
+        message: 'Email already exists'
       });
     }
 
     // Check if email already exists in clinics table
     const { data: existingClinic, error: clinicCheckError } = await supabase
       .from('clinics')
-      .select('id, name')
+      .select('id')
       .eq('email', normalizedEmail)
       .limit(1);
 
     if (existingClinic && existingClinic.length > 0) {
       return res.status(400).json({
         success: false,
-        message: `Email already registered as clinic: ${existingClinic[0].name}`
+        message: 'Email already exists'
       });
     }
 

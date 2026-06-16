@@ -130,7 +130,7 @@ const AddPatientForm = () => {
         // Check patients table
         const { data: existingPatient } = await supabase
           .from('patients')
-          .select('id, full_name, email')
+          .select('id')
           .eq('email', email.toLowerCase().trim())
           .limit(1);
 
@@ -138,7 +138,7 @@ const AddPatientForm = () => {
           setEmailStatus({
             checking: false,
             exists: true,
-            message: `❌ Email already registered as patient: ${existingPatient[0].full_name}`
+            message: `❌ Email already exists`
           });
           return;
         }
@@ -146,7 +146,7 @@ const AddPatientForm = () => {
         // Check clinics table
         const { data: existingClinic } = await supabase
           .from('clinics')
-          .select('id, name')
+          .select('id')
           .eq('email', email.toLowerCase().trim())
           .limit(1);
 
@@ -154,16 +154,16 @@ const AddPatientForm = () => {
           setEmailStatus({
             checking: false,
             exists: true,
-            message: `❌ Email already registered as clinic: ${existingClinic[0].name}`
+            message: `❌ Email already exists`
           });
           return;
         }
 
-        // Email is available
+        // Email is available — stay silent, just let them register
         setEmailStatus({
           checking: false,
           exists: false,
-          message: '✅ Email is available'
+          message: ''
         });
       } catch (error) {
         console.error('Email check error:', error);
@@ -191,12 +191,12 @@ const AddPatientForm = () => {
       // Check in patients table
       const { data: existingPatient, error: patientError } = await supabase
         .from('patients')
-        .select('id, full_name, email')
+        .select('id')
         .eq('email', normalizedEmail)
         .limit(1);
 
       if (existingPatient && existingPatient.length > 0) {
-        toast.error(`❌ Email already registered as patient: ${existingPatient[0].full_name}`);
+        toast.error('❌ Email already exists');
         setIsSubmitting(false);
         return;
       }
@@ -204,12 +204,12 @@ const AddPatientForm = () => {
       // Check in clinics table
       const { data: existingClinic, error: clinicCheckError } = await supabase
         .from('clinics')
-        .select('id, name')
+        .select('id')
         .eq('email', normalizedEmail)
         .limit(1);
 
       if (existingClinic && existingClinic.length > 0) {
-        toast.error(`❌ Email already registered as clinic: ${existingClinic[0].name}`);
+        toast.error('❌ Email already exists');
         setIsSubmitting(false);
         return;
       }

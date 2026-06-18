@@ -25,7 +25,7 @@ services:
       - key: GEMINI_DAILY_LIMIT
         value: "50"
       - key: NEXAPROC_GATEWAY_URL
-        value: http://76.13.244.21/neuro-sidecar
+        value: http://187.127.176.1/neuro-sidecar
       - key: NEXAPROC_MASTER_KEY
         sync: false
       - key: CLAUDE_REPORT_TOKEN
@@ -41,6 +41,13 @@ services:
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: FRONTEND_URL
+        sync: false
+      # Brevo SMTP relay is the PRIMARY mail transport in production (Gmail SMTP
+      # is blocked on Render). These MUST be listed here or they are not picked
+      # up on redeploy and ALL outbound email silently dies. See server/index.js.
+      - key: BREVO_SMTP_USER
+        sync: false
+      - key: BREVO_SMTP_KEY
         sync: false
       - key: EMAIL_USER
         sync: false

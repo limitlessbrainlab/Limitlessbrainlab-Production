@@ -1,6 +1,4 @@
 const axios = require('axios');
-const fs = require('fs');
-const pdfParse = require('pdf-parse');
 
 /**
  * Sidecar client for the Nexaproc AI Gateway (AIaaS) on the Hostinger VPS.
@@ -15,79 +13,10 @@ const pdfParse = require('pdf-parse');
  * directly — it calls our route, which forwards to the gateway here.
  */
 
-const GATEWAY_URL = process.env.NEXAPROC_GATEWAY_URL || 'http://76.13.244.21:8787';
+const GATEWAY_URL = process.env.NEXAPROC_GATEWAY_URL || 'http://187.127.176.1/neuro-sidecar';
 const MASTER_KEY = process.env.NEXAPROC_MASTER_KEY || '';
 // Gateway caps the JSON body at 1MB; keep the extracted text well under it.
 const MAX_TEXT_CHARS = 200000;
-
-/**
- * Extract a PDF's text, send it to the gateway, and return the rendered PDF.
- * @param {string} filePath  Absolute path to the uploaded PDF on disk.
- * @param {object} [opts]
- * @param {string} [opts.taskID='CLAUDE_REPORT']
- * @param {string} [opts.filename]
- * @returns {Promise<{pdf: Buffer}>}
- */
-async function generateClaudeReportFromPdf(filePath, opts = {}) {
-  const { taskID = 'CLAUDE_REPORT' } = opts;
-
-  if (!MASTER_KEY) {
-    throw new Error('NEXAPROC_MASTER_KEY is not set on the server. Cannot authenticate to the AIaaS gateway.');
-  }
-
-  // Extract text from the PDF (fast; the qEEG values are textual).
-  let text;
-  try {
-    const parsed = await pdfParse(fs.readFileSync(filePath));
-    text = (parsed.text || '').trim();
-  } catch (e) {
-    throw new Error(`Failed to read the PDF: ${e.message}`);
-  }
-  if (!text) {
-    throw new Error('No extractable text found in the PDF (it may be a scanned image).');
-  }
-  if (text.length > MAX_TEXT_CHARS) text = text.slice(0, MAX_TEXT_CHARS);
-
-  try {
-    const response = await axios.post(
-      `${GATEWAY_URL}/api/report-pdf`,
-      { taskID, payload: text, timeoutMs: 295000 },
-      {
-        headers: { 'X-Nexaproc-Key': MASTER_KEY, 'Content-Type': 'application/json' },
-        timeout: 320000,
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity,
-        responseType: 'arraybuffer',
-      }
-    );
-
-    return { pdf: Buffer.from(response.data) };
-  } catch (error) {
-    if (error.response) {
-      const status = error.response.status;
-      // Error bodies arrive as an arraybuffer (responseType above); decode JSON.
-      let gwMsg = error.response.statusText;
-      try {
-        const parsed = JSON.parse(Buffer.from(error.response.data).toString('utf8'));
-        gwMsg = parsed.error || gwMsg;
-      } catch (_) { /* not JSON */ }
-      if (status === 401 || status === 403) {
-        throw new Error('AIaaS rejected the request (bad or missing NEXAPROC_MASTER_KEY).');
-      }
-      if (status === 429) {
-        throw new Error('AIaaS is busy processing another request. Please try again in a moment.');
-      }
-      if (status === 504) {
-        throw new Error('AIaaS timed out generating the report. The document may be too large.');
-      }
-      throw new Error(`AIaaS error (${status}): ${gwMsg}`);
-    }
-    if (error.code === 'ECONNREFUSED' || error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-      throw new Error(`Could not reach the AIaaS gateway at ${GATEWAY_URL}. ${error.message}`);
-    }
-    throw error;
-  }
-}
 
 /**
  * Build the doctor-readable narrative prompt from the deterministic report data.
@@ -280,7 +209,7 @@ async function generateReportNarrative(reportData) {
   const learnedExamples = await fetchReportExamples();
 
   const payload = buildNarrativePrompt(reportData, learnedExamples);
-  const opts = { headers: { 'X-Nexaproc-Key': MASTER_KEY, 'Content-Type': 'application/json' }, timeout: 180000 };
+  const opts = { headers: { 'X-Nexaproc-Key': MASTER_KEY, 'Content-Type': 'application/json' }, timeout: 300000 };
 
   // One retry ONLY when the single-flight gateway rejects us fast as "busy" (429) —
   // that call cost ~nothing, so retrying is cheap. Do NOT retry on a 504/timeout:
@@ -376,7 +305,7 @@ ${pdfText}`;
   // SSE heartbeat keeps the client stream alive meanwhile. Do not retry slow
   // 504/timeouts. On final 429 give a clear, actionable message (not the raw
   // "Request failed with status code 429").
-  const opts = { headers: { 'X-Nexaproc-Key': MASTER_KEY, 'Content-Type': 'application/json' }, timeout: 180000 };
+  const opts = { headers: { 'X-Nexaproc-Key': MASTER_KEY, 'Content-Type': 'application/json' }, timeout: 300000 };
   const MAX_BUSY_WAIT_MS = 120000;
   let response;
   let waitedMs = 0;
@@ -479,7 +408,6 @@ function postLesson(stage, error, lesson) {
 }
 
 module.exports = {
-  generateClaudeReportFromPdf,
   generateReportNarrative,
   extractReportSource,
   renderHtmlOnVps,

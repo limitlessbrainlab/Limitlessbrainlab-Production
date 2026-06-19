@@ -42,6 +42,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
   const [genderFilter, setGenderFilter] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
+  const [sortOrder, setSortOrder] = useState('desc'); // 'desc' = latest first (default), 'asc' = oldest first
   const [loading, setLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [patientForUpload, setPatientForUpload] = useState(null);
@@ -638,7 +639,11 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
     const matchesGender = !genderFilter || patient.gender === genderFilter;
 
     return matchesSearch && matchesGender;
-  }).sort((a, b) => new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0)); // newest patients first
+  }).sort((a, b) => {
+    const da = new Date(a.createdAt || a.created_at || 0).getTime();
+    const db = new Date(b.createdAt || b.created_at || 0).getTime();
+    return sortOrder === 'asc' ? da - db : db - da; // default 'desc' = latest first
+  });
 
   // Client-side pagination — keeps the DOM light for clinics with many patients
   // (all rows are already fetched in 2 queries above; this only limits rendering).
@@ -728,7 +733,16 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
             Patients ({filteredPatients.length})
           </h3>
           <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-500 dark:text-gray-400">Rows:</label>
+            <label className="text-sm text-gray-500 dark:text-gray-400">Sort:</label>
+            <select
+              value={sortOrder}
+              onChange={(e) => { setSortOrder(e.target.value); setPage(1); }}
+              className="text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
+            >
+              <option value="desc">Latest to Oldest</option>
+              <option value="asc">Oldest to Latest</option>
+            </select>
+            <label className="text-sm text-gray-500 dark:text-gray-400 ml-2">Rows:</label>
             <select
               value={pageSize}
               onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}

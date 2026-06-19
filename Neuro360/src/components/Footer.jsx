@@ -174,13 +174,13 @@ const Footer = () => {
             {/* Login Buttons */}
             <div className="mt-3 sm:mt-4 flex flex-row gap-2">
               <button
-                onClick={() => navigate('/login', { state: { userType: 'patient' } })}
+                onClick={() => navigate('/patient/login')}
                 className="bg-[#323956] hover:bg-[#232D3C] text-white px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 transform hover:scale-105 text-center cursor-pointer"
               >
                 Patient Login
               </button>
               <button
-                onClick={() => navigate('/login', { state: { userType: 'clinic' } })}
+                onClick={() => navigate('/clinic/login')}
                 className="bg-[#323956] hover:bg-[#232D3C] text-white px-4 sm:px-5 py-2 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 transform hover:scale-105 text-center cursor-pointer"
               >
                 Clinic Login

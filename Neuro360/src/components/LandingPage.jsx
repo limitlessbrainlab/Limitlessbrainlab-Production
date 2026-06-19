@@ -1475,8 +1475,8 @@ const LandingPage = () => {
               <ul className="space-y-3">
                 <li><Link to="/" className="hover:text-[#F5D05D] transition-colors">Home</Link></li>
                 <li><a href="#how-it-works" className="hover:text-[#F5D05D] transition-colors">How It Works</a></li>
-                <li><Link to="/login" className="hover:text-[#F5D05D] transition-colors">For Individuals</Link></li>
-                <li><Link to="/login" className="hover:text-[#F5D05D] transition-colors">For Clinics</Link></li>
+                <li><Link to="/patient/login" className="hover:text-[#F5D05D] transition-colors">For Individuals</Link></li>
+                <li><Link to="/clinic/login" className="hover:text-[#F5D05D] transition-colors">For Clinics</Link></li>
                 <li><a href="#testimonials" className="hover:text-[#F5D05D] transition-colors">Testimonials</a></li>
               </ul>
             </div>

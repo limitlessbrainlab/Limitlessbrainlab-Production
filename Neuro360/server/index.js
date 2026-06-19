@@ -278,7 +278,7 @@ const getAdminNotificationHtml = (formTitle, dataRows) => `
               </table>
               <p style="color: #555; font-size: 14px; line-height: 1.7; margin: 0 0 20px;">Please login to your portal to review and approve.</p>
               <div style="text-align: center; margin: 0 0 24px;">
-                <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/login" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 36px; border-radius: 8px; font-weight: 600; font-size: 15px;">Login to Portal →</a>
+                <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/admin/login" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 36px; border-radius: 8px; font-weight: 600; font-size: 15px;">Login to Portal →</a>
               </div>
               <p style="color: #555; font-size: 14px; margin: 0 0 4px;">Best regards,</p>
               <p style="color: #323956; font-size: 14px; font-weight: 600; margin: 0 0 2px;">Support Team,</p>
@@ -4286,7 +4286,7 @@ app.post('/api/clinic-credentials', async (req, res) => {
                   <!-- Login Button -->
                   <tr>
                     <td style="padding: 0 32px 24px;" align="center">
-                      <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic-login" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                      <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic/login" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                         Login to Your Clinic Portal
                       </a>
                     </td>
@@ -5770,7 +5770,7 @@ app.post('/api/send-welcome-email', async (req, res) => {
       console.log('ℹ️ Using default email service for patient welcome email');
     }
 
-    const loginUrl = `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/login`;
+    const loginUrl = `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/patient/login`;
 
     const mailOptions = {
       from: fromEmail,
@@ -5907,7 +5907,7 @@ app.post('/api/send-email-update-notification', async (req, res) => {
 
     // Generate system password
     const systemPassword = generateSystemPassword();
-    const loginUrl = `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/login`;
+    const loginUrl = `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/patient/login`;
 
     const mailOptions = {
       from: fromEmail,
@@ -6022,12 +6022,13 @@ app.post('/api/send-report-email', async (req, res) => {
     }
 
     const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
-    const loginUrl = `${FRONTEND_URL}/login`;
+    const patientLoginUrl = `${FRONTEND_URL}/patient/login`;
+    const clinicLoginUrl = `${FRONTEND_URL}/clinic/login`;
 
     // Report is delivered as a download LINK (no PDF attachment). Both patient
     // and clinic get the same Neuro Performance Report template.
-    const reportHtmlPatient = getReportEmailHtml({ isClinic: false, patientName, clinicName, reportUrl, loginUrl });
-    const reportHtmlClinic = getReportEmailHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl });
+    const reportHtmlPatient = getReportEmailHtml({ isClinic: false, patientName, clinicName, reportUrl, loginUrl: patientLoginUrl });
+    const reportHtmlClinic = getReportEmailHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl: clinicLoginUrl });
 
     // Email to Patient
     const patientMailOptions = {
@@ -6039,7 +6040,7 @@ app.post('/api/send-report-email', async (req, res) => {
         'X-Mailer': 'Limitless Brain Lab Mailer'
       },
       subject: `Your Neuro Performance Report is Ready`,
-      text: `Hi ${patientName},\n\nYour Neuro Performance Report is ready.\n\nDownload your report (PDF): ${reportUrl}\nLog in to your portal: ${loginUrl}\n\nThe Limitless Brain Lab Team`,
+      text: `Hi ${patientName},\n\nYour Neuro Performance Report is ready.\n\nDownload your report (PDF): ${reportUrl}\nLog in to your portal: ${patientLoginUrl}\n\nThe Limitless Brain Lab Team`,
       attachments: getLogoAttachment(),
       html: reportHtmlPatient
     };
@@ -6049,7 +6050,7 @@ app.post('/api/send-report-email', async (req, res) => {
       from: EMAIL_FROM,
       to: clinicEmail,
       subject: `Neuro Performance Report — ${patientName}`,
-      text: `Hello ${clinicName},\n\nThe Neuro Performance Report for ${patientName} is ready for clinical review.\n\nDownload the report (PDF): ${reportUrl}\nLog in to your portal: ${loginUrl}\n\nThe Limitless Brain Lab Team`,
+      text: `Hello ${clinicName},\n\nThe Neuro Performance Report for ${patientName} is ready for clinical review.\n\nDownload the report (PDF): ${reportUrl}\nLog in to your portal: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
       attachments: getLogoAttachment(),
       html: reportHtmlClinic
     };
@@ -7104,7 +7105,7 @@ app.post('/api/send-partner-patient-welcome', async (req, res) => {
               </div>
             </div>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/login" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Login Now →</a>
+              <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/patient/login" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Login Now →</a>
             </div>
           </div>
           <div style="background: #f8fafc; padding: 18px 30px; text-align: center; border-top: 1px solid #e5e7eb;">

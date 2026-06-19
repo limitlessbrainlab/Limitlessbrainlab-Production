@@ -156,16 +156,16 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
 
       setPatients(patientsData || []);
 
-      // Load reports for each patient
+      // Load ALL reports for these patients in ONE query (was N sequential
+      // queries — the cause of the slow Patient Management load), then group
+      // by patient_id in memory.
       const reportsMap = {};
-      for (const patient of (patientsData || [])) {
-        try {
-          const reports = await DatabaseService.getReportsByPatient(patient.id);
-          reportsMap[patient.id] = reports || [];
-        } catch (error) {
-          console.error(`Error loading reports for patient ${patient.id}:`, error);
-          reportsMap[patient.id] = [];
-        }
+      const patientIds = (patientsData || []).map((p) => p.id);
+      const allReports = await DatabaseService.getReportsByPatients(patientIds);
+      for (const report of (allReports || [])) {
+        const pid = report.patient_id;
+        if (!pid) continue;
+        (reportsMap[pid] = reportsMap[pid] || []).push(report);
       }
 
       setPatientReports(reportsMap);

@@ -733,6 +733,28 @@ class DatabaseService {
     }
   }
 
+  // Batched: fetch reports for MANY patients in a single query (avoids the N+1
+  // problem where the UI looped one getReportsByPatient call per patient).
+  async getReportsByPatients(patientIds) {
+    try {
+      const ids = (patientIds || []).filter(Boolean);
+      if (ids.length === 0) return [];
+      const actualTable = this.mapTableName('reports');
+      const { data, error } = await this.supabaseService.supabase
+        .from(actualTable)
+        .select('*')
+        .in('patient_id', ids);
+      if (error) {
+        console.error('ERROR: getReportsByPatients:', error);
+        return [];
+      }
+      return data || [];
+    } catch (error) {
+      console.error('ERROR: getReportsByPatients:', error);
+      return [];
+    }
+  }
+
   async addReport(reportData) {
     const report = await this.add('reports', reportData);
 

@@ -41,7 +41,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
   const [searchTerm, setSearchTerm] = useState('');
   const [genderFilter, setGenderFilter] = useState('');
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 25;
+  const [pageSize, setPageSize] = useState(15);
   const [loading, setLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [patientForUpload, setPatientForUpload] = useState(null);
@@ -642,9 +642,9 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
 
   // Client-side pagination — keeps the DOM light for clinics with many patients
   // (all rows are already fetched in 2 queries above; this only limits rendering).
-  const pageCount = Math.max(1, Math.ceil(filteredPatients.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(filteredPatients.length / pageSize));
   const currentPage = Math.min(page, pageCount);
-  const pagedPatients = filteredPatients.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pagedPatients = filteredPatients.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   useEffect(() => { setPage(1); }, [searchTerm, genderFilter]);
 
   if (loading) {
@@ -723,10 +723,24 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
 
       {/* Patients Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 flex items-center justify-between gap-3">
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">
             Patients ({filteredPatients.length})
           </h3>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-500 dark:text-gray-400">Rows:</label>
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+              className="text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
+            >
+              <option value={10}>10</option>
+              <option value={15}>15</option>
+              <option value={20}>20</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -879,7 +893,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
           {pageCount > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
               <span className="text-sm text-gray-500 dark:text-gray-400">
-                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredPatients.length)} of {filteredPatients.length}
+                Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredPatients.length)} of {filteredPatients.length}
               </span>
               <div className="flex items-center gap-2">
                 <button

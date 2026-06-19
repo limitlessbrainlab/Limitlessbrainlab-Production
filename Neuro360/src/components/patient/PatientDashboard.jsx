@@ -1393,7 +1393,7 @@ const PatientDashboard = () => {
     { id: 'brain-coach', label: 'Book a Coach', icon: UserCheck },
     { id: 'neurofeedback', label: 'Home Neurofeedback', icon: Radio },
     { id: 'photobiomodulation', label: 'Photobiomodulation', icon: Sun },
-    { id: 'five-pillars', label: '5 Pillars of Mastery', icon: Award },
+    // { id: 'five-pillars', label: '5 Pillars of Mastery', icon: Award }, // hidden from sidebar per request
     { id: 'brain-courses', label: 'Brain Courses', icon: GraduationCap },
     // { id: 'events', label: 'Events', icon: Calendar }, // hidden — not active yet
     { id: 'wallet', label: 'Wallet', icon: Wallet },

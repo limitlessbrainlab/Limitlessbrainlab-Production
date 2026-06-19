@@ -70,17 +70,16 @@ export const PatientProvider = ({ children }) => {
       setPatients(clinicPatients);
       setLastLoadedClinicId(clinicId);
       
-      // Load reports for each patient
+      // Load ALL reports for these patients in ONE query (was N sequential
+      // queries — the N+1 slow path), then group by patient_id in memory.
       const reportsMap = {};
-      for (const patient of clinicPatients) {
-        try {
-          const reports = await DatabaseService.getReportsByPatient(patient.id);
-          reportsMap[patient.id] = reports || [];
-        } catch (error) {
-          reportsMap[patient.id] = [];
-        }
+      const allReports = await DatabaseService.getReportsByPatients(clinicPatients.map((p) => p.id));
+      for (const report of (allReports || [])) {
+        const pid = report.patient_id;
+        if (!pid) continue;
+        (reportsMap[pid] = reportsMap[pid] || []).push(report);
       }
-      
+
       setPatientReports(reportsMap);
       
       return clinicPatients;
@@ -151,17 +150,15 @@ export const PatientProvider = ({ children }) => {
       // Clear reports cache to ensure fresh data
       localStorage.removeItem('dbCache_reports');
       
-      // Reload reports for each patient
+      // Reload ALL reports for these patients in ONE query (was N sequential queries).
       const reportsMap = {};
-      for (const patient of patients) {
-        try {
-          const reports = await DatabaseService.getReportsByPatient(patient.id);
-          reportsMap[patient.id] = reports || [];
-        } catch (error) {
-          reportsMap[patient.id] = [];
-        }
+      const allReports = await DatabaseService.getReportsByPatients(patients.map((p) => p.id));
+      for (const report of (allReports || [])) {
+        const pid = report.patient_id;
+        if (!pid) continue;
+        (reportsMap[pid] = reportsMap[pid] || []).push(report);
       }
-      
+
       setPatientReports(reportsMap);
     } catch (error) {
       console.error('ERROR: Error refreshing patient reports:', error);

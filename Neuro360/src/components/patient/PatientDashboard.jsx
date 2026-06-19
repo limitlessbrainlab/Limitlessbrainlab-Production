@@ -402,8 +402,9 @@ const PatientDashboard = () => {
           // Handle bundle — mark all 4 assessments as purchased
           if (assessmentId === 'assessment_bundle') {
             const bundleIds = ['brain_fitness', 'brain_burnout', 'brain_age', 'dementia_index'];
-            for (const bId of bundleIds) {
-              await supabase.from('assessment_purchases').insert({
+            // Insert all bundle items in parallel (was sequential awaits).
+            await Promise.all(bundleIds.map((bId) =>
+              supabase.from('assessment_purchases').insert({
                 patient_email: user.email.toLowerCase(),
                 assessment_id: bId,
                 assessment_name: assessmentNames[bId],
@@ -413,8 +414,8 @@ const PatientDashboard = () => {
                 currency: 'USD',
                 status: 'completed',
                 purchased_at: new Date().toISOString()
-              }).catch(err => console.warn(`Bundle item ${bId} save skipped:`, err.message));
-            }
+              }).catch(err => console.warn(`Bundle item ${bId} save skipped:`, err.message))
+            ));
           }
           // Send JotForm link email to patient
           try {

@@ -5599,7 +5599,7 @@ app.post('/api/send-password-email', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email and password are required' });
     }
 
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    if (!mailerConfigured) {
       return res.json({ success: false, message: 'Email not configured' });
     }
 
@@ -6400,9 +6400,58 @@ app.post('/api/request-demo-report', async (req, res) => {
         </html>
       `,
       attachments: getLogoAttachment()
+    }).catch((err) => console.error('Demo admin notification failed:', err.message));
+
+    // Send the actual DEMO REPORTS to the user who requested them.
+    const demoPerfReport = path.join(__dirname, 'assets', 'demo-reports', 'NeuroSense-Performance-Report.pdf');
+    const demoNeuroReport = path.join(__dirname, 'assets', 'pdf-templates', 'Neurosense Report.pdf');
+    const demoAttachments = getLogoAttachment();
+    if (fs.existsSync(demoPerfReport)) {
+      demoAttachments.push({ filename: 'NeuroSense Performance Report.pdf', path: demoPerfReport });
+    } else {
+      console.warn('Demo performance report not found:', demoPerfReport);
+    }
+    if (fs.existsSync(demoNeuroReport)) {
+      demoAttachments.push({ filename: 'NeuroSense Report.pdf', path: demoNeuroReport });
+    } else {
+      console.warn('Demo NeuroSense report not found:', demoNeuroReport);
+    }
+
+    await emailTransporter.sendMail({
+      from: EMAIL_FROM,
+      to: email,
+      subject: 'Your NeuroSense Demo Reports - Limitless Brain Lab',
+      html: `
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+        <body style="margin:0;padding:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#f4f7fa;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7fa;padding:40px 20px;"><tr><td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.1);">
+              <tr><td style="background:linear-gradient(135deg,#323956 0%,#1a1f36 100%);padding:28px 32px;text-align:center;">
+                <img src="cid:company-logo" alt="Limitless Brain Lab" style="width:80px;height:80px;border-radius:50%;object-fit:cover;" />
+                <h1 style="color:#ffffff;margin:14px 0 0;font-size:22px;font-weight:700;">Your NeuroSense Demo Reports</h1>
+              </td></tr>
+              <tr><td style="padding:28px 32px;color:#444;font-size:15px;line-height:1.7;">
+                <p style="margin:0 0 14px;">Thank you for your interest in <strong style="color:#323956;">Limitless Brain Lab</strong>.</p>
+                <p style="margin:0 0 12px;">Attached are two sample reports showing exactly what you receive with a NeuroSense brain assessment:</p>
+                <ul style="margin:0 0 14px;padding-left:18px;">
+                  <li style="margin-bottom:6px;"><strong>NeuroSense Performance Report</strong> &mdash; your 12-page brain-type &amp; performance breakdown.</li>
+                  <li><strong>NeuroSense Report</strong> &mdash; the detailed QEEG brain health report.</li>
+                </ul>
+                <p style="margin:0 0 16px;color:#666;font-size:13px;">These are sample reports for demonstration. Your personalized reports are generated from your own brain scan.</p>
+                <p style="margin:18px 0 0;">Warm regards,<br/><strong style="color:#323956;">Team Limitless Brain Lab</strong></p>
+              </td></tr>
+              <tr><td style="background:#f8f9fc;padding:18px 32px;border-top:1px solid #e5e7eb;color:#aaa;font-size:11px;">
+                This demo report was sent from Limitless Brain Lab.
+              </td></tr>
+            </table>
+          </td></tr></table>
+        </body></html>
+      `,
+      attachments: demoAttachments
     });
 
-    res.json({ success: true, message: 'Demo report request submitted successfully' });
+    res.json({ success: true, message: 'Demo report sent to your email' });
   } catch (error) {
     console.error('Error sending demo report request email:', error);
     res.status(500).json({ success: false, message: 'Failed to submit request. Please try again.' });
@@ -6420,7 +6469,7 @@ app.post('/api/notify-patient-report', async (req, res) => {
       return res.status(400).json({ success: false, message: 'At least patient or clinic email is required' });
     }
 
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    if (!mailerConfigured) {
       return res.status(500).json({ success: false, message: 'Email not configured' });
     }
 
@@ -6536,7 +6585,7 @@ app.post('/api/send-no-credit-email', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Clinic email is required' });
     }
 
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    if (!mailerConfigured) {
       return res.status(500).json({ success: false, message: 'Email not configured' });
     }
 

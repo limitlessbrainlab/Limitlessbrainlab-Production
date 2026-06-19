@@ -328,8 +328,16 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
           uploadedBy: r.processed_by || 'Super Admin'
         }));
 
-      // Merge reports from all three sources
-      const allReports = [...normalizedReports, ...clinicDocReports, ...algorithmReports];
+      // Merge reports from all three sources, then DE-DUPLICATE by id so duplicate
+      // rows can never inflate the "Total Reports" count (defensive guard).
+      const mergedReports = [...normalizedReports, ...clinicDocReports, ...algorithmReports];
+      const seenReportIds = new Set();
+      const allReports = mergedReports.filter((r) => {
+        const key = r.id != null ? String(r.id) : `${r.patientId}|${r.fileName}|${r.uploadedAt}`;
+        if (seenReportIds.has(key)) return false;
+        seenReportIds.add(key);
+        return true;
+      });
 
       console.log('DATA: Fetched from server:', {
         reports: normalizedReports.length,

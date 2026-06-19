@@ -46,6 +46,8 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
   const [selectedPatient, setSelectedPatient] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [patientSortOrder, setPatientSortOrder] = useState('desc'); // 'desc' = latest first (default)
+  const [reportPage, setReportPage] = useState(1);
+  const [reportPageSize, setReportPageSize] = useState(15);
   const [loading, setLoading] = useState(true);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -166,6 +168,9 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
   useEffect(() => {
     loadData();
   }, [superAdminSelectedClinic]);
+
+  // Reset to page 1 when the filters/sort change
+  useEffect(() => { setReportPage(1); }, [searchTerm, selectedClinic, selectedPatient, patientSortOrder]);
 
   useEffect(() => {
     // Load patients for upload form dropdown only — does NOT overwrite the main patients list
@@ -1362,6 +1367,10 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
           return patientSortOrder === 'asc' ? da - db : db - da; // default 'desc' = latest first
         });
 
+        const reportPageCount = Math.max(1, Math.ceil(patientGroups.length / reportPageSize));
+        const reportCurrentPage = Math.min(reportPage, reportPageCount);
+        const pagedGroups = patientGroups.slice((reportCurrentPage - 1) * reportPageSize, reportCurrentPage * reportPageSize);
+
         return (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 flex items-center justify-between gap-3">
@@ -1378,6 +1387,18 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
                   <option value="desc">Latest to Oldest</option>
                   <option value="asc">Oldest to Latest</option>
                 </select>
+                <label className="text-sm text-gray-500 dark:text-gray-400 ml-2">Rows:</label>
+                <select
+                  value={reportPageSize}
+                  onChange={(e) => { setReportPageSize(Number(e.target.value)); setReportPage(1); }}
+                  className="text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                >
+                  <option value={10}>10</option>
+                  <option value={15}>15</option>
+                  <option value={20}>20</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
               </div>
             </div>
 
@@ -1393,7 +1414,7 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {patientGroups.map((group) => {
+                  {pagedGroups.map((group) => {
                     const isExpanded = expandedPatientId === (group.patientId || group.patientName);
                     return (
                       <React.Fragment key={group.patientId || group.patientName}>
@@ -1502,6 +1523,31 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
                   >
                     Upload First Report
                   </button>
+                </div>
+              )}
+
+              {reportPageCount > 1 && (
+                <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-gray-700">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    Showing {(reportCurrentPage - 1) * reportPageSize + 1}&ndash;{Math.min(reportCurrentPage * reportPageSize, patientGroups.length)} of {patientGroups.length} patients
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setReportPage((p) => Math.max(1, p - 1))}
+                      disabled={reportCurrentPage <= 1}
+                      className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      Prev
+                    </button>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">Page {reportCurrentPage} of {reportPageCount}</span>
+                    <button
+                      onClick={() => setReportPage((p) => Math.min(reportPageCount, p + 1))}
+                      disabled={reportCurrentPage >= reportPageCount}
+                      className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

@@ -45,6 +45,7 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
   const [selectedClinic, setSelectedClinic] = useState('');
   const [selectedPatient, setSelectedPatient] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [patientSortOrder, setPatientSortOrder] = useState('desc'); // 'desc' = latest first (default)
   const [loading, setLoading] = useState(true);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -1355,16 +1356,29 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
             groupedByPatient[key].latestUpload = report.createdAt;
           }
         });
-        const patientGroups = Object.values(groupedByPatient).sort((a, b) =>
-          new Date(b.latestUpload) - new Date(a.latestUpload)
-        );
+        const patientGroups = Object.values(groupedByPatient).sort((a, b) => {
+          const da = new Date(a.latestUpload || 0).getTime();
+          const db = new Date(b.latestUpload || 0).getTime();
+          return patientSortOrder === 'asc' ? da - db : db - da; // default 'desc' = latest first
+        });
 
         return (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 flex items-center justify-between gap-3">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                 Patients ({patientGroups.length}) &middot; Total Reports ({filteredReports.length})
               </h3>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-500 dark:text-gray-400">Sort:</label>
+                <select
+                  value={patientSortOrder}
+                  onChange={(e) => setPatientSortOrder(e.target.value)}
+                  className="text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                >
+                  <option value="desc">Latest to Oldest</option>
+                  <option value="asc">Oldest to Latest</option>
+                </select>
+              </div>
             </div>
 
             <div className="overflow-x-auto">

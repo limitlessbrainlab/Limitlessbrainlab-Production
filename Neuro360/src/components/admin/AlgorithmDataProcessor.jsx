@@ -2095,11 +2095,29 @@ const AlgorithmDataProcessor = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading patients...</p>
-        </div>
+      <div className="p-4 sm:p-6 lg:p-8 animate-pulse">
+        {/* Header skeleton */}
+        <div className="h-7 w-64 bg-gray-200 dark:bg-gray-700 rounded mb-6"></div>
+        {/* Clinic group + patient cards skeleton */}
+        {[1, 2].map((g) => (
+          <div key={g} className="mb-8">
+            <div className="h-5 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-600"></div>
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3.5 w-2/3 bg-gray-200 dark:bg-gray-600 rounded"></div>
+                      <div className="h-3 w-1/2 bg-gray-100 dark:bg-gray-700 rounded"></div>
+                    </div>
+                  </div>
+                  <div className="h-3 w-1/3 bg-gray-100 dark:bg-gray-700 rounded mt-4"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     );
   }

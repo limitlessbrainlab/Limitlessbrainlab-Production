@@ -638,7 +638,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
     const matchesGender = !genderFilter || patient.gender === genderFilter;
 
     return matchesSearch && matchesGender;
-  });
+  }).sort((a, b) => new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0)); // newest patients first
 
   // Client-side pagination — keeps the DOM light for clinics with many patients
   // (all rows are already fetched in 2 queries above; this only limits rendering).

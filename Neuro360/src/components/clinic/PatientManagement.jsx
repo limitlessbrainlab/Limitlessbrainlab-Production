@@ -40,6 +40,8 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'details'
   const [searchTerm, setSearchTerm] = useState('');
   const [genderFilter, setGenderFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
   const [loading, setLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [patientForUpload, setPatientForUpload] = useState(null);
@@ -638,6 +640,13 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
     return matchesSearch && matchesGender;
   });
 
+  // Client-side pagination — keeps the DOM light for clinics with many patients
+  // (all rows are already fetched in 2 queries above; this only limits rendering).
+  const pageCount = Math.max(1, Math.ceil(filteredPatients.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pagedPatients = filteredPatients.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  useEffect(() => { setPage(1); }, [searchTerm, genderFilter]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -745,7 +754,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredPatients.map((patient) => {
+              {pagedPatients.map((patient) => {
                 const reports = patientReports[patient.id] || [];
 
                 return (
@@ -864,6 +873,31 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
               >
                 Add First Patient
               </button>
+            </div>
+          )}
+
+          {pageCount > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredPatients.length)} of {filteredPatients.length}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Prev
+                </button>
+                <span className="text-sm text-gray-600 dark:text-gray-300">Page {currentPage} of {pageCount}</span>
+                <button
+                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                  disabled={currentPage >= pageCount}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
         </div>

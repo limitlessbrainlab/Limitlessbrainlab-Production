@@ -135,6 +135,16 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
     return item.phone || item.contact_number || 'N/A';
   };
 
+  // Map the contact-form button (source) to a labeled badge for the Contact tab.
+  const renderPackage = (src) => {
+    const map = {
+      'treat-my-brain': ['Treat My Brain', 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'],
+      'protect-my-brain': ['Protect My Brain', 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'],
+    };
+    const [text, cls] = map[src] || ['General Inquiry', 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'];
+    return <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>{text}</span>;
+  };
+
   // Render table columns based on active tab
   const renderTableHeader = () => {
     switch (activeTab) {
@@ -145,6 +155,7 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
             <th className="px-4 py-3">Email</th>
             <th className="px-4 py-3">Phone</th>
             <th className="px-4 py-3">City</th>
+            <th className="px-4 py-3">Package</th>
             <th className="px-4 py-3">Date</th>
             <th className="px-4 py-3 text-right">Actions</th>
           </tr>
@@ -196,6 +207,7 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
             <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{item.email || 'N/A'}</td>
             <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{item.phone || 'N/A'}</td>
             <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{item.city || 'N/A'}</td>
+            <td className="px-4 py-3 text-sm">{renderPackage(item.source)}</td>
             <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{formatDate(item.created_at)}</td>
             <td className="px-4 py-3 text-right">{renderActions(item)}</td>
           </tr>

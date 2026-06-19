@@ -181,7 +181,8 @@ const ContactFormPopup = ({ isOpen, onClose, source = null }) => {
             email: formData.email,
             phone: fullPhone,
             city: selectedCity,
-            message: formData.message ? formData.message.toUpperCase() : null
+            message: formData.message ? formData.message.toUpperCase() : null,
+            source: source || null
           }
         ]);
 

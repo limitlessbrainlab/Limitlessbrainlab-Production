@@ -1183,13 +1183,13 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 lg:p-8">
         {/* Filters skeleton */}
-        <div className="flex flex-wrap gap-3 mb-6 animate-pulse">
+        <div className="flex flex-wrap gap-3 mb-6">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-10 flex-1 min-w-[160px] bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
           ))}
         </div>
         {/* Table skeleton */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden animate-pulse">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
             <div className="h-5 w-56 bg-gray-200 dark:bg-gray-600 rounded"></div>
           </div>

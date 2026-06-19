@@ -2095,7 +2095,7 @@ const AlgorithmDataProcessor = () => {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8 animate-pulse">
+      <div className="p-4 sm:p-6 lg:p-8">
         {/* Header skeleton */}
         <div className="h-7 w-64 bg-gray-200 dark:bg-gray-700 rounded mb-6"></div>
         {/* Clinic group + patient cards skeleton */}

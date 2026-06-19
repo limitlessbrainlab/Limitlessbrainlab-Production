@@ -654,7 +654,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
 
   if (loading) {
     return (
-      <div className="p-1 animate-pulse">
+      <div className="p-1">
         {/* Search/filter skeleton */}
         <div className="flex flex-wrap gap-3 mb-6">
           {[1, 2, 3].map((i) => (

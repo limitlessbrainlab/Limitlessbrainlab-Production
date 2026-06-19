@@ -6404,7 +6404,7 @@ app.post('/api/request-demo-report', async (req, res) => {
 
     // Send the actual DEMO REPORTS to the user who requested them.
     const demoPerfReport = path.join(__dirname, 'assets', 'demo-reports', 'NeuroSense-Performance-Report.pdf');
-    const demoNeuroReport = path.join(__dirname, 'assets', 'pdf-templates', 'Neurosense Report.pdf');
+    const demoNeuroReport = path.join(__dirname, 'assets', 'demo-reports', 'NeuroSense-Report.pdf');
     const demoAttachments = getLogoAttachment();
     if (fs.existsSync(demoPerfReport)) {
       demoAttachments.push({ filename: 'NeuroSense Performance Report.pdf', path: demoPerfReport });

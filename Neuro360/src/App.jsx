@@ -169,6 +169,12 @@ function App() {
                   <Route path="/page/:slug" element={<StaticPage />} />
                   <Route path="/privacy-policy" element={<StaticPage />} />
                   <Route path="/login" element={<LoginForm />} />
+                  {/* Role-scoped login URLs — only the matching role can sign in here */}
+                  <Route path="/patient/login" element={<LoginForm userType="patient" />} />
+                  <Route path="/patients/login" element={<LoginForm userType="patient" />} />
+                  <Route path="/clinic/login" element={<LoginForm userType="clinic" />} />
+                  <Route path="/clinics/login" element={<LoginForm userType="clinic" />} />
+                  <Route path="/admin/login" element={<LoginForm userType="admin" />} />
                   <Route path="/register" element={<RegisterForm />} />
                   <Route path="/activation-pending" element={<ActivationPending />} />
                   <Route path="/forgot-password" element={<ForgotPasswordForm />} />

@@ -5,7 +5,7 @@ import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 
-const LoginForm = () => {
+const LoginForm = ({ userType: userTypeProp } = {}) => {
   const [showPassword, setShowPassword] = useState(false);
 
   // Safety check for AuthContext
@@ -30,8 +30,9 @@ const LoginForm = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Get user type from navigation state (from landing page)
-  const userTypeFromState = location.state?.userType;
+  // Role scope: prefer the route prop (/patient/login, /clinic/login, /admin/login),
+  // then navigation state (footer buttons), else generic /login (no scope).
+  const userTypeFromState = userTypeProp || location.state?.userType;
 
   const {
     register,
@@ -62,6 +63,13 @@ const LoginForm = () => {
             setError('root', {
               type: 'manual',
               message: 'No clinic account found with these credentials. Please use Patient Login instead.'
+            });
+            return;
+          }
+          if (userTypeFromState === 'admin') {
+            setError('root', {
+              type: 'manual',
+              message: 'No admin account found with these credentials.'
             });
             return;
           }
@@ -132,6 +140,7 @@ const LoginForm = () => {
           <h2 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2 sm:mb-3">
             {userTypeFromState === 'patient' ? 'Patient Login' :
              userTypeFromState === 'clinic' ? 'Clinic Login' :
+             userTypeFromState === 'admin' ? 'Admin Login' :
              'Welcome Back'}
           </h2>
           <p className="text-gray-600 font-medium text-sm sm:text-base">

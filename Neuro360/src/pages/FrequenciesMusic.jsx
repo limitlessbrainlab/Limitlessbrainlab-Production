@@ -991,10 +991,26 @@ const FrequenciesMusic = () => {
                   <td className="py-2 px-3">Harmonize relationships</td>
                   <td className="py-2 px-3">Anytime</td>
                 </tr>
-                <tr>
+                <tr className="border-b border-gray-100 dark:border-gray-700">
                   <td className="py-2 px-3 font-medium text-teal-600">741 Hz Solfeggio</td>
                   <td className="py-2 px-3">Cleanse toxins & awaken intuition</td>
                   <td className="py-2 px-3">Anytime</td>
+                </tr>
+                {/* Moved here from the Meditations page "When to Use Each Meditation" table */}
+                <tr className="border-b border-gray-100 dark:border-gray-700">
+                  <td className="py-2 px-3 font-medium text-yellow-600">Gamma</td>
+                  <td className="py-2 px-3">Focus & memory</td>
+                  <td className="py-2 px-3">Important tasks</td>
+                </tr>
+                <tr className="border-b border-gray-100 dark:border-gray-700">
+                  <td className="py-2 px-3 font-medium text-indigo-600">852 Hz Solfeggio</td>
+                  <td className="py-2 px-3">Spiritual insight</td>
+                  <td className="py-2 px-3">Spiritual practice</td>
+                </tr>
+                <tr>
+                  <td className="py-2 px-3 font-medium text-orange-600">963 Hz Solfeggio</td>
+                  <td className="py-2 px-3">Divine consciousness</td>
+                  <td className="py-2 px-3">Deep meditation</td>
                 </tr>
               </tbody>
             </table>

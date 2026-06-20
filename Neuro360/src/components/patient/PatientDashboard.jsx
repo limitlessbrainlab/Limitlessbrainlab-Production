@@ -8054,7 +8054,7 @@ const PatientDashboard = () => {
           </div>
         </div>
 
-        {/* Meditation Guide */}
+        {/* Meditation Guide — "When to Use Each Meditation" table moved to the Frequencies page ("When to Use Each Frequency"). Commented out per request.
         <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg p-3 sm:p-6 border border-gray-200 dark:border-gray-700">
           <h3 className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">When to Use Each Meditation</h3>
           <div className="overflow-x-auto -mx-1">
@@ -8090,6 +8090,7 @@ const PatientDashboard = () => {
             </table>
           </div>
         </div>
+        */}
 
         {/* Other Meditation Packs Grid */}
         {meditationPacks.length > 3 && (

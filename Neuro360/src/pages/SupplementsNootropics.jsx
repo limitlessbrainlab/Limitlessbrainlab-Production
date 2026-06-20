@@ -131,7 +131,7 @@ const SupplementsNootropics = () => {
       </div>
 
       <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
-        {/* Hero Banner */}
+        {/* Hero Banner — commented out per request
         <div className="relative rounded-2xl overflow-hidden mb-6 sm:mb-8 bg-gradient-to-r from-[#7c3aed] via-[#a855f7] to-[#e9d5ff]">
           <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between p-6 sm:p-10">
             <div className="text-white mb-4 sm:mb-0">
@@ -146,10 +146,11 @@ const SupplementsNootropics = () => {
               </div>
             </div>
           </div>
-          {/* Background decorations */}
+          Background decorations
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/3 translate-x-1/3"></div>
           <div className="absolute bottom-0 left-1/2 w-96 h-32 bg-white/5 rounded-full translate-y-1/2"></div>
         </div>
+        */}
 
         {/* Filter & Sort Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">

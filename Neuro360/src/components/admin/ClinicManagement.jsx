@@ -127,7 +127,7 @@ const ClinicManagement = ({ onUpdate }) => {
         setLoading(true);
 
         // Load clinics with proper error handling
-        await loadClinics(false); // Don't skip cleanup to ensure proper data loading
+        await loadClinics(true); // Skip the legacy demo-data cleanup scan on mount — it re-fetches the whole clinics table on every load (~1.4s) for a one-time chore that's long done.
 
 
       } catch (error) {
@@ -264,15 +264,17 @@ const ClinicManagement = ({ onUpdate }) => {
         return;
       }
 
-      // Check if database already has data
-      const existingClinics = await DatabaseService.get('clinics');
-      if (existingClinics.length > 0) {
+      // Get localStorage data FIRST. localStorage→DB migration is a one-time
+      // legacy path; on every normal mount there is nothing to migrate, so bail
+      // out here before spending a ~1.4s clinics fetch we don't need.
+      const localStorageData = JSON.parse(localStorage.getItem('clinics') || '[]');
+      if (localStorageData.length === 0) {
         return;
       }
 
-      // Get localStorage data
-      const localStorageData = JSON.parse(localStorage.getItem('clinics') || '[]');
-      if (localStorageData.length === 0) {
+      // Check if database already has data
+      const existingClinics = await DatabaseService.get('clinics');
+      if (existingClinics.length > 0) {
         return;
       }
 

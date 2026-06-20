@@ -5866,8 +5866,8 @@ app.post('/api/send-welcome-email', async (req, res) => {
 // Send Email Updated Notification
 app.post('/api/send-email-update-notification', async (req, res) => {
   try {
-    const { patientName, newEmail, clinicName, clinicUrl, clinicSmtpEmail, clinicSmtpPassword } = req.body;
-    console.log('📧 send-email-update-notification called:', { patientName, newEmail, clinicName });
+    const { patientName, newEmail, password, emailChanged, passwordChanged, clinicName, clinicUrl, clinicSmtpEmail, clinicSmtpPassword } = req.body;
+    console.log('📧 send-email-update-notification called:', { patientName, newEmail, clinicName, emailChanged: !!emailChanged, passwordChanged: !!passwordChanged });
 
     if (!newEmail || !patientName) {
       console.log('❌ Missing required fields:', { email: !!newEmail, patientName: !!patientName });
@@ -5905,14 +5905,15 @@ app.post('/api/send-email-update-notification', async (req, res) => {
       }
     }
 
-    // Generate system password
-    const systemPassword = generateSystemPassword();
+    // Show the real new password ONLY when the clinic actually set one this edit.
+    // When only the email changed, the password is unchanged and is never shown.
+    const hasNewPassword = !!password;
     const loginUrl = `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/patient/login`;
 
     const mailOptions = {
       from: fromEmail,
       to: newEmail,
-      subject: 'Your email ID updated — Limitless Brain Lab Portal',
+      subject: 'Your login credentials were updated — Limitless Brain Lab Portal',
       attachments: getLogoAttachment(),
       html: `
         <!DOCTYPE html>
@@ -5924,7 +5925,7 @@ app.post('/api/send-email-update-notification', async (req, res) => {
           <div style="max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
             <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 25px; text-align: center;">
               <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin-bottom: 10px;" />
-              <h1 style="color: white; margin: 0; font-size: 22px;">Email Updated</h1>
+              <h1 style="color: white; margin: 0; font-size: 22px;">Credentials Updated</h1>
               <p style="color: #F5D05D; margin: 8px 0 0; font-size: 14px;">Your Limitless Brain Lab Portal Access</p>
             </div>
 
@@ -5934,7 +5935,7 @@ app.post('/api/send-email-update-notification', async (req, res) => {
               </p>
 
               <p style="color: #666; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
-                A quick update: your email ID registered with <strong>${clinicName || 'your clinic'}</strong> has been updated.
+                Your login details for <strong>${clinicName || 'your clinic'}</strong> have been updated. Your current portal credentials are below.
               </p>
 
               <div style="background: #f8f9fc; border-radius: 10px; padding: 20px; margin: 20px 0;">
@@ -5946,8 +5947,11 @@ app.post('/api/send-email-update-notification', async (req, res) => {
                 </div>
 
                 <div style="background: white; border-radius: 8px; padding: 12px 15px; border-left: 4px solid #10b981;">
-                  <p style="color: #888; margin: 0; font-size: 11px; text-transform: uppercase;">System Generated Password</p>
-                  <p style="color: #323956; margin: 4px 0 0; font-size: 15px; font-weight: 600; font-family: monospace;">${systemPassword}</p>
+                  ${hasNewPassword
+                    ? `<p style="color: #888; margin: 0; font-size: 11px; text-transform: uppercase;">New Password</p>
+                  <p style="color: #323956; margin: 4px 0 0; font-size: 15px; font-weight: 600; font-family: monospace;">${password}</p>`
+                    : `<p style="color: #888; margin: 0; font-size: 11px; text-transform: uppercase;">Password</p>
+                  <p style="color: #323956; margin: 4px 0 0; font-size: 14px; font-weight: 500;">Unchanged — keep using your existing password.</p>`}
                 </div>
               </div>
 
@@ -5980,12 +5984,11 @@ app.post('/api/send-email-update-notification', async (req, res) => {
     };
 
     const sendResult = await transporter.sendMail(mailOptions);
-    console.log('✅ Email update notification sent successfully:', { to: newEmail, messageId: sendResult?.messageId, password: systemPassword });
+    console.log('✅ Credentials update email sent successfully:', { to: newEmail, messageId: sendResult?.messageId, passwordChanged: hasNewPassword });
 
     res.json({
       success: true,
-      message: 'Email update notification sent successfully',
-      password: systemPassword
+      message: 'Credentials update email sent successfully'
     });
 
   } catch (error) {

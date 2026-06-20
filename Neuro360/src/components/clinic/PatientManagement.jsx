@@ -393,6 +393,8 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
     try {
       // Check if email has changed
       const emailChanged = selectedPatient?.email !== data.email;
+      // Password is optional on edit: blank keeps the current password, a value resets it.
+      const passwordChanged = !!data.password;
 
       // Map form fields to database schema
       const patientData = {
@@ -411,10 +413,15 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
         date_of_birth: data.dateOfBirth || null
       };
 
+      // Only overwrite the bcrypt password column when a new password was entered.
+      if (passwordChanged) {
+        patientData.password = await hashPassword(data.password);
+      }
+
       await DatabaseService.update('patients', selectedPatient.id, patientData);
 
-      // Send email update notification if email was changed
-      if (emailChanged && data.email) {
+      // Email the patient their updated credentials whenever email and/or password changed.
+      if (emailChanged || passwordChanged) {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const baseUrl = apiUrl.replace(/\/api\/?$/, '');
 
@@ -434,17 +441,20 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
           body: JSON.stringify({
             patientName: data.name,
             newEmail: data.email,
+            password: passwordChanged ? data.password : null,
+            emailChanged,
+            passwordChanged,
             clinicName: user?.clinicName || user?.name || 'Your Clinic',
             clinicUrl: clinicUrl,
             clinicSmtpEmail: smtpEmail,
             clinicSmtpPassword: smtpPass
           })
         }).catch(emailError => {
-          console.error('Failed to send email update notification:', emailError);
+          console.error('Failed to send credentials update email:', emailError);
         });
       }
 
-      toast.success(emailChanged ? 'Patient updated and email sent to new address' : 'Patient updated successfully');
+      toast.success((emailChanged || passwordChanged) ? 'Patient updated — credentials emailed to patient' : 'Patient updated successfully');
       loadPatients();
       setShowModal(false);
       setSelectedPatient(null);
@@ -1986,30 +1996,29 @@ const PatientModal = ({ patient, onSubmit, onClose, register, handleSubmit, watc
             {errors.email && <p className="text-red-500 text-xs mt-0.5">{errors.email.message}</p>}
           </div>
 
-          {!patient && (
+          {(
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Password *
+                      {patient ? 'New Password' : 'Password *'}
                     </label>
                     <div className="relative">
                       <input
                         type={showPassword ? "text" : "password"}
                         {...register('password', {
-                          required: 'Password is required',
-                          minLength: {
-                            value: 8,
-                            message: 'Minimum 8 characters required'
-                          },
+                          // Optional on edit (existing patient): a blank value keeps the
+                          // current password, so every strength check passes when empty.
+                          required: patient ? false : 'Password is required',
                           validate: {
-                            hasUpperCase: (value) => /[A-Z]/.test(value) || 'Must include uppercase letter (A-Z)',
-                            hasLowerCase: (value) => /[a-z]/.test(value) || 'Must include lowercase letter (a-z)',
-                            hasNumber: (value) => /[0-9]/.test(value) || 'Must include number (0-9)',
-                            hasSpecialChar: (value) => /[!@#$%^&*(),.?":{}|<>]/.test(value) || 'Must include special character (@#$%...)'
+                            minLength: (value) => (patient && !value) || (value?.length || 0) >= 8 || 'Minimum 8 characters required',
+                            hasUpperCase: (value) => (patient && !value) || /[A-Z]/.test(value) || 'Must include uppercase letter (A-Z)',
+                            hasLowerCase: (value) => (patient && !value) || /[a-z]/.test(value) || 'Must include lowercase letter (a-z)',
+                            hasNumber: (value) => (patient && !value) || /[0-9]/.test(value) || 'Must include number (0-9)',
+                            hasSpecialChar: (value) => (patient && !value) || /[!@#$%^&*(),.?":{}|<>]/.test(value) || 'Must include special character (@#$%...)'
                           }
                         })}
                         className="w-full px-2.5 py-1.5 pr-8 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                        placeholder="Enter password"
+                        placeholder={patient ? 'Leave blank to keep current' : 'Enter password'}
                       />
                       <button
                         type="button"
@@ -2020,19 +2029,19 @@ const PatientModal = ({ patient, onSubmit, onClose, register, handleSubmit, watc
                       </button>
                     </div>
                     {errors.password && <p className="text-red-500 text-xs mt-0.5">{errors.password.message}</p>}
-                    <p className="text-xs text-gray-400 mt-1">Min 8 chars, uppercase, lowercase, number, special char (@#$)</p>
+                    <p className="text-xs text-gray-400 mt-1">{patient ? 'Leave blank to keep the current password. ' : ''}Min 8 chars, uppercase, lowercase, number, special char (@#$)</p>
                   </div>
 
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Confirm Password *
+                      {patient ? 'Confirm New Password' : 'Confirm Password *'}
                     </label>
                     <div className="relative">
                       <input
                         type={showConfirmPassword ? "text" : "password"}
                         {...register('confirmPassword', {
-                          required: 'Please confirm password',
-                          validate: (value, formValues) => value === formValues.password || 'Passwords do not match'
+                          required: patient ? false : 'Please confirm password',
+                          validate: (value, formValues) => !formValues.password || value === formValues.password || 'Passwords do not match'
                         })}
                         className="w-full px-2.5 py-1.5 pr-8 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                         placeholder="Re-enter password"

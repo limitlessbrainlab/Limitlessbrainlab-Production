@@ -106,9 +106,13 @@ const AlgorithmDataProcessor = () => {
 
   const loadPatients = async () => {
     try {
-      const patientsData = await DatabaseService.get('patients');
-      const clinicsData = await DatabaseService.get('clinics');
-      const algorithmResults = await DatabaseService.get('algorithmResults') || [];
+      // Fetch the three independent tables CONCURRENTLY (was 3 sequential round-trips).
+      const [patientsData, clinicsData, algorithmResultsRaw] = await Promise.all([
+        DatabaseService.get('patients'),
+        DatabaseService.get('clinics'),
+        DatabaseService.get('algorithmResults'),
+      ]);
+      const algorithmResults = algorithmResultsRaw || [];
 
       // Enrich patients with clinic names and algorithm status
       const enrichedPatients = patientsData.map(patient => {
@@ -142,9 +146,8 @@ const AlgorithmDataProcessor = () => {
 
   const loadProcessingHistory = async (patientId) => {
     try {
-      // Load algorithm results for this patient
-      const results = await DatabaseService.get('algorithmResults');
-      const patientResults = results.filter(r => r.patientId === patientId);
+      // Load algorithm results for THIS patient server-side (was a whole-table scan).
+      const patientResults = (await DatabaseService.findBy('algorithmResults', 'patient_id', patientId)) || [];
 
 
       // Log all records for debugging

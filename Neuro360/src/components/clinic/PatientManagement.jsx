@@ -786,22 +786,22 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Patient
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Contact
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Demographics
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Reports
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Added
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -812,7 +812,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
 
                 return (
                   <tr key={patient.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${(patient.referred_by === 'Limitless Brain Lab' || patient.referredBy === 'Limitless Brain Lab') ? 'bg-amber-50 dark:bg-amber-900/20 border-l-4 border-l-[#F5D05D]' : ''}`}>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className={`h-10 w-10 rounded-full flex items-center justify-center ${(patient.referred_by === 'Limitless Brain Lab' || patient.referredBy === 'Limitless Brain Lab') ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-primary-100 dark:bg-blue-900/30'}`}>
                             <Users className={`h-5 w-5 ${(patient.referred_by === 'Limitless Brain Lab' || patient.referredBy === 'Limitless Brain Lab') ? 'text-amber-600 dark:text-amber-400' : 'text-primary-600 dark:text-blue-400'}`} />
@@ -828,18 +828,18 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">{patient.email || 'N/A'}</div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">{patient.phone || 'N/A'}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">{getPatientAge(patient)} years</div>
                         {(patient.date_of_birth || patient.dateOfBirth) && (
                           <div className="text-[11px] text-gray-400">{new Date(patient.date_of_birth || patient.dateOfBirth).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
                         )}
                         <div className="text-sm text-gray-500 dark:text-gray-400 capitalize">{patient.gender || 'N/A'}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-4 whitespace-nowrap">
                         <div className="space-y-1">
                           {reports.length > 0 ? (() => {
                             const latest = [...reports].sort((a, b) =>
@@ -863,10 +863,10 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {new Date(patient.createdAt).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3, hour12: true })}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <td className="px-3 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex items-center justify-end space-x-2">
                           <button
                             onClick={() => setExpandedPatientForm(patient.id)}

@@ -261,6 +261,7 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
       >
         <Eye className="w-4 h-4" />
       </button>
+      {/* Delete button removed per request — inquiries must not be deletable by anyone.
       <button
         onClick={() => handleDelete(item.id)}
         className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
@@ -268,6 +269,7 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
       >
         <Trash2 className="w-4 h-4" />
       </button>
+      */}
     </div>
   );
 

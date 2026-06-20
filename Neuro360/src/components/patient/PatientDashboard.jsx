@@ -248,11 +248,11 @@ const PatientDashboard = () => {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
       // Find assessment link for email delivery
       const assessmentData = [
-        { id: 'brain_fitness', link: 'https://form.jotform.com/sweta_adatia/neuroperformance' },
+        { id: 'brain_fitness', link: 'https://form.jotform.com/233250136675151' },
         { id: 'brain_burnout', link: 'https://form.jotform.com/260117244562148' },
-        { id: 'brain_age', link: 'https://form.jotform.com/sweta_adatia/brain-age-estimator--neuroage-gap-c' },
+        { id: 'brain_age', link: 'https://form.jotform.com/252245065792056' },
         { id: 'dementia_index', link: 'https://form.jotform.com/260034749079159' },
-        { id: 'assessment_bundle', link: 'https://form.jotform.com/sweta_adatia/neuroperformance,https://form.jotform.com/260117244562148,https://form.jotform.com/sweta_adatia/brain-age-estimator--neuroage-gap-c,https://form.jotform.com/260034749079159' }
+        { id: 'assessment_bundle', link: 'https://form.jotform.com/233250136675151,https://form.jotform.com/260117244562148,https://form.jotform.com/252245065792056,https://form.jotform.com/260034749079159' }
       ];
       const assessmentLink = assessmentData.find(a => a.id === assessmentId)?.link || '';
 
@@ -306,11 +306,11 @@ const PatientDashboard = () => {
             assessment_bundle: 'Complete Brain Assessment Bundle'
           };
           const assessmentLinks = {
-            brain_fitness: 'https://form.jotform.com/sweta_adatia/neuroperformance',
+            brain_fitness: 'https://form.jotform.com/233250136675151',
             brain_burnout: 'https://form.jotform.com/260117244562148',
-            brain_age: 'https://form.jotform.com/sweta_adatia/brain-age-estimator--neuroage-gap-c',
+            brain_age: 'https://form.jotform.com/252245065792056',
             dementia_index: 'https://form.jotform.com/260034749079159',
-            assessment_bundle: 'https://form.jotform.com/sweta_adatia/neuroperformance,https://form.jotform.com/260117244562148,https://form.jotform.com/sweta_adatia/brain-age-estimator--neuroage-gap-c,https://form.jotform.com/260034749079159'
+            assessment_bundle: 'https://form.jotform.com/233250136675151,https://form.jotform.com/260117244562148,https://form.jotform.com/252245065792056,https://form.jotform.com/260034749079159'
           };
 
           // Check if already saved (prevent duplicates on page refresh)
@@ -5013,7 +5013,7 @@ const PatientDashboard = () => {
                   desc: 'Your Brain Fitness Score is a simple, at-a-glance number that summarizes how well your brain is currently operating across core systems like focus, resilience, recovery, and cognitive efficiency. Think of it like a "readiness score" for your mind, showing how prepared you are for daily performance, learning, decision-making, and emotional steadiness, and where targeted habits can move the needle quickly.',
                   icon: Brain,
                   color: 'from-blue-500 to-blue-600',
-                  link: 'https://form.jotform.com/sweta_adatia/neuroperformance',
+                  link: 'https://form.jotform.com/233250136675151',
                   price: 2.99,
                   originalPrice: 9.99
                 },
@@ -5035,7 +5035,7 @@ const PatientDashboard = () => {
                   desc: 'Your Brain Age Estimator compares how your brain is functioning today (attention, speed, memory, regulation) against typical patterns across age groups, so you can see whether your brain is performing "younger," "on track," or "older" than your chronological age. It\'s not a label, it\'s a directional snapshot that helps you track progress over time and spot areas where sleep, stress, and lifestyle may be quietly aging your brain faster than they should.',
                   icon: Calendar,
                   color: 'from-green-500 to-teal-500',
-                  link: 'https://form.jotform.com/sweta_adatia/brain-age-estimator--neuroage-gap-c',
+                  link: 'https://form.jotform.com/252245065792056',
                   price: 2.99,
                   originalPrice: 9.99
                 },
@@ -5096,6 +5096,22 @@ const PatientDashboard = () => {
                             <Play className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                             <span>Get Assessment</span>
                           </button>
+                        ) : assessment.id === 'brain_fitness' ? (
+                          <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-2 sm:gap-3">
+                            <div className="flex items-center space-x-1">
+                              <span className="text-base sm:text-lg font-bold text-green-600 dark:text-green-400">$2.99 USD</span>
+                              <span className="text-xs sm:text-sm text-gray-400 line-through">$9.99 USD</span>
+                            </div>
+                            <button
+                              className="px-3 sm:px-4 py-1.5 bg-gradient-to-r from-[#323956] to-[#232D3C] hover:from-[#3d4569] hover:to-[#2d3a4d] text-white text-xs sm:text-sm font-semibold rounded-lg flex items-center space-x-1.5 transition-all"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveJotForm({ title: assessment.title, link: assessment.link });
+                              }}
+                            >
+                              <span>Buy Now</span>
+                            </button>
+                          </div>
                         ) : (
                           <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-2 sm:gap-3">
                             <div className="flex items-center space-x-1">

@@ -22,6 +22,7 @@ import {
   Brain
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import useRealtimeRefetch from '../../hooks/useRealtimeRefetch';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -51,6 +52,16 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
     setCurrentPage(1);
     setSearchTerm('');
   }, [activeTab]);
+
+  // Live updates for the tabs whose tables are realtime-enabled + anon-readable.
+  // (Partnership/franchise_inquiries is RLS-locked to authenticated, so it stays
+  // on manual Refresh.)
+  const REALTIME_TABLE_BY_TAB = { contact: 'contact_inquiries', program: 'program_inquiries' };
+  useRealtimeRefetch(
+    REALTIME_TABLE_BY_TAB[activeTab] ? [{ table: REALTIME_TABLE_BY_TAB[activeTab] }] : [],
+    loadData,
+    [activeTab]
+  );
 
   const loadData = async () => {
     try {

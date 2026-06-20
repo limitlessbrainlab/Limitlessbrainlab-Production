@@ -34,6 +34,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import NotificationService from '../../services/notificationService';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
+import useRealtimeRefetch from '../../hooks/useRealtimeRefetch';
 
 const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) => {
   const { user } = useAuth();
@@ -168,6 +169,9 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
   useEffect(() => {
     loadData();
   }, [superAdminSelectedClinic]);
+
+  // Live updates: refetch when any report changes (admin sees all clinics).
+  useRealtimeRefetch([{ table: 'reports' }], loadData, []);
 
   // Reset to page 1 when the filters/sort change
   useEffect(() => { setReportPage(1); }, [searchTerm, selectedClinic, selectedPatient, patientSortOrder]);

@@ -24,6 +24,7 @@ import DatabaseService from '../../services/databaseService';
 import StorageService from '../../services/storageService';
 import { supabase } from '../../lib/supabaseClient';
 import { uploadPatientDocument, getPatientDocSignedUrl, deletePatientDocument } from '../../services/patientDocuments';
+import useRealtimeRefetch from '../../hooks/useRealtimeRefetch';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import UploadReportModal from './UploadReportModal';
 import ClinicalReportView from './ClinicalReportView';
@@ -188,6 +189,18 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
       setLoading(false);
     }
   }, [clinicId, loadPatients]);
+
+  // Live updates: refetch when this clinic's patients or reports change.
+  useRealtimeRefetch(
+    clinicId
+      ? [
+          { table: 'patients', filter: `org_id=eq.${clinicId}` },
+          { table: 'reports', filter: `clinic_id=eq.${clinicId}` },
+        ]
+      : [],
+    loadPatients,
+    [clinicId]
+  );
 
   // ✅ LOAD ALL CLINIC/PARTNER NAMES FOR REFERRAL DROPDOWN WITH TYPES
   const [referralOptionsWithTypes, setReferralOptionsWithTypes] = useState([]);

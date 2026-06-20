@@ -5,6 +5,7 @@ import bookingService from '../../services/bookingService';
 import progressTrackingService from '../../services/progressTrackingService';
 import { supabase } from '../../lib/supabaseClient';
 import DatabaseService from '../../services/databaseService';
+import useRealtimeRefetch from '../../hooks/useRealtimeRefetch';
 import StorageService from '../../services/storageService';
 import brainRegionService from '../../services/brainRegionService';
 import KSB_27_COMBINATIONS from '../../utils/ksb27Combinations';
@@ -1185,15 +1186,21 @@ const PatientDashboard = () => {
     loadPatientData();
   }, [user?.id]);
 
-  // Fetch immediately on tab open + poll every 30s while on the Neurosense Reports tab
+  // Fetch immediately on tab open while on the Neurosense Reports tab.
   useEffect(() => {
     if (activeTab !== 'neurosense-reports' || !patientDbId) return;
-    fetchPatientReports(patientDbId); // immediate fetch on tab open
-    const interval = setInterval(() => {
-      fetchPatientReports(patientDbId);
-    }, 30000);
-    return () => clearInterval(interval);
+    fetchPatientReports(patientDbId);
   }, [activeTab, patientDbId]);
+
+  // Live updates: refetch this patient's reports the instant one changes
+  // (replaces the old 30s poll).
+  useRealtimeRefetch(
+    (activeTab === 'neurosense-reports' && patientDbId)
+      ? [{ table: 'reports', filter: `patient_id=eq.${patientDbId}` }]
+      : [],
+    () => fetchPatientReports(patientDbId),
+    [activeTab, patientDbId]
+  );
 
   // Fetch brain parameters for sidebar menu
   useEffect(() => {

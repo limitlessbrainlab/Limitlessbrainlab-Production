@@ -7887,6 +7887,7 @@ const PatientDashboard = () => {
         {/* Video Previews Section */}
         {(() => {
           const driveEmbed = (id) => `https://drive.google.com/file/d/${id}/preview`;
+          const YOGA_NIDRA_URL = 'https://sweta8238.graphy.com/products/Yoga-Nidra---The-Ultimate-Whole-Brain-Synchronization-6788054d6cd6065534a49399';
           const meditationVideos = [
             {
               num: 0, featured: true,
@@ -7906,6 +7907,7 @@ const PatientDashboard = () => {
             { num: 9,  title: 'NEURO MANIFESTATION MEDITATION',        embedUrl: driveEmbed('1cjmrKIC683t42CcJuZvkPug0Ed6GdPCU'), thumb: '/meditation-thumbs/thumb-9.webp' },
             { num: 10, title: 'NEURO DEPRESSION HEALING MEDITATION',   embedUrl: driveEmbed('1xkTyCTbZ2WMmi3Ose_76xck1bq6Z0GBb'), thumb: '/meditation-thumbs/thumb-10.webp' },
             { num: 11, title: 'NEURO DEEP SLEEP MEDITATION',           embedUrl: driveEmbed('1AZNpbXzRT_XU9mNIU1pKuZVutUi3fNn9'), thumb: '/meditation-thumbs/thumb-11.webp' },
+            { num: 12, title: 'YOGA NIDRA — THE ULTIMATE WHOLE BRAIN SYNCHRONIZATION', thumb: '/meditation-thumbs/yoga-nidra.webp', buyUrl: YOGA_NIDRA_URL },
           ];
           const featured = meditationVideos[0];
           const rest = meditationVideos.slice(1);
@@ -7989,7 +7991,7 @@ const PatientDashboard = () => {
                     <div className="p-3 flex flex-col flex-grow">
                       <p className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-white leading-snug line-clamp-2 flex-grow mb-3">{v.title}</p>
                       <a
-                        href="https://sweta8238.graphy.com/products#nav_barv"
+                        href={v.buyUrl || 'https://sweta8238.graphy.com/products#nav_barv'}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="w-full bg-[#c9a227] hover:bg-[#b8911f] text-white py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 transition-colors"
@@ -9132,6 +9134,7 @@ const PatientDashboard = () => {
             return '/dashboard/frequencies';
           };
 
+          const YOGA_NIDRA_URL = 'https://sweta8238.graphy.com/products/Yoga-Nidra---The-Ultimate-Whole-Brain-Synchronization-6788054d6cd6065534a49399';
           const getModalityLink = (key, value) => {
             if (!value) return null;
             switch(key) {
@@ -9144,6 +9147,8 @@ const PatientDashboard = () => {
                 return slug ? `/dashboard/ans-reset?video=${slug}` : '/dashboard/ans-reset';
               }
               case 'meditation': {
+                // Yoga Nidra opens its dedicated free video directly; other meditations open the meditations page.
+                if (value.toLowerCase().includes('yoga nidra')) return YOGA_NIDRA_URL;
                 return '/dashboard/meditations';
               }
               case 'binaural': {
@@ -9191,7 +9196,7 @@ const PatientDashboard = () => {
               icon: '🌙',
               label: 'Yoga Nidra',
               value: 'Yoga Nidra\n30–40 min · PM',
-              link: '/dashboard/meditations?type=relaxation'
+              link: YOGA_NIDRA_URL
             });
           }
           return (
@@ -9257,7 +9262,11 @@ const PatientDashboard = () => {
                 {modalities.map((m, i) => (
                   <button
                     key={i}
-                    onClick={() => m.link && navigate(m.link)}
+                    onClick={() => {
+                      if (!m.link) return;
+                      if (/^https?:\/\//.test(m.link)) window.open(m.link, '_blank', 'noopener,noreferrer');
+                      else navigate(m.link);
+                    }}
                     className="flex items-start space-x-2.5 p-2.5 sm:p-3 bg-gray-50 dark:bg-gray-700/40 rounded-lg border border-gray-100 dark:border-gray-600 text-left w-full hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-700 transition-colors cursor-pointer group"
                   >
                     <span className="text-base sm:text-lg flex-shrink-0 mt-0.5">{m.icon}</span>

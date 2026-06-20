@@ -156,7 +156,7 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
             <th className="px-4 py-3">Phone</th>
             <th className="px-4 py-3">City</th>
             <th className="px-4 py-3">Package</th>
-            <th className="px-4 py-3">Date</th>
+            <th className="px-4 py-3">Inquiry Date &amp; Time</th>
             <th className="px-4 py-3 text-right">Actions</th>
           </tr>
         );
@@ -165,7 +165,7 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
           <tr className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
             <th className="px-4 py-3">Email</th>
             <th className="px-4 py-3">Contact Number</th>
-            <th className="px-4 py-3">Date</th>
+            <th className="px-4 py-3">Inquiry Date &amp; Time</th>
             <th className="px-4 py-3 text-right">Actions</th>
           </tr>
         );
@@ -177,7 +177,7 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
             <th className="px-4 py-3">Phone</th>
             <th className="px-4 py-3">City/Country</th>
             <th className="px-4 py-3">Category</th>
-            <th className="px-4 py-3">Date</th>
+            <th className="px-4 py-3">Inquiry Date &amp; Time</th>
             <th className="px-4 py-3 text-right">Actions</th>
           </tr>
         );
@@ -189,7 +189,7 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
             <th className="px-4 py-3">Phone</th>
             <th className="px-4 py-3">Profession</th>
             <th className="px-4 py-3">Program</th>
-            <th className="px-4 py-3">Date</th>
+            <th className="px-4 py-3">Inquiry Date &amp; Time</th>
             <th className="px-4 py-3 text-right">Actions</th>
           </tr>
         );

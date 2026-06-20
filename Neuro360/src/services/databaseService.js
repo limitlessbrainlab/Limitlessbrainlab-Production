@@ -588,8 +588,11 @@ class DatabaseService {
   }
 
   async getClinicUsage(clinicId) {
-    const usage = await this.findBy('usage', 'clinicId', clinicId);
-    const reports = await this.findBy('reports', 'clinicId', clinicId);
+    // Run the two independent lookups concurrently instead of sequentially.
+    const [usage, reports] = await Promise.all([
+      this.findBy('usage', 'clinicId', clinicId),
+      this.findBy('reports', 'clinicId', clinicId),
+    ]);
 
     return {
       totalReports: reports.length,
@@ -619,22 +622,18 @@ class DatabaseService {
       try {
         const actualTable = this.mapTableName('reports');
 
-        // Primary query: filter by clinic_id directly (covers Super Admin uploads)
-        const { data: directReports, error: directError } = await this.supabaseService.supabase
-          .from(actualTable)
-          .select('*')
-          .eq('clinic_id', clinicId);
+        // Primary query (by clinic_id) and the legacy null-clinic scan run CONCURRENTLY.
+        const [directRes, legacyRes] = await Promise.all([
+          this.supabaseService.supabase.from(actualTable).select('*').eq('clinic_id', clinicId),
+          this.supabaseService.supabase.from(actualTable).select('*').is('clinic_id', null),
+        ]);
 
-        if (directError) {
-          console.error('ERROR: Error querying reports by clinic_id:', directError);
+        if (directRes.error) {
+          console.error('ERROR: Error querying reports by clinic_id:', directRes.error);
           return [];
         }
-
-        // Fallback: also check for legacy reports with org_id but missing clinic_id
-        const { data: legacyReports } = await this.supabaseService.supabase
-          .from(actualTable)
-          .select('*')
-          .is('clinic_id', null);
+        const directReports = directRes.data;
+        const legacyReports = legacyRes.data;
 
         // Merge: direct results + any legacy reports matching by org_id
         const legacyMatches = (legacyReports || []).filter(report =>
@@ -647,62 +646,25 @@ class DatabaseService {
           ...legacyMatches.filter(r => !allReportIds.has(r.id))
         ];
 
-
-        // Fix old reports by updating them with clinic_id field if missing
+        // Backfill missing clinic_id/patient_id IN MEMORY only (so the list displays
+        // correctly). Do NOT write back to the DB on this read path — that issued N
+        // sequential UPDATEs on every clinic-detail open. Persistent backfill belongs
+        // in a one-off migration, not a read.
         for (const report of clinicReports) {
-          let needsUpdate = false;
-          const updates = {};
-
-          // Fix missing clinic_id
           if (!report.clinic_id && (report.org_id || report.clinicId)) {
-            updates.clinic_id = clinicId;
             report.clinic_id = clinicId;
-            needsUpdate = true;
           }
-
-          // Fix missing patient_id - try to get from report_data or file_path
           if (!report.patient_id) {
-
-            // Check if report_data has patient info
             if (report.report_data && typeof report.report_data === 'object') {
               const patientIdFromData = report.report_data.patientId || report.report_data.patient_id;
-              if (patientIdFromData) {
-                updates.patient_id = patientIdFromData;
-                report.patient_id = patientIdFromData;
-                needsUpdate = true;
-              } else {
-              }
-            } else {
+              if (patientIdFromData) report.patient_id = patientIdFromData;
             }
-
-            // If still no patient_id, try to extract from file_path
-            if (!updates.patient_id && report.file_path) {
+            if (!report.patient_id && report.file_path) {
               // file_path format: reports/{clinicId}/{patientId}/{filename}
               const pathParts = report.file_path.split('/');
               if (pathParts.length >= 3 && pathParts[0] === 'reports') {
-                const potentialPatientId = pathParts[2];
-                updates.patient_id = potentialPatientId;
-                report.patient_id = potentialPatientId;
-                needsUpdate = true;
-              } else {
+                report.patient_id = pathParts[2];
               }
-            } else if (!report.file_path) {
-            }
-
-            if (!updates.patient_id) {
-              console.warn(`  WARNING: Could not determine patient_id for report ${report.id}`);
-            }
-          }
-
-          // Apply updates if needed
-          if (needsUpdate && Object.keys(updates).length > 0) {
-            try {
-              await this.supabaseService.supabase
-                .from(actualTable)
-                .update(updates)
-                .eq('id', report.id);
-            } catch (updateError) {
-              console.warn(`  WARNING: Could not update report ${report.id}:`, updateError);
             }
           }
         }

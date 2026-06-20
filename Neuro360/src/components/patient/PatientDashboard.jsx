@@ -797,32 +797,39 @@ const PatientDashboard = () => {
   const fetchAlgorithmResults = async (patientDbId, patientEmail, patientName) => {
     try {
 
-      const allResults = await DatabaseService.get('algorithmResults');
-      if (allResults?.length > 0) {
+      // Fast path: query algorithm_results by patient_id server-side (indexed, ~1 row set)
+      // instead of pulling the whole table and filtering in JS. Fall back to a full scan +
+      // email/name match only for legacy rows that lack patient_id.
+      const notClaude = (r) => (r.report_mode || r.reportMode || 'neurosense') !== 'claude';
+      let patientResults = [];
+      try {
+        const byId = await DatabaseService.findBy('algorithmResults', 'patient_id', patientDbId);
+        patientResults = (byId || []).filter(notClaude);
+      } catch (e) {
+        patientResults = [];
       }
 
-      // Filter by patient_id (UUID) or patientId, also try matching by email/name
-      // Check all possible field name variations (camelCase, snake_case, lowercase)
-      const patientResults = allResults.filter(r => {
-        // Match by patient ID - check all possible field name variations
-        const rid = r.patient_id || r.patientId || r.patientid;
-        const matchById = rid && rid === patientDbId;
+      if (patientResults.length === 0) {
+        const allResults = await DatabaseService.get('algorithmResults');
+        patientResults = (allResults || []).filter(r => {
+          // Match by patient ID - check all possible field name variations
+          const rid = r.patient_id || r.patientId || r.patientid;
+          const matchById = rid && rid === patientDbId;
 
-        // Match by email - check all possible field name variations
-        const remail = r.patient_email || r.patientEmail || r.patientemail;
-        const matchByEmail = patientEmail && remail &&
-          remail.toLowerCase().trim() === patientEmail.toLowerCase().trim();
+          // Match by email - check all possible field name variations
+          const remail = r.patient_email || r.patientEmail || r.patientemail;
+          const matchByEmail = patientEmail && remail &&
+            remail.toLowerCase().trim() === patientEmail.toLowerCase().trim();
 
-        // Match by patient name (fallback) - check inputData.patientName too
-        const rname = r.patient_name || r.patientName || r.patientname || r.inputData?.patientName;
-        const matchByName = patientName && rname &&
-          rname.toLowerCase().trim() === patientName.toLowerCase().trim();
+          // Match by patient name (fallback) - check inputData.patientName too
+          const rname = r.patient_name || r.patientName || r.patientname || r.inputData?.patientName;
+          const matchByName = patientName && rname &&
+            rname.toLowerCase().trim() === patientName.toLowerCase().trim();
 
-        // Exclude Claude-mode results — those are super-admin-only until the Claude
-        // report is explicitly shared (which appears via the separate reports path).
-        const mode = r.report_mode || r.reportMode || 'neurosense';
-        return (matchById || matchByEmail || matchByName) && mode !== 'claude';
-      });
+          // Exclude Claude-mode results — super-admin-only until explicitly shared.
+          return (matchById || matchByEmail || matchByName) && notClaude(r);
+        });
+      }
 
 
       // Set the scan count (total algorithm results for this patient)
@@ -911,15 +918,19 @@ const PatientDashboard = () => {
         // If not found by ID, try to find by email
         if (!patientRecord && user.email) {
 
-          const allPatients = await DatabaseService.get('patients');
-
-          // More robust email matching with trim
+          // Prefer an indexed server-side lookup by email; fall back to a case-insensitive
+          // full scan only if the exact match misses (handles legacy case/whitespace diffs).
           const userEmailLower = user.email.trim().toLowerCase();
-          patientRecord = allPatients.find(p => {
-            if (!p.email) return false;
-            const patientEmailLower = p.email.trim().toLowerCase();
-            return patientEmailLower === userEmailLower;
-          });
+          let byEmail = [];
+          try { byEmail = await DatabaseService.findBy('patients', 'email', user.email.trim()); } catch (e) { byEmail = []; }
+          patientRecord = (byEmail && byEmail[0]) || null;
+          if (!patientRecord) {
+            const allPatients = await DatabaseService.get('patients');
+            patientRecord = allPatients.find(p => {
+              if (!p.email) return false;
+              return p.email.trim().toLowerCase() === userEmailLower;
+            });
+          }
 
         }
 
@@ -954,33 +965,20 @@ const PatientDashboard = () => {
           } else {
           }
 
-          // Fetch clinical report for this patient
-          await fetchClinicalReport(user.id);
-
-          // Fetch all reports for this patient (including response reports)
-          // Use patientRecord.id — reports are stored with patient_id = patients table row id,
-          // which only equals user.id when findById('patients', user.id) matched directly.
+          // Patient details are already known; fetch the four independent datasets
+          // CONCURRENTLY instead of sequentially (was ~4 blocking round-trips ≈ several
+          // seconds of latency; now ~one round-trip).
           setPatientDbId(patientRecord.id);
-          await fetchPatientReports(patientRecord.id);
-
-          // Fetch algorithm results for this patient (7 brain parameters)
-          // Use patient's database ID, email, and name for matching
           const patientFullName = patientRecord.fullName || patientRecord.full_name || patientRecord.name || user.name;
-          await fetchAlgorithmResults(patientRecord.id, patientRecord.email || user.email, patientFullName);
-
-          // Fetch clinic data if patient has clinic_id or org_id
-          let clinicData = null;
           const clinicId = patientRecord.clinicId || patientRecord.clinic_id || patientRecord.orgId || patientRecord.org_id || patientRecord.ownerId || patientRecord.owner_id;
           setPatientClinicId(clinicId || null);
 
-
-          if (clinicId) {
-            try {
-              clinicData = await DatabaseService.findById('clinics', clinicId);
-            } catch (clinicError) {
-            }
-          } else {
-          }
+          const [, , , clinicData] = await Promise.all([
+            fetchClinicalReport(user.id),
+            fetchPatientReports(patientRecord.id),
+            fetchAlgorithmResults(patientRecord.id, patientRecord.email || user.email, patientFullName),
+            clinicId ? DatabaseService.findById('clinics', clinicId).catch(() => null) : Promise.resolve(null),
+          ]);
 
           // Get extra profile fields from medical_history.profile_details (if stored there)
           const profileDetails = patientRecord.medical_history?.profile_details || {};

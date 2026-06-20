@@ -171,7 +171,8 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
   }, [superAdminSelectedClinic]);
 
   // Live updates: refetch when any report changes (admin sees all clinics).
-  useRealtimeRefetch([{ table: 'reports' }], loadData, []);
+  // Deferred arrow so `loadData` (declared below) isn't read during render (TDZ).
+  useRealtimeRefetch([{ table: 'reports' }], () => loadData(), []);
 
   // Reset to page 1 when the filters/sort change
   useEffect(() => { setReportPage(1); }, [searchTerm, selectedClinic, selectedPatient, patientSortOrder]);

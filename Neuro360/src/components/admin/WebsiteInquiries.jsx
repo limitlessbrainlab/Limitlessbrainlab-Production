@@ -57,9 +57,10 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
   // (Partnership/franchise_inquiries is RLS-locked to authenticated, so it stays
   // on manual Refresh.)
   const REALTIME_TABLE_BY_TAB = { contact: 'contact_inquiries', program: 'program_inquiries' };
+  // Deferred arrow so `loadData` (declared below) isn't read during render (TDZ).
   useRealtimeRefetch(
     REALTIME_TABLE_BY_TAB[activeTab] ? [{ table: REALTIME_TABLE_BY_TAB[activeTab] }] : [],
-    loadData,
+    () => loadData(),
     [activeTab]
   );
 

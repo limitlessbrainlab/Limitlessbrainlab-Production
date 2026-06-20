@@ -789,7 +789,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Patient
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="w-full px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Contact
                 </th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -828,7 +828,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
+                      <td className="w-full px-3 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">{patient.email || 'N/A'}</div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">{patient.phone || 'N/A'}</div>
                       </td>

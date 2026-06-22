@@ -109,6 +109,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
   // Get clinic name and SMTP config - fetch directly from database
   const [clinicDisplayName, setClinicDisplayName] = useState('unknown_clinic');
   const [clinicSmtpConfig, setClinicSmtpConfig] = useState({ smtp_email: '', smtp_password: '' });
+  const [clinicEmail, setClinicEmail] = useState('');
   useEffect(() => {
     const fetchClinicName = async () => {
       if (!clinicId) return;
@@ -119,6 +120,8 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
         } else if (clinicData?.contact_person) {
           setClinicDisplayName(clinicData.contact_person);
         }
+        // Clinic contact email — used to notify the clinic when a new patient is added
+        setClinicEmail(clinicData?.email || '');
         // Store SMTP config for sending emails from clinic's own email
         // Note: findById converts snake_case to camelCase, so smtp_email becomes smtpEmail
         const smtpEmail = clinicData?.smtpEmail || clinicData?.smtp_email || '';
@@ -414,7 +417,8 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
             password: data.password,
             clinicName: user?.clinicName || user?.name || 'Your Clinic',
             clinicSmtpEmail: clinicSmtpConfig.smtp_email || '',
-            clinicSmtpPassword: clinicSmtpConfig.smtp_password || ''
+            clinicSmtpPassword: clinicSmtpConfig.smtp_password || '',
+            clinicEmail: clinicEmail || user?.email || ''
           })
         }).catch(emailError => {
           console.error('Failed to send welcome email:', emailError);

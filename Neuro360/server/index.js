@@ -5726,8 +5726,8 @@ app.post('/api/create-patient-auth', async (req, res) => {
 // Send Welcome Email with Login Credentials to Patient
 app.post('/api/send-welcome-email', async (req, res) => {
   try {
-    const { patientName, email, password, clinicName, clinicSmtpEmail, clinicSmtpPassword } = req.body;
-    console.log('📧 send-welcome-email called:', { patientName, email, clinicName, hasClinicSmtp: !!(clinicSmtpEmail && clinicSmtpPassword) });
+    const { patientName, email, password, clinicName, clinicSmtpEmail, clinicSmtpPassword, clinicEmail } = req.body;
+    console.log('📧 send-welcome-email called:', { patientName, email, clinicName, hasClinicSmtp: !!(clinicSmtpEmail && clinicSmtpPassword), clinicEmail });
 
     if (!email || !password || !patientName) {
       console.log('❌ Missing required fields:', { email: !!email, password: !!password, patientName: !!patientName });
@@ -5841,6 +5841,73 @@ app.post('/api/send-welcome-email', async (req, res) => {
 
     const sendResult = await transporter.sendMail(mailOptions);
     console.log('✅ Welcome email sent successfully:', { to: email, messageId: sendResult?.messageId });
+
+    // Also notify the clinic that a new patient was created. Separate template with
+    // NO password. Sent from the default system address (not clinic SMTP) so it reliably
+    // lands in the clinic's inbox even when clinic SMTP isn't configured. Non-fatal —
+    // a failure here must not break the patient welcome email.
+    if (clinicEmail) {
+      try {
+        const dashboardUrl = `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic/login`;
+        const dateAdded = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        await emailTransporter.sendMail({
+          from: EMAIL_FROM,
+          to: clinicEmail,
+          subject: `New Patient Added: ${patientName}`,
+          attachments: getLogoAttachment(),
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"></head>
+            <body style="margin:0;padding:20px;font-family:Arial,sans-serif;background-color:#f4f7fa;">
+              <div style="max-width:500px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+                <div style="background:linear-gradient(135deg,#323956 0%,#1a1f36 100%);padding:25px;text-align:center;">
+                  <img src="cid:company-logo" alt="Limitless Brain Lab" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:10px;" />
+                  <h1 style="color:white;margin:0;font-size:24px;">New Patient Added</h1>
+                  <p style="color:#F5D05D;margin:8px 0 0;font-size:14px;">Patient Management Notification</p>
+                </div>
+                <div style="padding:30px;">
+                  <p style="color:#333;font-size:16px;margin:0 0 20px;">Hello <strong>${clinicName || 'your clinic'}</strong>,</p>
+                  <p style="color:#666;font-size:14px;line-height:1.6;margin:0 0 20px;">
+                    A new patient has been created under your clinic on Limitless Brain Lab.
+                    Their account is now active and login credentials have been sent to the patient directly.
+                  </p>
+                  <div style="background:#f8f9fc;border-radius:10px;padding:20px;margin:20px 0;">
+                    <div style="background:white;border-radius:8px;padding:12px 15px;margin-bottom:10px;border-left:4px solid #3b82f6;">
+                      <p style="color:#888;margin:0;font-size:11px;text-transform:uppercase;">Patient Name</p>
+                      <p style="color:#323956;margin:4px 0 0;font-size:15px;font-weight:600;">${patientName}</p>
+                    </div>
+                    <div style="background:white;border-radius:8px;padding:12px 15px;margin-bottom:10px;border-left:4px solid #10b981;">
+                      <p style="color:#888;margin:0;font-size:11px;text-transform:uppercase;">Email</p>
+                      <p style="color:#323956;margin:4px 0 0;font-size:15px;font-weight:600;">${email}</p>
+                    </div>
+                    <div style="background:white;border-radius:8px;padding:12px 15px;border-left:4px solid #F5D05D;">
+                      <p style="color:#888;margin:0;font-size:11px;text-transform:uppercase;">Date Added</p>
+                      <p style="color:#323956;margin:4px 0 0;font-size:15px;font-weight:600;">${dateAdded}</p>
+                    </div>
+                  </div>
+                  <div style="text-align:center;margin:25px 0;">
+                    <a href="${dashboardUrl}" style="display:inline-block;background:linear-gradient(135deg,#323956 0%,#1a1f36 100%);color:white;text-decoration:none;padding:12px 30px;border-radius:8px;font-weight:600;font-size:14px;">
+                      Open Clinic Dashboard →
+                    </a>
+                  </div>
+                  <p style="color:#999;font-size:12px;line-height:1.6;margin:0;">
+                    No action is required. You can view and manage this patient from your clinic dashboard.
+                  </p>
+                </div>
+                <div style="background:#f8f9fc;padding:15px;text-align:center;border-top:1px solid #e5e7eb;">
+                  <p style="color:#888;margin:0;font-size:11px;">© ${new Date().getFullYear()} Limitless Brain Lab | Brain &amp; Mental Wellness</p>
+                </div>
+              </div>
+            </body>
+            </html>
+          `
+        });
+        console.log('✅ Clinic new-patient notification sent:', clinicEmail);
+      } catch (clinicMailErr) {
+        console.error('⚠️ Clinic notification failed (non-fatal):', clinicMailErr.message);
+      }
+    }
 
     res.json({
       success: true,

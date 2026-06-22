@@ -217,6 +217,7 @@ const UploadReportModal = ({ clinicId, patient, onUpload, onClose }) => {
 
       // Fetch clinic name from database for folder naming
       let clinicName = 'unknown_clinic';
+      let clinicEmail = '';
       try {
         const clinicData = await DatabaseService.findById('clinics', clinicId);
         if (clinicData?.name) {
@@ -224,6 +225,7 @@ const UploadReportModal = ({ clinicId, patient, onUpload, onClose }) => {
         } else if (clinicData?.contact_person) {
           clinicName = clinicData.contact_person;
         }
+        clinicEmail = clinicData?.email || '';
       } catch (e) {
         clinicName = user?.clinicName || user?.name || 'unknown_clinic';
       }
@@ -363,7 +365,7 @@ const UploadReportModal = ({ clinicId, patient, onUpload, onClose }) => {
           fetch(`${baseUrl}/api/send-report-received`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ patientEmail, patientName, clinicName })
+            body: JSON.stringify({ patientEmail, patientName, clinicName, clinicEmail: clinicEmail || user?.email || '' })
           }).catch(() => {});
         }
       } catch (emailErr) {

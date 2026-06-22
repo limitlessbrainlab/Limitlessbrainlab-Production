@@ -228,6 +228,46 @@ const getFullAttachments = () => {
   return attachments;
 };
 
+// Build a standard clinic/partner notification email (card layout, NEVER contains a password).
+// Used to keep the clinic/partner informed about patient-account events. Returns mailOptions.
+const buildClinicNotificationEmail = ({ to, subject, heading, subheading, greetingName, intro, rows = [], footerNote }) => {
+  const accent = ['#3b82f6', '#10b981', '#F5D05D', '#8b5cf6'];
+  const rowsHtml = rows.map((r, i) => `
+    <div style="background:white;border-radius:8px;padding:12px 15px;margin-bottom:10px;border-left:4px solid ${accent[i % accent.length]};">
+      <p style="color:#888;margin:0;font-size:11px;text-transform:uppercase;">${r.label}</p>
+      <p style="color:#323956;margin:4px 0 0;font-size:15px;font-weight:600;">${r.value}</p>
+    </div>`).join('');
+  return {
+    from: EMAIL_FROM,
+    to,
+    subject,
+    attachments: getLogoAttachment(),
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"></head>
+      <body style="margin:0;padding:20px;font-family:Arial,sans-serif;background-color:#f4f7fa;">
+        <div style="max-width:500px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+          <div style="background:linear-gradient(135deg,#323956 0%,#1a1f36 100%);padding:25px;text-align:center;">
+            <img src="cid:company-logo" alt="Limitless Brain Lab" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin-bottom:10px;" />
+            <h1 style="color:white;margin:0;font-size:24px;">${heading}</h1>
+            <p style="color:#F5D05D;margin:8px 0 0;font-size:14px;">${subheading}</p>
+          </div>
+          <div style="padding:30px;">
+            <p style="color:#333;font-size:16px;margin:0 0 20px;">Hello <strong>${greetingName || 'there'}</strong>,</p>
+            <p style="color:#666;font-size:14px;line-height:1.6;margin:0 0 20px;">${intro}</p>
+            ${rows.length ? `<div style="background:#f8f9fc;border-radius:10px;padding:20px;margin:20px 0;">${rowsHtml}</div>` : ''}
+            ${footerNote ? `<p style="color:#999;font-size:12px;line-height:1.6;margin:0;">${footerNote}</p>` : ''}
+          </div>
+          <div style="background:#f8f9fc;padding:15px;text-align:center;border-top:1px solid #e5e7eb;">
+            <p style="color:#888;margin:0;font-size:11px;">© ${new Date().getFullYear()} Limitless Brain Lab | Brain &amp; Mental Wellness</p>
+          </div>
+        </div>
+      </body>
+      </html>`
+  };
+};
+
 // Generate a random system password
 const generateSystemPassword = () => {
   const length = 12;
@@ -906,7 +946,7 @@ app.post('/api/edf-upload-notification', async (req, res) => {
 // received and analysis has started (triggered on report upload by the clinic).
 app.post('/api/send-report-received', async (req, res) => {
   try {
-    const { patientEmail, patientName, clinicName } = req.body;
+    const { patientEmail, patientName, clinicName, clinicEmail } = req.body;
 
     if (!patientEmail) {
       return res.status(400).json({ success: false, message: 'patientEmail is required' });
@@ -921,6 +961,29 @@ app.post('/api/send-report-received', async (req, res) => {
     };
 
     await emailTransporter.sendMail(mailOptions);
+
+    // Also notify the clinic (non-fatal).
+    if (clinicEmail) {
+      try {
+        await emailTransporter.sendMail(buildClinicNotificationEmail({
+          to: clinicEmail,
+          subject: `Report Received: ${patientName || 'Patient'}`,
+          heading: 'Report Received',
+          subheading: 'Patient Report Notification',
+          greetingName: clinicName || 'your clinic',
+          intro: `We've received a report submission for your patient <strong>${patientName || 'your patient'}</strong>. It is now being processed — you'll be notified when the report is ready.`,
+          rows: [
+            { label: 'Patient Name', value: patientName || '—' },
+            { label: 'Date Received', value: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) }
+          ],
+          footerNote: 'No action is required.'
+        }));
+        console.log('✅ Clinic report-received notification sent:', clinicEmail);
+      } catch (clinicMailErr) {
+        console.error('⚠️ Clinic report-received notification failed (non-fatal):', clinicMailErr.message);
+      }
+    }
+
     res.json({ success: true, message: 'Report received notification sent' });
   } catch (error) {
     console.error('Report received email error:', error.message);
@@ -4882,7 +4945,7 @@ app.post('/api/calendly-webhook', async (req, res) => {
 // Email 2 — 24-Hour Reminder (manual admin trigger)
 app.post('/api/send-24hr-reminder', async (req, res) => {
   try {
-    const { email, name } = req.body;
+    const { email, name, clinicEmail, clinicName } = req.body;
 
     if (!email || !name) {
       return res.status(400).json({
@@ -4974,6 +5037,28 @@ app.post('/api/send-24hr-reminder', async (req, res) => {
     };
 
     await emailTransporter.sendMail(mailOptions);
+
+    // Also notify the clinic that the patient's report is being finalised (non-fatal).
+    if (clinicEmail) {
+      try {
+        await emailTransporter.sendMail(buildClinicNotificationEmail({
+          to: clinicEmail,
+          subject: `Report Being Finalised: ${name}`,
+          heading: 'Report Being Finalised',
+          subheading: 'Patient Report Notification',
+          greetingName: clinicName || 'your clinic',
+          intro: `Your patient <strong>${name}</strong>'s report is being finalised and will be ready shortly. We'll email you as soon as it's available.`,
+          rows: [
+            { label: 'Patient Name', value: name },
+            { label: 'Status', value: 'Being finalised' }
+          ],
+          footerNote: 'No action is required.'
+        }));
+        console.log('✅ Clinic report-finalising notification sent:', clinicEmail);
+      } catch (clinicMailErr) {
+        console.error('⚠️ Clinic report-finalising notification failed (non-fatal):', clinicMailErr.message);
+      }
+    }
 
     res.json({
       success: true,
@@ -5933,8 +6018,8 @@ app.post('/api/send-welcome-email', async (req, res) => {
 // Send Email Updated Notification
 app.post('/api/send-email-update-notification', async (req, res) => {
   try {
-    const { patientName, newEmail, password, emailChanged, passwordChanged, clinicName, clinicUrl, clinicSmtpEmail, clinicSmtpPassword } = req.body;
-    console.log('📧 send-email-update-notification called:', { patientName, newEmail, clinicName, emailChanged: !!emailChanged, passwordChanged: !!passwordChanged });
+    const { patientName, newEmail, password, emailChanged, passwordChanged, clinicName, clinicUrl, clinicSmtpEmail, clinicSmtpPassword, clinicEmail } = req.body;
+    console.log('📧 send-email-update-notification called:', { patientName, newEmail, clinicName, emailChanged: !!emailChanged, passwordChanged: !!passwordChanged, clinicEmail });
 
     if (!newEmail || !patientName) {
       console.log('❌ Missing required fields:', { email: !!newEmail, patientName: !!patientName });
@@ -6052,6 +6137,30 @@ app.post('/api/send-email-update-notification', async (req, res) => {
 
     const sendResult = await transporter.sendMail(mailOptions);
     console.log('✅ Credentials update email sent successfully:', { to: newEmail, messageId: sendResult?.messageId, passwordChanged: hasNewPassword });
+
+    // Also notify the clinic that a patient's login details changed (no password shown, non-fatal).
+    if (clinicEmail) {
+      try {
+        const changed = [emailChanged ? 'Email' : null, passwordChanged ? 'Password' : null].filter(Boolean).join(' and ') || 'Login details';
+        await emailTransporter.sendMail(buildClinicNotificationEmail({
+          to: clinicEmail,
+          subject: `Patient Login Details Updated: ${patientName || 'Patient'}`,
+          heading: 'Patient Login Details Updated',
+          subheading: 'Patient Management Notification',
+          greetingName: clinicName || 'your clinic',
+          intro: `The login details for your patient <strong>${patientName || 'your patient'}</strong> were updated on Limitless Brain Lab. The updated credentials have been sent to the patient directly.`,
+          rows: [
+            { label: 'Patient Name', value: patientName || '—' },
+            { label: 'New Email', value: newEmail || '—' },
+            { label: 'What Changed', value: changed }
+          ],
+          footerNote: 'No action is required.'
+        }));
+        console.log('✅ Clinic credentials-update notification sent:', clinicEmail);
+      } catch (clinicMailErr) {
+        console.error('⚠️ Clinic credentials-update notification failed (non-fatal):', clinicMailErr.message);
+      }
+    }
 
     res.json({
       success: true,
@@ -7143,7 +7252,7 @@ app.post('/api/send-partner-no-credit-alert', async (req, res) => {
 // 5. PARTNER PATIENT WELCOME
 app.post('/api/send-partner-patient-welcome', async (req, res) => {
   try {
-    const { patientName, email, password, partnerName } = req.body;
+    const { patientName, email, password, partnerName, partnerEmail } = req.body;
 
     if (!email || !password || !patientName) {
       return res.status(400).json({ success: false, message: 'Required fields missing' });
@@ -7186,6 +7295,30 @@ app.post('/api/send-partner-patient-welcome', async (req, res) => {
     };
 
     await emailTransporter.sendMail(mailOptions);
+
+    // Also notify the partner that a new patient was created (no password, non-fatal).
+    if (partnerEmail) {
+      try {
+        await emailTransporter.sendMail(buildClinicNotificationEmail({
+          to: partnerEmail,
+          subject: `New Patient Added: ${patientName}`,
+          heading: 'New Patient Added',
+          subheading: 'Patient Management Notification',
+          greetingName: partnerName || 'Partner',
+          intro: `A new patient has been created under your account on Limitless Brain Lab. Login credentials have been sent to the patient directly.`,
+          rows: [
+            { label: 'Patient Name', value: patientName },
+            { label: 'Email', value: email },
+            { label: 'Date Added', value: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) }
+          ],
+          footerNote: 'No action is required. You can view and manage this patient from your dashboard.'
+        }));
+        console.log('✅ Partner new-patient notification sent:', partnerEmail);
+      } catch (partnerMailErr) {
+        console.error('⚠️ Partner new-patient notification failed (non-fatal):', partnerMailErr.message);
+      }
+    }
+
     res.json({ success: true, message: 'Patient welcome email sent' });
 
   } catch (error) {

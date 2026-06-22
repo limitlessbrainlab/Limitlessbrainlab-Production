@@ -500,7 +500,8 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
             clinicName: user?.clinicName || user?.name || 'Your Clinic',
             clinicUrl: clinicUrl,
             clinicSmtpEmail: smtpEmail,
-            clinicSmtpPassword: smtpPass
+            clinicSmtpPassword: smtpPass,
+            clinicEmail: clinicEmail || user?.email || ''
           })
         }).catch(emailError => {
           console.error('Failed to send credentials update email:', emailError);

@@ -5,6 +5,10 @@ import { compression } from 'vite-plugin-compression2'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // Unique per-build id — used by the app to force logout + clean reload on a new deployment.
+  define: {
+    __APP_BUILD_ID__: JSON.stringify(String(Date.now())),
+  },
   plugins: [
     react(),
     // Gzip + Brotli pre-compressed assets — Render serves .br/.gz automatically

@@ -5,6 +5,12 @@ import { authService } from '../services/authService';
 import DatabaseService from '../services/databaseService';
 import supabase from '../lib/supabaseClient';
 import { getFriendlyErrorMessage } from '../utils/friendlyError';
+import { clearAllAndSignOut } from '../utils/sessionCleanup';
+
+/* global __APP_BUILD_ID__ */
+// Unique id of the deployed build (injected by vite define). Changes every deployment.
+const APP_BUILD_ID = typeof __APP_BUILD_ID__ !== 'undefined' ? __APP_BUILD_ID__ : 'dev';
+const INACTIVITY_LIMIT_MS = 30 * 60 * 1000; // 30 minutes
 
 // START: DEVELOPMENT MODE: Bypass authentication
 const BYPASS_AUTH = import.meta.env.VITE_BYPASS_AUTH === 'true' || false; // Set to false to enable authentication
@@ -29,9 +35,58 @@ export const AuthProvider = ({ children }) => {
     checkAuthStatus();
   }, []);
 
+  // Auto-logout after 30 minutes of inactivity (clears all cache/storage on the way out).
+  useEffect(() => {
+    if (BYPASS_AUTH || !isAuthenticated) return;
+
+    const touch = () => { try { localStorage.setItem('lastActivity', String(Date.now())); } catch (e) { /* ignore */ } };
+    // Seed on (re)auth so a fresh session starts the clock now.
+    touch();
+
+    let lastWrite = Date.now();
+    const onActivity = () => {
+      const now = Date.now();
+      if (now - lastWrite > 30000) { lastWrite = now; touch(); } // throttle writes to ~30s
+    };
+    const events = ['mousemove', 'mousedown', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
+
+    const forceIdleLogout = async () => {
+      await clearAllAndSignOut();
+      localStorage.setItem('app_build_id', APP_BUILD_ID); // keep build id so deploy gate doesn't refire
+      window.location.replace('/');
+    };
+
+    const checkIdle = () => {
+      const last = parseInt(localStorage.getItem('lastActivity') || '0', 10);
+      if (last && Date.now() - last > INACTIVITY_LIMIT_MS) forceIdleLogout();
+    };
+    checkIdle(); // covers returning to a tab left idle > 30 min
+    const interval = setInterval(checkIdle, 60 * 1000);
+
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, onActivity));
+      clearInterval(interval);
+    };
+  }, [isAuthenticated]);
+
 
   const checkAuthStatus = async () => {
     try {
+      // DEPLOY GATE: if the running build differs from the one this browser last saw,
+      // a new deployment is live → wipe everything and hard-refresh into a clean build.
+      if (!BYPASS_AUTH) {
+        const storedBuildId = localStorage.getItem('app_build_id');
+        if (storedBuildId !== APP_BUILD_ID) {
+          const hadSession = !!(localStorage.getItem('authToken') || localStorage.getItem('user'));
+          await clearAllAndSignOut();
+          localStorage.setItem('app_build_id', APP_BUILD_ID); // set AFTER clear → no reload loop
+          if (hadSession) { window.location.reload(); return; } // hard refresh into login
+        } else {
+          localStorage.setItem('app_build_id', APP_BUILD_ID);
+        }
+      }
+
       // START: DEVELOPMENT MODE: Auto-authenticate with default user
       if (BYPASS_AUTH) {
 
@@ -487,47 +542,21 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-
-    // STEP 1: Clear cookies IMMEDIATELY (most important)
-    Cookies.remove('authToken');
-    Cookies.remove('authToken', { path: '/' });
-
-    // STEP 2: Clear localStorage IMMEDIATELY
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    localStorage.removeItem('demoUser');
-    localStorage.removeItem('demoToken');
-
-    // Clear all cached data
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('patients_') ||
-          key.startsWith('patient_reports_') ||
-          key.startsWith('dbCache_') ||
-          key.startsWith('clinic_')) {
-        localStorage.removeItem(key);
-      }
-    });
-
-    // STEP 3: Clear React state IMMEDIATELY
+    // Clear React state immediately for snappy UI.
     setUser(null);
     setIsAuthenticated(false);
-
-    // STEP 4: Show success message
     toast.success('Logged out successfully');
 
-    // STEP 5: Redirect IMMEDIATELY (don't wait for async operations)
-    window.location.href = '/';
-
-    // STEP 6: Background cleanup (non-blocking) - these happen after redirect starts
-    // Call authService logout in background (don't await)
+    // authService logout in background (don't await).
     if (!BYPASS_AUTH) {
       authService.logout().catch(err => console.warn('Background authService logout:', err));
     }
 
-    // Sign out from Supabase in background (don't await)
-    if (supabase) {
-      supabase.auth.signOut().catch(err => console.warn('Background Supabase signOut:', err));
-    }
+    // Full wipe: cookies, all localStorage/sessionStorage, Cache Storage, service workers,
+    // and Supabase sign-out — then a hard refresh to a clean state.
+    try { await clearAllAndSignOut(); } catch (e) { /* ignore */ }
+    localStorage.setItem('app_build_id', APP_BUILD_ID); // keep build id so deploy gate doesn't refire
+    window.location.href = '/';
   };
 
   const forgotPassword = async (email) => {

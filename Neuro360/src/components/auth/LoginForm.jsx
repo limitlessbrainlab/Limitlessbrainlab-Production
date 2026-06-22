@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
+import { clearAppDataCachesKeepSession } from '../../utils/sessionCleanup';
 
 const LoginForm = ({ userType: userTypeProp } = {}) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -27,7 +28,6 @@ const LoginForm = ({ userType: userTypeProp } = {}) => {
     );
   }
 
-  const navigate = useNavigate();
   const location = useLocation();
 
   // Role scope: prefer the route prop (/patient/login, /clinic/login, /admin/login),
@@ -98,14 +98,12 @@ const LoginForm = ({ userType: userTypeProp } = {}) => {
         // Payment/coach flows are patient-only, so only honor this for patients —
         // otherwise a stale paymentReturnUrl sends an admin/clinic user to a patient page.
         const paymentReturnUrl = localStorage.getItem('paymentReturnUrl');
-        if (paymentReturnUrl && userRole === 'patient') {
-          localStorage.removeItem('paymentReturnUrl');
-          navigate(paymentReturnUrl, { replace: true });
-        } else {
-          // Clear any stale return URL so it can't hijack a later navigation
-          localStorage.removeItem('paymentReturnUrl');
-          navigate(redirectPath, { replace: true });
-        }
+        const target = (paymentReturnUrl && userRole === 'patient') ? paymentReturnUrl : redirectPath;
+        // Clear stale return URL + wipe cached app data/Cache Storage (keep the new session),
+        // then hard-navigate so the dashboard loads completely fresh.
+        localStorage.removeItem('paymentReturnUrl');
+        await clearAppDataCachesKeepSession();
+        window.location.assign(target);
       } else {
         setError('root', {
           type: 'manual',

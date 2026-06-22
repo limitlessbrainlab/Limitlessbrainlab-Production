@@ -160,7 +160,15 @@ const PatientDashboard = () => {
     'emotional-regulation', 'learning', 'creativity',
     'neurosense-reports'
   ];
-  const isTabLocked = (tabId) => lockedTabIds.includes(tabId) && !algorithmResults && !loading;
+  const isTabLocked = (tabId) => {
+    if (!lockedTabIds.includes(tabId) || loading) return false;
+    // The reports tab is a download list for reports the clinic has shared. It must
+    // unlock whenever the patient has any shared report, even when no (non-claude)
+    // algorithm_results row exists — e.g. the scan was processed in "claude"
+    // performance mode, which fetchAlgorithmResults intentionally excludes.
+    if (tabId === 'neurosense-reports') return !algorithmResults && patientReports.length === 0;
+    return !algorithmResults;
+  };
 
   // Auto-scroll to locked popup when locked tab is opened
   useEffect(() => {
@@ -782,10 +790,25 @@ const PatientDashboard = () => {
   };
 
   // Fetch all reports for the patient (including response reports from super admin)
-  const fetchPatientReports = async (patientId) => {
+  const fetchPatientReports = async (patientId, patientName, clinicId) => {
     try {
 
-      const reports = await DatabaseService.getReportsByPatient(patientId);
+      let reports = await DatabaseService.getReportsByPatient(patientId);
+
+      // Fallback: if nothing matched by patient_id (e.g. the report was stored under
+      // a different/duplicate patient row for the same person), match by patient name
+      // scoped to the clinic so same-name patients at other clinics don't leak.
+      if ((!reports || reports.length === 0) && patientName) {
+        const all = await DatabaseService.get('reports');
+        const nameLc = patientName.toLowerCase().trim();
+        reports = all.filter(r => {
+          const rd = r.reportData || r.report_data || {};
+          const rn = (rd.patientName || rd.patient_name || '').toLowerCase().trim();
+          const rcid = r.clinicId || r.clinic_id;
+          const clinicOk = !clinicId || !rcid || rcid === clinicId;
+          return rn && rn === nameLc && clinicOk;
+        });
+      }
 
       setPatientReports(reports || []);
     } catch (error) {
@@ -976,7 +999,7 @@ const PatientDashboard = () => {
 
           const [, , , clinicData] = await Promise.all([
             fetchClinicalReport(user.id),
-            fetchPatientReports(patientRecord.id),
+            fetchPatientReports(patientRecord.id, patientFullName, clinicId),
             fetchAlgorithmResults(patientRecord.id, patientRecord.email || user.email, patientFullName),
             clinicId ? DatabaseService.findById('clinics', clinicId).catch(() => null) : Promise.resolve(null),
           ]);
@@ -1049,14 +1072,15 @@ const PatientDashboard = () => {
                 // Fetch all reports for this patient (including response reports)
                 // Use patientByEmail.id — reports are stored with patient_id = patients table row id.
                 setPatientDbId(patientByEmail.id);
-                await fetchPatientReports(patientByEmail.id);
+                const patientByEmailName = patientByEmail.fullName || patientByEmail.full_name || patientByEmail.name || user.name;
+                const clinicId = patientByEmail.clinicId || patientByEmail.clinic_id || patientByEmail.orgId || patientByEmail.org_id || patientByEmail.ownerId || patientByEmail.owner_id;
+                await fetchPatientReports(patientByEmail.id, patientByEmailName, clinicId);
 
                 // Fetch algorithm results for this patient (7 brain parameters)
                 // Use patient's database ID and email for matching
-                await fetchAlgorithmResults(patientByEmail.id, patientByEmail.email || user.email);
+                await fetchAlgorithmResults(patientByEmail.id, patientByEmail.email || user.email, patientByEmailName);
 
                 // Retry with the found patient
-                const clinicId = patientByEmail.clinicId || patientByEmail.clinic_id || patientByEmail.orgId || patientByEmail.org_id || patientByEmail.ownerId || patientByEmail.owner_id;
                 setPatientClinicId(clinicId || null);
                 let clinicData = null;
                 if (clinicId) {
@@ -1189,7 +1213,7 @@ const PatientDashboard = () => {
   // Fetch immediately on tab open while on the Neurosense Reports tab.
   useEffect(() => {
     if (activeTab !== 'neurosense-reports' || !patientDbId) return;
-    fetchPatientReports(patientDbId);
+    fetchPatientReports(patientDbId, patientData?.profile?.name, patientClinicId);
   }, [activeTab, patientDbId]);
 
   // Live updates: refetch this patient's reports the instant one changes
@@ -1198,7 +1222,7 @@ const PatientDashboard = () => {
     (activeTab === 'neurosense-reports' && patientDbId)
       ? [{ table: 'reports', filter: `patient_id=eq.${patientDbId}` }]
       : [],
-    () => fetchPatientReports(patientDbId),
+    () => fetchPatientReports(patientDbId, patientData?.profile?.name, patientClinicId),
     [activeTab, patientDbId]
   );
 

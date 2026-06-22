@@ -6186,10 +6186,12 @@ app.post('/api/send-report-email', async (req, res) => {
   try {
     const { patientName, patientEmail, clinicName, clinicEmail, reportUrl } = req.body;
 
-    if (!patientEmail || !clinicEmail || !reportUrl) {
+    // clinicEmail is OPTIONAL — the patient must always get the report; the clinic
+    // copy is only sent when a real clinic email is supplied (never a fake fallback).
+    if (!patientEmail || !reportUrl) {
       return res.status(400).json({
         success: false,
-        message: 'Patient email, clinic email, and report URL are required'
+        message: 'Patient email and report URL are required'
       });
     }
 
@@ -6224,27 +6226,27 @@ app.post('/api/send-report-email', async (req, res) => {
       html: reportHtmlPatient
     };
 
-    // Email to Clinic
-    const clinicMailOptions = {
-      from: EMAIL_FROM,
-      to: clinicEmail,
-      subject: `Neuro Performance Report — ${patientName}`,
-      text: `Hello ${clinicName},\n\nThe Neuro Performance Report for ${patientName} is ready for clinical review.\n\nDownload the report (PDF): ${reportUrl}\nLog in to your portal: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
-      attachments: getLogoAttachment(),
-      html: reportHtmlClinic
-    };
+    // Send the patient email always; send the clinic email only if a real address was provided.
+    const sends = [emailTransporter.sendMail(patientMailOptions)];
+    if (clinicEmail) {
+      const clinicMailOptions = {
+        from: EMAIL_FROM,
+        to: clinicEmail,
+        subject: `Neuro Performance Report — ${patientName}`,
+        text: `Hello ${clinicName},\n\nThe Neuro Performance Report for ${patientName} is ready for clinical review.\n\nDownload the report (PDF): ${reportUrl}\nLog in to your portal: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
+        attachments: getLogoAttachment(),
+        html: reportHtmlClinic
+      };
+      sends.push(emailTransporter.sendMail(clinicMailOptions));
+    }
 
-    // Send both emails in parallel
-    await Promise.all([
-      emailTransporter.sendMail(patientMailOptions),
-      emailTransporter.sendMail(clinicMailOptions)
-    ]);
+    await Promise.all(sends);
 
-    console.log('✅ Report emails sent successfully:', { patientEmail, clinicEmail });
+    console.log('✅ Report emails sent successfully:', { patientEmail, clinicEmail: clinicEmail || '(none)' });
 
     res.json({
       success: true,
-      message: 'Report emails sent to clinic and patient successfully'
+      message: clinicEmail ? 'Report emails sent to clinic and patient successfully' : 'Report email sent to patient successfully'
     });
 
   } catch (error) {

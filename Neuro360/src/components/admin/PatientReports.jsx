@@ -28,6 +28,7 @@ import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import DatabaseService from '../../services/databaseService';
 import StorageService from '../../services/storageService';
+import { getPatientDocSignedUrl } from '../../services/patientDocuments';
 import ErrorBoundary from '../ErrorBoundary';
 import SubscriptionPopup from './SubscriptionPopup';
 import { useAuth } from '../../contexts/AuthContext';
@@ -1809,28 +1810,33 @@ const PatientDetailModal = ({ patient, reports, clinics, onClose, onDownloadRepo
           eyesOpenEdf: 'Eyes Open EDF Recording',
           eyesClosedEdf: 'Eyes Closed EDF Recording'
         };
-        clinDocData.forEach(doc => {
+        for (const doc of clinDocData) {
           if (doc.file_urls && typeof doc.file_urls === 'object') {
-            Object.entries(doc.file_urls).forEach(([key, fileInfo]) => {
-              if (fileInfo && fileInfo.url) {
-                allDocs.push({
-                  type: key,
-                  typeLabel: typeLabels[key] || fileInfo.documentTitle || fileInfo.documentType || key,
-                  fileName: fileInfo.originalName || fileInfo.fileName || 'Document',
-                  url: fileInfo.url,
-                  path: fileInfo.path,
-                  size: fileInfo.size,
-                  documentType: fileInfo.documentType,
-                  documentTitle: fileInfo.documentTitle,
-                  uploadedBy: fileInfo.uploadedBy,
-                  notes: fileInfo.notes,
-                  uploadedAt: fileInfo.uploadedAt || doc.created_at,
-                  source: 'clinical_documentation'
-                });
+            for (const [key, fileInfo] of Object.entries(doc.file_urls)) {
+              if (!fileInfo || (!fileInfo.url && !fileInfo.path)) continue;
+              // Clinic uploads store path+bucket with an empty url (private bucket).
+              // Resolve a server-signed URL so the doc is viewable/downloadable here.
+              let url = fileInfo.url;
+              if (!url && fileInfo.path) {
+                url = await getPatientDocSignedUrl(fileInfo.bucket, fileInfo.path, 3600).catch(() => '');
               }
-            });
+              allDocs.push({
+                type: key,
+                typeLabel: typeLabels[key] || fileInfo.documentTitle || fileInfo.documentType || key,
+                fileName: fileInfo.originalName || fileInfo.fileName || 'Document',
+                url: url || '',
+                path: fileInfo.path,
+                size: fileInfo.size,
+                documentType: fileInfo.documentType,
+                documentTitle: fileInfo.documentTitle,
+                uploadedBy: fileInfo.uploadedBy,
+                notes: fileInfo.notes,
+                uploadedAt: fileInfo.uploadedAt || doc.created_at,
+                source: 'clinical_documentation'
+              });
+            }
           }
-        });
+        }
       }
 
       // 2. Fetch from clinical_reports table (ClinicalReportForm uploads)

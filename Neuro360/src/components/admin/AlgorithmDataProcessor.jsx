@@ -1323,6 +1323,24 @@ const AlgorithmDataProcessor = () => {
     }
   };
 
+  // Resolve the patient's clinic email reliably. Prefer the supplied clinicId, but fall
+  // back to looking up the patient (the algorithm_results row often has no clinic_id).
+  // Returns clinicEmail '' when none — callers must NOT substitute the admin address.
+  const resolveClinicForEmail = async ({ patientId, clinicId } = {}) => {
+    let cid = clinicId;
+    if (!cid && patientId) {
+      try {
+        const p = await DatabaseService.findById('patients', patientId);
+        cid = p?.clinic_id || p?.clinicId || p?.org_id || p?.orgId;
+      } catch (e) { /* ignore */ }
+    }
+    let clinicData = null;
+    if (cid) {
+      try { clinicData = await DatabaseService.findById('clinics', cid); } catch (e) { /* ignore */ }
+    }
+    return { clinicId: cid, clinicEmail: clinicData?.email || '', clinicName: clinicData?.name || 'Clinic' };
+  };
+
   // Send Report to Clinic and Patient - they can access it from their dashboards
   const handleSendReport = async () => {
     if (!pdfUrl) {
@@ -1440,10 +1458,7 @@ const AlgorithmDataProcessor = () => {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const baseUrl = apiUrl.replace(/\/api\/?$/, '');
 
-        const clinicId = selectedPatient.clinicId || selectedPatient.clinic_id || selectedPatient.org_id;
-        const clinicData = await DatabaseService.findById('clinics', clinicId);
-        const clinicEmail = clinicData?.email || 'limitlessbrainlab@gmail.com'; // fallback: admin inbox, never a dead address
-        const clinicName = clinicData?.name || 'Clinic';
+        const { clinicEmail, clinicName } = await resolveClinicForEmail({ patientId: selectedPatient?.id, clinicId: selectedPatient.clinicId || selectedPatient.clinic_id || selectedPatient.org_id });
 
         const token = await getFreshToken();
         const emailHeaders = { 'Content-Type': 'application/json' };
@@ -1587,10 +1602,7 @@ const AlgorithmDataProcessor = () => {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const baseUrl = apiUrl.replace(/\/api\/?$/, '');
 
-        const clinicId = selectedPatient.clinicId || selectedPatient.clinic_id || selectedPatient.org_id;
-        const clinicData = await DatabaseService.findById('clinics', clinicId);
-        const clinicEmail = clinicData?.email || 'limitlessbrainlab@gmail.com'; // fallback: admin inbox, never a dead address
-        const clinicName = clinicData?.name || 'Clinic';
+        const { clinicEmail, clinicName } = await resolveClinicForEmail({ patientId: selectedPatient?.id, clinicId: selectedPatient.clinicId || selectedPatient.clinic_id || selectedPatient.org_id });
 
         const token = await getFreshToken();
         const emailHeaders = { 'Content-Type': 'application/json' };
@@ -1636,12 +1648,13 @@ const AlgorithmDataProcessor = () => {
 
     try {
       const patientName = record.inputData?.patientName || record.patientName || getPatientName(selectedPatient);
-      const clinicId = record.clinicId || record.inputData?.clinicId || selectedPatient?.clinicId || selectedPatient?.clinic_id;
+      const patientId = record.patientId || record.inputData?.patientId || selectedPatient?.id;
       const patientEmail = record.patientEmail || record.inputData?.patientEmail || selectedPatient?.email;
 
-      const clinicData = clinicId ? await DatabaseService.findById('clinics', clinicId) : null;
-      const clinicEmail = clinicData?.email || 'limitlessbrainlab@gmail.com'; // fallback: admin inbox, never a dead address
-      const clinicName = clinicData?.name || 'Clinic';
+      const { clinicId, clinicEmail, clinicName } = await resolveClinicForEmail({
+        patientId,
+        clinicId: record.clinicId || record.inputData?.clinicId || selectedPatient?.clinicId || selectedPatient?.clinic_id || selectedPatient?.org_id
+      });
 
       const reportData = {
         clinicId: clinicId,

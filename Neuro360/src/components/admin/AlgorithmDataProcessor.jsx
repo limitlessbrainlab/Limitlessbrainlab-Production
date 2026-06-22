@@ -1476,7 +1476,8 @@ const AlgorithmDataProcessor = () => {
             clinicEmail: clinicEmail,
             reportUrl: fullUrl,
             reportFileName: fileName,
-            reportType: 'neurosense'
+            reportType: 'neurosense',
+            generatedAt: new Date().toISOString()
           })
         }).catch(emailError => {
           console.error('Failed to send report emails:', emailError);
@@ -1620,7 +1621,8 @@ const AlgorithmDataProcessor = () => {
             clinicEmail: clinicEmail,
             reportUrl: fullUrl,
             reportFileName: fileName,
-            reportType: 'claude'
+            reportType: 'claude',
+            generatedAt: new Date().toISOString()
           })
         }).catch(emailError => {
           console.error('Failed to send Claude report emails:', emailError);
@@ -1698,7 +1700,8 @@ const AlgorithmDataProcessor = () => {
           clinicEmail: clinicEmail,
           reportUrl: url,
           reportFileName: 'claude-brain-report.pdf',
-          reportType: 'claude'
+          reportType: 'claude',
+          generatedAt: record.processed_at || record.processedAt || record.created_at || record.createdAt || new Date().toISOString()
         })
       });
       if (!response.ok) throw new Error(`Server error (${response.status})`);
@@ -3404,6 +3407,18 @@ const AlgorithmDataProcessor = () => {
                       >
                         <Download className="h-4 w-4" />
                         <span>Eyes Closed</span>
+                      </button>
+                    )}
+
+                    {/* Base Neurosense Report — download the stored report PDF */}
+                    {(record.pdfUrl || record.pdf_url) && (
+                      <button
+                        onClick={() => downloadPdfFromUrl(record.pdfUrl || record.pdf_url, `Neurosense-Report-${(record.inputData?.patientName || getPatientName(selectedPatient) || 'patient').replace(/[^a-z0-9]/gi, '-')}.pdf`)}
+                        className="px-3 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center justify-center space-x-1"
+                        title="Download the base Neurosense Report PDF"
+                      >
+                        <Download className="h-4 w-4" />
+                        <span>Download Neurosense Report</span>
                       </button>
                     )}
 

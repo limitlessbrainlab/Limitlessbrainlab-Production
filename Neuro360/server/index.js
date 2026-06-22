@@ -197,6 +197,17 @@ const PORT = process.env.PORT || 5000;
 // Outbound email "From" address (all emails to users/patients/clinics)
 const EMAIL_FROM = `"Limitless Brain Lab" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`;
 
+// Consistent "date + time" formatter for email templates → e.g. "22 June 2026, 02:51 PM" (IST).
+const fmtDateTime = (d = new Date()) => {
+  const dt = d ? new Date(d) : new Date();
+  const safe = isNaN(dt.getTime()) ? new Date() : dt;
+  return safe.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  });
+};
+
 // Logo path for email attachments
 const LOGO_PATH = path.join(__dirname, '..', 'public', 'IBW Logo.png');
 const LOGO_CID = 'company-logo';
@@ -460,13 +471,13 @@ const getReportReceivedHtml = (patientName, clinicName) => `
 
 // Shared template for the Neuro Performance Report email (patient + clinic).
 // Delivers the report as a download LINK (no PDF attachment) plus a Login button.
-const getReportEmailHtml = ({ isClinic, patientName, clinicName, reportUrl, loginUrl }) => {
+const getReportEmailHtml = ({ isClinic, patientName, clinicName, reportUrl, loginUrl, generatedAt }) => {
   const rows = [
     { label: 'Patient Name', value: patientName || 'Not provided' },
     ...(isClinic ? [{ label: 'Clinic', value: clinicName || 'Not provided' }] : []),
     { label: 'Report Type', value: 'Neuro Performance Report' },
     { label: 'Report PDF', value: `<a href="${reportUrl}" style="color:#1e63b4;font-weight:600;text-decoration:none;">Download Report</a>` },
-    { label: 'Generated', value: new Date().toLocaleString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) }
+    { label: 'Generated', value: fmtDateTime(generatedAt) }
   ];
   return `
 <!DOCTYPE html>
@@ -974,7 +985,7 @@ app.post('/api/send-report-received', async (req, res) => {
           intro: `We've received a report submission for your patient <strong>${patientName || 'your patient'}</strong>. It is now being processed — you'll be notified when the report is ready.`,
           rows: [
             { label: 'Patient Name', value: patientName || '—' },
-            { label: 'Date Received', value: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) }
+            { label: 'Date Received', value: fmtDateTime(new Date()) }
           ],
           footerNote: 'No action is required.'
         }));
@@ -1412,7 +1423,7 @@ app.post('/api/feedback', async (req, res) => {
                           <td align="right" style="vertical-align: middle;">
                             <div style="background: rgba(255,255,255,0.12); border-radius: 10px; padding: 10px 14px; display: inline-block;">
                               <p style="color: rgba(255,255,255,0.7); margin: 0; font-size: 10px; text-transform: uppercase;">Received on</p>
-                              <p style="color: #ffffff; margin: 3px 0 0; font-size: 13px; font-weight: 600;">${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                              <p style="color: #ffffff; margin: 3px 0 0; font-size: 13px; font-weight: 600;">${fmtDateTime(new Date())}</p>
                             </div>
                           </td>
                         </tr>
@@ -4591,7 +4602,7 @@ app.post('/api/registration-confirmation', async (req, res) => {
                           Thank you for choosing <strong style="color: #323956;">Limitless Brain Lab</strong>
                         </p>
                         <p style="color: #aaa; margin: 6px 0 0; font-size: 11px;">
-                          ${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                          ${fmtDateTime(new Date())}
                         </p>
                       </td>
                     </tr>
@@ -5934,7 +5945,7 @@ app.post('/api/send-welcome-email', async (req, res) => {
     if (clinicEmail) {
       try {
         const dashboardUrl = `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic/login`;
-        const dateAdded = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        const dateAdded = fmtDateTime(new Date());
         await emailTransporter.sendMail({
           from: EMAIL_FROM,
           to: clinicEmail,
@@ -6184,7 +6195,7 @@ app.post('/api/send-email-update-notification', async (req, res) => {
 // Send QEEG Report Email to Clinic and Patient
 app.post('/api/send-report-email', async (req, res) => {
   try {
-    const { patientName, patientEmail, clinicName, clinicEmail, reportUrl } = req.body;
+    const { patientName, patientEmail, clinicName, clinicEmail, reportUrl, generatedAt } = req.body;
 
     // clinicEmail is OPTIONAL — the patient must always get the report; the clinic
     // copy is only sent when a real clinic email is supplied (never a fake fallback).
@@ -6208,8 +6219,8 @@ app.post('/api/send-report-email', async (req, res) => {
 
     // Report is delivered as a download LINK (no PDF attachment). Both patient
     // and clinic get the same Neuro Performance Report template.
-    const reportHtmlPatient = getReportEmailHtml({ isClinic: false, patientName, clinicName, reportUrl, loginUrl: patientLoginUrl });
-    const reportHtmlClinic = getReportEmailHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl: clinicLoginUrl });
+    const reportHtmlPatient = getReportEmailHtml({ isClinic: false, patientName, clinicName, reportUrl, loginUrl: patientLoginUrl, generatedAt });
+    const reportHtmlClinic = getReportEmailHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl: clinicLoginUrl, generatedAt });
 
     // Email to Patient
     const patientMailOptions = {
@@ -6539,7 +6550,7 @@ app.post('/api/request-demo-report', async (req, res) => {
                           <td align="right" style="vertical-align: middle;">
                             <div style="background: rgba(255,255,255,0.12); border-radius: 10px; padding: 10px 14px; display: inline-block;">
                               <p style="color: rgba(255,255,255,0.7); margin: 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Received on</p>
-                              <p style="color: #ffffff; margin: 3px 0 0; font-size: 13px; font-weight: 600;">${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                              <p style="color: #ffffff; margin: 3px 0 0; font-size: 13px; font-weight: 600;">${fmtDateTime(new Date())}</p>
                             </div>
                           </td>
                         </tr>
@@ -7311,7 +7322,7 @@ app.post('/api/send-partner-patient-welcome', async (req, res) => {
           rows: [
             { label: 'Patient Name', value: patientName },
             { label: 'Email', value: email },
-            { label: 'Date Added', value: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) }
+            { label: 'Date Added', value: fmtDateTime(new Date()) }
           ],
           footerNote: 'No action is required. You can view and manage this patient from your dashboard.'
         }));

@@ -55,16 +55,18 @@ async function getClinicCode(orgId) {
  */
 async function getNextSequentialNumber(orgId, yearMonth) {
   try {
-    // Query patients with external_id matching the pattern for this clinic and month
+    // Query ALL patients with external_id matching the month for this clinic.
+    // We must look at every row and take the true numeric max of the suffix —
+    // ordering by external_id lexically and taking the top row is wrong when
+    // the same org has multiple clinic-code prefixes (e.g. the clinic name
+    // changed), which would otherwise produce a colliding sequence number.
     const pattern = `%-${yearMonth}-%`;
 
     const { data, error } = await supabase
       .from('patients')
       .select('external_id')
       .eq('org_id', orgId)
-      .like('external_id', pattern)
-      .order('external_id', { ascending: false })
-      .limit(1);
+      .like('external_id', pattern);
 
     if (error) {
       console.error('Error fetching patient count:', error);
@@ -75,19 +77,18 @@ async function getNextSequentialNumber(orgId, yearMonth) {
       return 1; // First patient for this clinic in this month
     }
 
-    // Extract the sequential number from the last external_id
-    // Format: CLINICCODE-YYYYMM-XXXX
-    const lastExternalId = data[0].external_id;
-    const parts = lastExternalId.split('-');
-
-    if (parts.length === 3) {
-      const lastNumber = parseInt(parts[2], 10);
-      if (!isNaN(lastNumber)) {
-        return lastNumber + 1;
+    // Find the highest sequential suffix across all matching external_ids.
+    // Format: CLINICCODE-YYYYMM-XXXX  (suffix is the last dash-segment)
+    let maxNumber = 0;
+    for (const row of data) {
+      const parts = (row.external_id || '').split('-');
+      const num = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(num) && num > maxNumber) {
+        maxNumber = num;
       }
     }
 
-    return 1;
+    return maxNumber + 1;
   } catch (error) {
     console.error('Error in getNextSequentialNumber:', error);
     return 1;

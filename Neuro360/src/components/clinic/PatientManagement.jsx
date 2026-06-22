@@ -256,11 +256,24 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
       // ✅ EMAIL VALIDATION - Check if email already exists FIRST
       const sanitizedEmail = data.email?.trim().toLowerCase();
 
-      // Check in patients table
-      const existingPatient = patients.find(p => p.email?.toLowerCase() === sanitizedEmail);
-      if (existingPatient) {
-        toast.error('❌ Email already exists');
-        return;
+      // Check in patients table GLOBALLY (not just this clinic's loaded list).
+      // The patients.email column is globally unique, so an email registered under
+      // another clinic would otherwise slip past a local check and fail on insert
+      // with a confusing "record already exists" error.
+      try {
+        const { data: existingPatient } = await supabase
+          .from('patients')
+          .select('id')
+          .eq('email', sanitizedEmail)
+          .limit(1);
+
+        if (existingPatient && existingPatient.length > 0) {
+          toast.error('❌ Email already exists');
+          return;
+        }
+      } catch (patientCheckError) {
+        console.error('Error checking patient emails:', patientCheckError);
+        // Continue anyway - try to create patient
       }
 
       // Check in clinics table via Supabase
@@ -358,7 +371,30 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
         created_at: new Date().toISOString()
       };
 
-      await DatabaseService.add('patients', patientData);
+      // Insert with retry on external_id collision. The (external_id, org_id)
+      // unique constraint can still be hit by concurrent adds or stale UID
+      // counters, so regenerate the UID and retry a few times before failing.
+      let inserted = false;
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          await DatabaseService.add('patients', patientData);
+          inserted = true;
+          break;
+        } catch (insertError) {
+          const isUidConflict =
+            insertError?.code === '23505' &&
+            (insertError?.message?.includes('external_id') || insertError?.message?.includes('patients_external_id'));
+          if (!isUidConflict) throw insertError;
+
+          // Collision on the generated UID — get a fresh one and try again.
+          const retryUid = await generatePatientUID(clinicId);
+          patientData.external_id =
+            retryUid && retryUid !== patientData.external_id ? retryUid : `PAT-${Date.now()}`;
+        }
+      }
+      if (!inserted) {
+        throw new Error('Could not generate a unique patient ID. Please try again.');
+      }
 
       // Send welcome email in background (don't block the UI)
       if (authCreated) {

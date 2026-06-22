@@ -130,15 +130,19 @@ const AddPatientForm = () => {
         // Check patients table
         const { data: existingPatient } = await supabase
           .from('patients')
-          .select('id')
+          .select('id, clinic_id, org_id')
           .eq('email', email.toLowerCase().trim())
           .limit(1);
 
         if (existingPatient && existingPatient.length > 0) {
+          const ex = existingPatient[0];
+          const sameClinic = ex.clinic_id === clinicId || ex.org_id === clinicId;
           setEmailStatus({
             checking: false,
             exists: true,
-            message: `❌ Email already exists`
+            message: sameClinic
+              ? '❌ A patient with this email already exists in your clinic'
+              : '❌ This email is already registered to another patient — please use a different email'
           });
           return;
         }
@@ -154,7 +158,7 @@ const AddPatientForm = () => {
           setEmailStatus({
             checking: false,
             exists: true,
-            message: `❌ Email already exists`
+            message: `❌ This email is already in use by a clinic or partner account`
           });
           return;
         }
@@ -191,12 +195,16 @@ const AddPatientForm = () => {
       // Check in patients table
       const { data: existingPatient, error: patientError } = await supabase
         .from('patients')
-        .select('id')
+        .select('id, clinic_id, org_id')
         .eq('email', normalizedEmail)
         .limit(1);
 
       if (existingPatient && existingPatient.length > 0) {
-        toast.error('❌ Email already exists');
+        const ex = existingPatient[0];
+        const sameClinic = ex.clinic_id === clinicId || ex.org_id === clinicId;
+        toast.error(sameClinic
+          ? 'A patient with this email already exists in your clinic.'
+          : 'This email is already registered to another patient on Limitless Brain Lab. Patient emails must be unique — please use a different email.');
         setIsSubmitting(false);
         return;
       }
@@ -209,7 +217,7 @@ const AddPatientForm = () => {
         .limit(1);
 
       if (existingClinic && existingClinic.length > 0) {
-        toast.error('❌ Email already exists');
+        toast.error('This email is already in use by a clinic or partner account. Please use a different email.');
         setIsSubmitting(false);
         return;
       }

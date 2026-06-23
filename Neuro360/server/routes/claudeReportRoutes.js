@@ -120,12 +120,20 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
     progress('extract');
     const source = await extractReportSource(text);
 
+    // Continuous per-parameter display percentages computed by the caller from the
+    // real algorithm metrics. When present, the snapshot bars use these instead of the
+    // coarse score/3 buckets (which pinned almost every patient at 67%).
+    let displayPercents = null;
+    if (req.body && req.body.displayPercents) {
+      try { displayPercents = JSON.parse(req.body.displayPercents); } catch (_) { displayPercents = null; }
+    }
+
     // Deterministic build (derives %s, statuses, 5-type classification, profile).
     progress('build');
     const reportData = buildReportDataFromSource(source, {
       name: (req.body && req.body.patientName) || undefined,
       clinicName: (req.body && req.body.clinicName) || undefined,
-    });
+    }, displayPercents);
 
     // Call 2 (inside): fetch the doctor-readable narrative, then render to PDF.
     // onProgress fires 'narrative' then 'render' from inside the generator.

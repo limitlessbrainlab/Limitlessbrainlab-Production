@@ -81,7 +81,7 @@ function burnoutResistStatus(red) {
  * @param {object} patient      { name, id, processedAt, clinicName, age, gender }.
  * @returns {object} reportData consumed by the 12-page template + narrative prompt.
  */
-function buildReportData(qeegData, algoResults, patient = {}) {
+function buildReportData(qeegData, algoResults, patient = {}, displayPercents = null) {
   const params = algoResults?.parameters || [];
 
   const cognition = score(params, 'Cognition');
@@ -95,15 +95,37 @@ function buildReportData(qeegData, algoResults, patient = {}) {
   const pct = (s) => Math.round((s / 3) * 100);
   const invPct = (red) => Math.round(((3 - red) / 3) * 100);
 
+  // Continuous display percentages (0–100) computed upstream from the real metric
+  // margins. When present, the snapshot bars use these instead of the coarse
+  // score/3 buckets (which pinned almost every patient at 67%). Clinical pass/fail
+  // scoring is unchanged — this is display granularity only.
+  const dp = displayPercents && typeof displayPercents === 'object' ? displayPercents : {};
+  const useDp = (key, fallback) => {
+    const v = dp[key];
+    return (typeof v === 'number' && isFinite(v)) ? Math.max(0, Math.min(100, Math.round(v))) : fallback;
+  };
+  // Status derived from the continuous % so the bar and label stay coherent.
+  const posStatusPct = (p) => (p >= 75 ? 'Excellent' : p >= 45 ? 'Moderate' : 'Needs Attention');
+  const stressStatusPct = (p) => (p >= 75 ? 'Excellent' : p >= 50 ? 'Good' : p >= 30 ? 'Moderate' : 'Low');
+  const burnoutStatusPct = (p) => (p >= 75 ? 'Strong' : p >= 50 ? 'Mild Load' : p >= 30 ? 'Moderate Load' : 'High Load');
+  const hasDp = Object.keys(dp).length > 0;
+
   // Snapshot bars in the report's display order.
+  const stressPct = useDp('stress', invPct(stressRed));
+  const cognitionPct = useDp('cognition', pct(cognition));
+  const focusPct = useDp('focus', pct(focus));
+  const learningPct = useDp('learning', pct(learning));
+  const burnoutPct = useDp('burnout', invPct(burnoutRed));
+  const emotionalPct = useDp('emotional', pct(emotional));
+  const creativityPct = useDp('creativity', pct(creativity));
   const bars = [
-    { key: 'stress', label: 'Stress Regulation', percent: invPct(stressRed), status: stressRegStatus(stressRed), icon: '⚡' },
-    { key: 'cognition', label: 'Cognition', percent: pct(cognition), status: positiveStatus(cognition), icon: '🧠' },
-    { key: 'focus', label: 'Focus & Attention', percent: pct(focus), status: positiveStatus(focus), icon: '🎯' },
-    { key: 'learning', label: 'Learning', percent: pct(learning), status: positiveStatus(learning), icon: '📚' },
-    { key: 'burnout', label: 'Burnout Resistance', percent: invPct(burnoutRed), status: burnoutResistStatus(burnoutRed), icon: '🔋' },
-    { key: 'emotional', label: 'Emotional Regulation', percent: pct(emotional), status: positiveStatus(emotional), icon: '💗' },
-    { key: 'creativity', label: 'Creativity', percent: pct(creativity), status: positiveStatus(creativity), icon: '🎨' },
+    { key: 'stress', label: 'Stress Regulation', percent: stressPct, status: hasDp ? stressStatusPct(stressPct) : stressRegStatus(stressRed), icon: '⚡' },
+    { key: 'cognition', label: 'Cognition', percent: cognitionPct, status: hasDp ? posStatusPct(cognitionPct) : positiveStatus(cognition), icon: '🧠' },
+    { key: 'focus', label: 'Focus & Attention', percent: focusPct, status: hasDp ? posStatusPct(focusPct) : positiveStatus(focus), icon: '🎯' },
+    { key: 'learning', label: 'Learning', percent: learningPct, status: hasDp ? posStatusPct(learningPct) : positiveStatus(learning), icon: '📚' },
+    { key: 'burnout', label: 'Burnout Resistance', percent: burnoutPct, status: hasDp ? burnoutStatusPct(burnoutPct) : burnoutResistStatus(burnoutRed), icon: '🔋' },
+    { key: 'emotional', label: 'Emotional Regulation', percent: emotionalPct, status: hasDp ? posStatusPct(emotionalPct) : positiveStatus(emotional), icon: '💗' },
+    { key: 'creativity', label: 'Creativity', percent: creativityPct, status: hasDp ? posStatusPct(creativityPct) : positiveStatus(creativity), icon: '🎨' },
   ];
 
   const overall = Math.round(bars.reduce((s, b) => s + b.percent, 0) / bars.length);
@@ -196,7 +218,7 @@ function buildReportData(qeegData, algoResults, patient = {}) {
  * @param {object} patient  Fallback meta { id, clinicName } from the request.
  * @returns {object} reportData (same shape as buildReportData).
  */
-function buildReportDataFromSource(source, patient = {}) {
+function buildReportDataFromSource(source, patient = {}, displayPercents = null) {
   const markers = source && source.markers;
   if (!markers || Object.values(markers).every((v) => v == null)) {
     throw new Error('Could not read the report: no performance scores were found in the uploaded PDF.');
@@ -252,7 +274,7 @@ function buildReportDataFromSource(source, patient = {}) {
     id: patient.id,
     clinicName: patient.clinicName,
     processedAt,
-  });
+  }, displayPercents);
 
   // If a deep-dive metric was missing but the brainwave block had alpha peak,
   // surface it on the profile so page 4 still shows the peak.

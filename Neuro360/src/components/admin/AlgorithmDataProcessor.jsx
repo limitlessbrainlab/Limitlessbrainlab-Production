@@ -23,6 +23,59 @@ const parseResultsData = (data) => {
   return [];
 };
 
+// ── Continuous per-parameter display % (fixes "everything 67%") ──────────────
+// Each parameter = 3 pass/fail sub-metrics summed 0–3, previously shown as
+// score/3 (only 0/33/67/100) which pinned most patients at 67%. Here we derive a
+// smooth 0–100% from how far each metric sits from its clinical threshold
+// (threshold = 50% midpoint, scaled by margin). Clinical pass/fail thresholds are
+// NOT changed — display granularity only. Sub-metric value is in the "healthy
+// direction" so the average is directly the displayed % (higher = better), which
+// also gives Stress→Regulation and Burnout→Resistance correctly.
+const METRIC_RULES = [
+  { match: 'arousal', threshold: 1, better: 'less' },
+  { match: 'relaxation', threshold: 8, better: 'greater' },
+  { match: 'alpha peak', threshold: 9, better: 'greater' },
+  { match: 'theta:beta', threshold: 1.5, better: 'less' },
+  { match: 'focus theta', threshold: 20, better: 'less' },
+  { match: 'excessive delta', threshold: 20, better: 'less' },
+  { match: 'regeneration', threshold: 30, better: 'greater' },
+];
+const metricNorm = (m) => {
+  const name = (m?.name || '').toLowerCase();
+  const v = m?.value;
+  const rule = METRIC_RULES.find((r) => name.includes(r.match));
+  if (rule && typeof v === 'number' && isFinite(v)) {
+    const scale = Math.max(Math.abs(rule.threshold) * 0.5, 1e-6);
+    const dir = rule.better === 'greater' ? 1 : -1;
+    const n = 0.5 + (0.5 * dir * (v - rule.threshold)) / scale;
+    return Math.max(0, Math.min(1, n));
+  }
+  // Band / non-numeric metric (Alpha:Theta Balance, Alpha Asymmetry) → use pass/fail.
+  return (m?.score >= 1) ? 1 : 0;
+};
+const paramPercent = (param) => {
+  const ms = (param && param.metrics) || [];
+  if (!ms.length) return null;
+  const avg = ms.reduce((a, m) => a + metricNorm(m), 0) / ms.length;
+  return Math.round(avg * 100);
+};
+const computeParameterPercents = (resultsArr) => {
+  const byName = {};
+  (resultsArr || []).forEach((p) => { byName[String(p.parameter || p.name || '').toLowerCase()] = p; });
+  const map = {
+    cognition: 'cognition', stress: 'stress', focus: 'focus & attention',
+    learning: 'learning', burnout: 'burnout & fatigue',
+    emotional: 'emotional regulation', creativity: 'creativity',
+  };
+  const out = {};
+  for (const [key, pname] of Object.entries(map)) {
+    const p = byName[pname];
+    const v = p ? paramPercent(p) : null;
+    if (v != null) out[key] = v;
+  }
+  return out;
+};
+
 // Default LBL clinic — unlimited report credits (never blocked).
 const DEFAULT_CLINIC_ID = 'e34abedf-9d27-4000-a9c1-b8bad8bc8c30';
 
@@ -1256,6 +1309,14 @@ const AlgorithmDataProcessor = () => {
       console.log(`[Claude Report] Step 2: NeuroSense PDF loaded (${(blob.size / 1024).toFixed(1)} KB), building upload payload…`);
       const formData = new FormData();
       formData.append('pdf', new File([blob], 'neurosense-report.pdf', { type: 'application/pdf' }));
+      // Send continuous per-parameter % from the real algorithm metrics so the
+      // performance report shows distinct values instead of the pinned 67% buckets.
+      try {
+        const dp = computeParameterPercents(results);
+        if (dp && Object.keys(dp).length) formData.append('displayPercents', JSON.stringify(dp));
+      } catch (dpErr) {
+        console.warn('Could not compute display percents:', dpErr?.message);
+      }
       console.log(`[Claude Report] Step 3: POST ${apiUrl}/qeeg/claude-report (streaming progress)…`);
       // Cap the request at 20 min. The full pipeline (extract → narrative → render)
       // legitimately takes several minutes on the shared single-flight gateway, so a

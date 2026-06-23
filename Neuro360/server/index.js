@@ -256,8 +256,8 @@ const buildClinicNotificationEmail = ({ to, subject, heading, subheading, greeti
   return {
     from: EMAIL_FROM,
     to,
-    subject,
-    attachments: getLogoAttachment(),
+    // logo + Dr. Sweta signature so the brand footer's images resolve regardless of transport.
+    attachments: getFullAttachments(),
     html: `
       <!DOCTYPE html>
       <html>
@@ -279,6 +279,7 @@ const buildClinicNotificationEmail = ({ to, subject, heading, subheading, greeti
             <p style="color:#888;margin:0;font-size:11px;">© ${new Date().getFullYear()} Limitless Brain Lab | Brain &amp; Mental Wellness</p>
           </div>
         </div>
+        ${getEmailFooterHtml()}
       </body>
       </html>`
   };
@@ -6893,11 +6894,15 @@ app.post('/api/send-credit-alert', async (req, res) => {
     const remaining = allowed - used;
 
     // Determine which threshold was hit (exact, so it fires once as used climbs by 1).
+    // Band-crossing detection from the LIVE clinics values: fire a tier exactly once when this
+    // report's single consumed credit pushed `remaining` into a more-severe band (compare current
+    // remaining vs remaining+1 = the value before this report). Robust to odd allowances; no spam.
     const half = Math.floor(allowed / 2);
-    let tier = null;
-    if (remaining <= 0) tier = 'exhausted';
-    else if (remaining === 1) tier = 'one_left';
-    else if (half >= 2 && remaining === half) tier = 'half';
+    const tierOf = (r) => (r <= 0 ? 'exhausted' : r <= 1 ? 'one_left' : (half >= 2 && r <= half) ? 'half' : 'none');
+    const rank = { none: 0, half: 1, one_left: 2, exhausted: 3 };
+    const cur = tierOf(remaining);
+    const prev = tierOf(remaining + 1);
+    const tier = (cur !== 'none' && rank[cur] > rank[prev]) ? cur : null;
     if (!tier) return res.json({ success: true, sent: false, reason: 'no threshold crossed', remaining });
 
     const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';

@@ -194,6 +194,11 @@ emailTransporter.verify((error, success) => {
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Per-deploy backend version — changes on every Render deploy (each deploy restarts the
+// process → new boot timestamp). The frontend polls /api/app-version and forces logout +
+// reload when this changes since the user's session started.
+const SERVER_VERSION = `${process.env.RENDER_GIT_COMMIT || 'local'}-${Date.now()}`;
+
 // Outbound email "From" address (all emails to users/patients/clinics)
 const EMAIL_FROM = `"Limitless Brain Lab" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`;
 
@@ -827,6 +832,12 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV
   });
+});
+
+// Per-deploy backend version — the frontend polls this to force logout on a new Render deploy.
+app.get('/api/app-version', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.status(200).json({ version: SERVER_VERSION });
 });
 
 // ===== PROTECTED ROUTES (Auth Required) =====

@@ -1,16 +1,31 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import fs from 'fs'
 import { compression } from 'vite-plugin-compression2'
+
+// Unique per-build id — baked into the bundle AND emitted to dist/version.json so the
+// running app can detect a new deployment at runtime and force logout + clean reload.
+const BUILD_ID = String(Date.now())
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  // Unique per-build id — used by the app to force logout + clean reload on a new deployment.
   define: {
-    __APP_BUILD_ID__: JSON.stringify(String(Date.now())),
+    __APP_BUILD_ID__: JSON.stringify(BUILD_ID),
   },
   plugins: [
     react(),
+    // Emit /version.json carrying the same build id the bundle was built with.
+    {
+      name: 'emit-version-json',
+      closeBundle() {
+        try {
+          fs.writeFileSync(path.resolve(__dirname, 'dist/version.json'), JSON.stringify({ buildId: BUILD_ID }))
+        } catch (e) {
+          console.warn('emit-version-json failed:', e.message)
+        }
+      },
+    },
     // Gzip + Brotli pre-compressed assets — Render serves .br/.gz automatically
     compression({ algorithm: 'brotliCompress', exclude: /\.(png|jpg|jpeg|webp|gif|svg)$/ }),
     compression({ algorithm: 'gzip', exclude: /\.(png|jpg|jpeg|webp|gif|svg)$/ }),

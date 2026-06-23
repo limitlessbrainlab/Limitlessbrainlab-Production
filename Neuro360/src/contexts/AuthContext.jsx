@@ -10,7 +10,7 @@ import { clearAllAndSignOut } from '../utils/sessionCleanup';
 /* global __APP_BUILD_ID__ */
 // Unique id of the deployed build (injected by vite define). Changes every deployment.
 const APP_BUILD_ID = typeof __APP_BUILD_ID__ !== 'undefined' ? __APP_BUILD_ID__ : 'dev';
-const INACTIVITY_LIMIT_MS = 30 * 60 * 1000; // 30 minutes
+const INACTIVITY_LIMIT_MS = 20 * 60 * 1000; // 20 minutes
 
 // START: DEVELOPMENT MODE: Bypass authentication
 const BYPASS_AUTH = import.meta.env.VITE_BYPASS_AUTH === 'true' || false; // Set to false to enable authentication
@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }) => {
     checkAuthStatus();
   }, []);
 
-  // Auto-logout after 30 minutes of inactivity (clears all cache/storage on the way out).
+  // Auto-logout after 20 minutes of inactivity (clears all cache/storage on the way out).
   useEffect(() => {
     if (BYPASS_AUTH || !isAuthenticated) return;
 
@@ -61,12 +61,56 @@ export const AuthProvider = ({ children }) => {
       const last = parseInt(localStorage.getItem('lastActivity') || '0', 10);
       if (last && Date.now() - last > INACTIVITY_LIMIT_MS) forceIdleLogout();
     };
-    checkIdle(); // covers returning to a tab left idle > 30 min
+    checkIdle(); // covers returning to a tab left idle > 20 min
     const interval = setInterval(checkIdle, 60 * 1000);
 
     return () => {
       events.forEach((e) => window.removeEventListener(e, onActivity));
       clearInterval(interval);
+    };
+  }, [isAuthenticated]);
+
+  // Force logout of OPEN sessions when a NEW deployment goes live (Vercel frontend OR
+  // Render backend), without needing the user to refresh. Polls a per-build version every
+  // 60s + on tab refocus; any change since this session started → full wipe + reload.
+  // Authenticated-only so public pages are never disrupted; loop-proof (see below).
+  useEffect(() => {
+    if (BYPASS_AUTH || !isAuthenticated) return;
+    let stopped = false;
+    let backendBaseline = null; // backend version present when this session started
+
+    const wipeAndReload = async () => {
+      stopped = true;
+      try { await clearAllAndSignOut(); } catch (e) { /* ignore */ }
+      localStorage.setItem('app_build_id', APP_BUILD_ID); // keep on-load gate consistent
+      window.location.reload();
+    };
+
+    const check = async () => {
+      try {
+        const [f, b] = await Promise.allSettled([
+          fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)),
+          fetch(`/api/app-version?t=${Date.now()}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)),
+        ]);
+        if (stopped) return;
+        const front = f.status === 'fulfilled' && f.value ? f.value.buildId : null;
+        const back = b.status === 'fulfilled' && b.value ? b.value.version : null;
+        if (back != null && backendBaseline == null) backendBaseline = back; // first capture (no action)
+        const frontChanged = front && front !== APP_BUILD_ID;                 // Vercel redeployed
+        const backChanged = back != null && backendBaseline != null && back !== backendBaseline; // Render redeployed
+        if (frontChanged || backChanged) await wipeAndReload();
+      } catch (e) { /* offline/transient → ignore */ }
+    };
+
+    const id = setInterval(check, 60 * 1000);
+    const onVis = () => { if (document.visibilityState === 'visible') check(); };
+    document.addEventListener('visibilitychange', onVis);
+    check(); // immediate first check (also captures the backend baseline)
+
+    return () => {
+      stopped = true;
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
     };
   }, [isAuthenticated]);
 

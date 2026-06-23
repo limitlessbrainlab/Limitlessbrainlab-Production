@@ -121,6 +121,31 @@ router.post('/process', upload.fields([
     logProgress('FILE_UPLOAD', `Eyes Open received: ${eyesOpenFile.originalname} (${(eyesOpenFile.size / 1024).toFixed(2)} KB)`, '📁');
     logProgress('FILE_UPLOAD', `Eyes Closed received: ${eyesClosedFile.originalname} (${(eyesClosedFile.size / 1024).toFixed(2)} KB)`, '📁');
 
+    // Credit guard (defense in depth) — block generation when the clinic has no report
+    // credits left. Single DB read, no AI calls. Default LBL clinic is unlimited. Fail-open
+    // on lookup error so a transient DB issue never blocks legitimate generation.
+    const DEFAULT_CLINIC_ID = 'e34abedf-9d27-4000-a9c1-b8bad8bc8c30';
+    const reqClinicId = req.body && req.body.clinicId;
+    if (reqClinicId && reqClinicId !== DEFAULT_CLINIC_ID) {
+      try {
+        const { createClient } = require('@supabase/supabase-js');
+        const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+        const { data: clinic } = await sb.from('clinics').select('reports_allowed, reports_used, name').eq('id', reqClinicId).single();
+        const allowed = Number(clinic?.reports_allowed ?? 0);
+        const used = Number(clinic?.reports_used ?? 0);
+        if (allowed > 0 && used >= allowed) {
+          logProgress('CREDITS', `BLOCKED - no credits for ${clinic?.name || reqClinicId}`, '❌');
+          return res.status(402).json({
+            error: true,
+            message: 'Report credits exhausted for this clinic. Please purchase more credits to generate reports.',
+            debug: progressLog,
+          });
+        }
+      } catch (creditErr) {
+        console.warn('Credit guard lookup failed (fail-open):', creditErr.message);
+      }
+    }
+
     // Step 1: Replace EEG logo with NeuroSense logo in uploaded PDFs
     logProgress('LOGO_REPLACE', 'Starting logo replacement', '🔄');
     let modifiedEyesOpenPath = eyesOpenFile.path;

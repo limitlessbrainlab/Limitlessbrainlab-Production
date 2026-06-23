@@ -6772,7 +6772,7 @@ app.post('/api/notify-patient-report', async (req, res) => {
 // =====================================================
 app.post('/api/send-no-credit-email', async (req, res) => {
   try {
-    const { clinicEmail, clinicName, clinicType } = req.body;
+    const { clinicEmail, clinicName, clinicType, notifyAdmin } = req.body;
 
     if (!clinicEmail) {
       return res.status(400).json({ success: false, message: 'Clinic email is required' });
@@ -6819,6 +6819,33 @@ app.post('/api/send-no-credit-email', async (req, res) => {
 
     await emailTransporter.sendMail(mailOptions);
     console.log(`✉️ No-credit email sent to ${clinicEmail}`);
+
+    // Optionally copy the super-admin inbox (e.g. generation was blocked from the admin side).
+    if (notifyAdmin) {
+      const adminInbox = process.env.EMAIL_TO || process.env.EMAIL_USER;
+      if (adminInbox) {
+        try {
+          await emailTransporter.sendMail({
+            from: EMAIL_FROM,
+            to: adminInbox,
+            subject: `Report blocked — no credits: ${displayName}`,
+            attachments: getLogoAttachment(),
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto;">
+                <p style="color:#333;font-size:15px;">A report generation was <strong>blocked</strong> because the ${accountType.toLowerCase()} has 0 report credits.</p>
+                <div style="background:#f8f9fc;border-radius:10px;padding:16px 20px;margin:16px 0;">
+                  <p style="margin:0;color:#323956;font-size:14px;"><strong>${accountType}:</strong> ${displayName}</p>
+                  <p style="margin:6px 0 0;color:#323956;font-size:14px;"><strong>Email:</strong> ${clinicEmail}</p>
+                </div>
+                <p style="color:#666;font-size:13px;">The ${accountType.toLowerCase()} has been notified to purchase more credits.</p>
+              </div>`,
+          });
+          console.log(`✉️ No-credit admin copy sent to ${adminInbox}`);
+        } catch (adminMailErr) {
+          console.warn('No-credit admin copy failed (non-fatal):', adminMailErr.message);
+        }
+      }
+    }
 
     res.json({ success: true, message: 'No credit notification email sent' });
   } catch (error) {

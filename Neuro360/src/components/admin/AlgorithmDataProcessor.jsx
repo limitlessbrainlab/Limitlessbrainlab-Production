@@ -23,6 +23,31 @@ const parseResultsData = (data) => {
   return [];
 };
 
+// Default LBL clinic — unlimited report credits (never blocked).
+const DEFAULT_CLINIC_ID = 'e34abedf-9d27-4000-a9c1-b8bad8bc8c30';
+
+// Resolve a clinic's report-credit status. Returns { exhausted, remaining, clinic }.
+// Default clinic is always unlimited. On lookup failure we DON'T block (fail-open) so a
+// transient error never prevents legitimate generation.
+const getClinicCreditStatus = async (clinicId) => {
+  if (!clinicId || clinicId === DEFAULT_CLINIC_ID) {
+    return { exhausted: false, remaining: Infinity, clinic: null };
+  }
+  try {
+    const clinic = await DatabaseService.findById('clinics', clinicId);
+    const allowed = Number(clinic?.reportsAllowed ?? clinic?.reports_allowed ?? 0);
+    const used = Number(clinic?.reportsUsed ?? clinic?.reports_used ?? 0);
+    const remaining = allowed - used;
+    // Only enforce when a positive allowance exists; allowed===0 (unconfigured) is treated
+    // as unlimited to avoid blocking clinics that were never assigned credits.
+    const exhausted = allowed > 0 && remaining <= 0;
+    return { exhausted, remaining, clinic };
+  } catch (e) {
+    console.warn('Credit lookup failed (fail-open):', e?.message);
+    return { exhausted: false, remaining: Infinity, clinic: null };
+  }
+};
+
 const AlgorithmDataProcessor = () => {
   const [patients, setPatients] = useState([]);
   const [clinics, setClinics] = useState([]);
@@ -75,6 +100,8 @@ const AlgorithmDataProcessor = () => {
   // Live progress for the Claude report (fed by the backend SSE stream).
   const [claudeProgress, setClaudeProgress] = useState(0);
   const [claudeStages, setClaudeStages] = useState([]); // [{ key, label, status, elapsedMs }]
+  // Selected patient's clinic credit status (for the exhausted alert + gating).
+  const [creditStatus, setCreditStatus] = useState({ exhausted: false, remaining: Infinity, clinic: null });
   const claudeCreepRef = useRef(null); // interval id for intra-stage bar "creep"
   const sidecarAbortReasonRef = useRef(null); // 'SIDECAR_DOWN' | null — set before aborting controller
 
@@ -306,9 +333,41 @@ const AlgorithmDataProcessor = () => {
     }
   };
 
+  // Notify the clinic + super admin that generation was blocked for lack of credits.
+  const notifyNoCredits = (clinic) => {
+    if (!clinic?.email) return;
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const baseUrl = apiUrl.replace(/\/api\/?$/, '');
+    fetch(`${baseUrl}/api/send-no-credit-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clinicEmail: clinic.email,
+        clinicName: clinic.name,
+        clinicType: clinic.clinicType || clinic.clinic_type || 'clinic',
+        notifyAdmin: true,
+      }),
+    }).catch(() => {}); // fire and forget
+  };
+
+  // Re-check credits and block if exhausted. Fires the no-credit email + toast. Returns
+  // true when BLOCKED (caller should return early).
+  const blockIfNoCredits = async (clinicId) => {
+    const status = await getClinicCreditStatus(clinicId);
+    setCreditStatus(status);
+    if (status.exhausted) {
+      toast.error(`Report credits exhausted for ${status.clinic?.name || 'this clinic'}. Generation is blocked until more credits are purchased.`);
+      notifyNoCredits(status.clinic);
+      return true;
+    }
+    return false;
+  };
+
   const handleGenerateReport = async (patient) => {
     setSelectedPatient(patient);
     setShowProcessingUI(true);
+    // Resolve the clinic's credit status up-front so the UI can alert/disable before any attempt.
+    getClinicCreditStatus(patient.clinicId || patient.clinic_id || patient.org_id).then(setCreditStatus);
     // Reset upload states
     setEyesOpenFile(null);
     setEyesClosedFile(null);
@@ -539,6 +598,8 @@ const AlgorithmDataProcessor = () => {
   };
 
   const processQEEGFiles = async () => {
+    // Hard block generation when the patient's clinic has no report credits left.
+    if (await blockIfNoCredits(selectedPatient?.clinicId || selectedPatient?.clinic_id || selectedPatient?.org_id)) return;
     setIsProcessing(true);
     setConsoleLog([]);
     setProgress(0);
@@ -559,6 +620,7 @@ const AlgorithmDataProcessor = () => {
       formData.append('patientExternalId', selectedPatient.external_id || '');
       formData.append('patientName', getPatientName(selectedPatient));
       formData.append('clinicName', selectedPatient.clinicName);
+      formData.append('clinicId', selectedPatient.clinicId || selectedPatient.clinic_id || selectedPatient.org_id || '');
       // Add complete patient data for PDF
       formData.append('dateOfBirth', selectedPatient.dateOfBirth || selectedPatient.date_of_birth || 'Not specified');
       formData.append('age', selectedPatient.age || calculateAge(selectedPatient.dateOfBirth || selectedPatient.date_of_birth) || 'N/A');
@@ -1152,6 +1214,8 @@ const AlgorithmDataProcessor = () => {
   const handleUploadToClaude = async () => {
     if (isGeneratingClaudeReport) return;
     if (!pdfUrl) { toast.error('Generate & save the NeuroSense report first.'); return; }
+    // Hard block performance-report generation when the clinic has no credits left.
+    if (await blockIfNoCredits(selectedPatient?.clinicId || selectedPatient?.clinic_id || selectedPatient?.org_id)) return;
 
     // Pre-flight: check sidecar is alive before starting the long upload
     const preflightApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -1352,6 +1416,7 @@ const AlgorithmDataProcessor = () => {
       toast.error('No patient selected');
       return;
     }
+    if (await blockIfNoCredits(selectedPatient?.clinicId || selectedPatient?.clinic_id || selectedPatient?.org_id)) return;
 
     setIsSendingReport(true);
 
@@ -1512,6 +1577,7 @@ const AlgorithmDataProcessor = () => {
       toast.error('No patient selected');
       return;
     }
+    if (await blockIfNoCredits(selectedPatient?.clinicId || selectedPatient?.clinic_id || selectedPatient?.org_id)) return;
 
     setIsSendingClaudeReport(true);
 
@@ -1657,6 +1723,9 @@ const AlgorithmDataProcessor = () => {
         patientId,
         clinicId: record.clinicId || record.inputData?.clinicId || selectedPatient?.clinicId || selectedPatient?.clinic_id || selectedPatient?.org_id
       });
+
+      // Hard block when the clinic has no report credits left.
+      if (await blockIfNoCredits(clinicId)) return;
 
       const reportData = {
         clinicId: clinicId,
@@ -2579,12 +2648,23 @@ const AlgorithmDataProcessor = () => {
             />
           </div>
 
+          {/* Credit-exhausted alert — shown before any generation attempt */}
+          {creditStatus.exhausted && (
+            <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4 flex items-start gap-3">
+              <X className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-red-800 dark:text-red-300">Report credits exhausted{creditStatus.clinic?.name ? ` for ${creditStatus.clinic.name}` : ''}</p>
+                <p className="text-sm text-red-600 dark:text-red-400 mt-0.5">Report generation is disabled until this clinic purchases more credits. The clinic has been notified.</p>
+              </div>
+            </div>
+          )}
+
           {/* Execute Button */}
           <button
             onClick={handleExecuteCalculation}
-            disabled={!eyesOpenFile || !eyesClosedFile || isProcessing || isSaved}
+            disabled={!eyesOpenFile || !eyesClosedFile || isProcessing || isSaved || creditStatus.exhausted}
             className={`w-full mb-6 py-3 px-4 rounded-lg font-medium flex items-center justify-center space-x-2 transition-colors shadow-md ${
-              eyesOpenFile && eyesClosedFile && !isProcessing && !isSaved
+              eyesOpenFile && eyesClosedFile && !isProcessing && !isSaved && !creditStatus.exhausted
                 ? 'bg-primary hover:bg-navy-700 text-white'
                 : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
             }`}
@@ -2953,13 +3033,13 @@ const AlgorithmDataProcessor = () => {
                   {/* Upload the generated NeuroSense report to Claude → 12-page report */}
                   <button
                     onClick={handleUploadToClaude}
-                    disabled={isGeneratingClaudeReport || !pdfUrl || !isSaved}
+                    disabled={isGeneratingClaudeReport || !pdfUrl || !isSaved || creditStatus.exhausted}
                     className={`w-full py-3 px-4 rounded-lg font-medium flex items-center justify-center space-x-2 transition-colors shadow-md ${
-                      isGeneratingClaudeReport || !pdfUrl || !isSaved
+                      isGeneratingClaudeReport || !pdfUrl || !isSaved || creditStatus.exhausted
                         ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
                         : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                     }`}
-                    title={!isSaved ? 'Save results first' : !pdfUrl ? 'Generate the NeuroSense report first' : 'Build the 12-page Neurosense Performance Report'}
+                    title={creditStatus.exhausted ? 'Report credits exhausted for this clinic' : !isSaved ? 'Save results first' : !pdfUrl ? 'Generate the NeuroSense report first' : 'Build the 12-page Neurosense Performance Report'}
                   >
                     {isGeneratingClaudeReport ? (
                       <>

@@ -34,6 +34,7 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
   const [loading, setLoading] = useState(false);
   const [showSubscriptionPopup, setShowSubscriptionPopup] = useState(false);
   const [subscription, setSubscription] = useState(null);
+  const [clinicRecord, setClinicRecord] = useState(null); // authoritative credit source (clinics.reports_used/allowed)
   const [error, setError] = useState(null);
   const [isLimitReached, setIsLimitReached] = useState(false);
   const [otherDocuments, setOtherDocuments] = useState([]);
@@ -95,6 +96,15 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
       const subscriptions = await DatabaseService.get('subscriptions') || [];
       const clinicSubscription = subscriptions.find(sub => sub.clinicId === clinicId);
       setSubscription(clinicSubscription);
+
+      // Load the clinic record — the authoritative source for report credits
+      // (clinics.reports_used / reports_allowed), so usage matches the Subscription tab + DB.
+      try {
+        const clinicRec = await DatabaseService.findById('clinics', clinicId);
+        setClinicRecord(clinicRec || null);
+      } catch (e) {
+        console.warn('Could not load clinic credit record:', e?.message);
+      }
 
       // Ensure reportsData is an array
       let validReports = Array.isArray(reportsData) ? reportsData : [];
@@ -303,25 +313,20 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
     return { limitReached: false, reason: null };
   };
 
-  // Get clinic's current usage info
+  // Get clinic's current usage info — ALWAYS from the authoritative clinics columns
+  // (clinics.reports_used / reports_allowed), so this matches the Subscription tab and the DB.
   const getClinicUsageInfo = () => {
-    if (subscription && subscription.status === 'active') {
-      return {
-        used: reports.length,
-        allowed: subscription.reportsAllowed,
-        remaining: subscription.reportsAllowed - reports.length,
-        isTrial: false,
-        planName: subscription.planName
-      };
-    } else {
-      return {
-        used: reports.length,
-        allowed: 10,
-        remaining: 10 - reports.length,
-        isTrial: true,
-        planName: 'Trial Plan'
-      };
-    }
+    const used = Number(clinicRecord?.reportsUsed ?? clinicRecord?.reports_used ?? 0);
+    const allowed = Number(clinicRecord?.reportsAllowed ?? clinicRecord?.reports_allowed ?? 0);
+    const status = clinicRecord?.subscriptionStatus ?? clinicRecord?.subscription_status;
+    const tier = clinicRecord?.subscriptionTier ?? clinicRecord?.subscription_tier;
+    return {
+      used,
+      allowed,
+      remaining: allowed - used,
+      isTrial: status !== 'active',
+      planName: tier || (status === 'active' ? 'Active Plan' : 'Trial Plan'),
+    };
   };
 
   const handleDownloadReport = async (report) => {
@@ -472,23 +477,9 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
           fileName
         });
         toast.error(`The file for "${fileName}" could not be found. It may not have been uploaded correctly — please try again or contact support.`);
-      } else {
-        // Increment download counter (shared quota with uploads)
-        try {
-          const clinic = await DatabaseService.findById('clinics', clinicId);
-          if (clinic) {
-            await DatabaseService.update('clinics', clinicId, {
-              reportsUsed: (clinic.reportsUsed || 0) + 1
-            });
-
-            // Reload reports to update usage display
-            await loadReports();
-          }
-        } catch (counterError) {
-          console.error('WARNING: Failed to increment download counter:', counterError);
-          // Don't show error to user - download was successful
-        }
       }
+      // NOTE: downloads do NOT consume a credit. reports_used is incremented only when a
+      // report is CREATED (DB trigger on reports INSERT). The old code double-counted here.
     } catch (error) {
       console.error('ERROR: Error downloading report:', error);
       toast.error(getFriendlyErrorMessage(error, 'Failed to download the report. Please try again.'));

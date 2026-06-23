@@ -6866,6 +6866,116 @@ app.post('/api/send-no-credit-email', async (req, res) => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════════
+// REPORT-CREDIT THRESHOLD ALERTS — half / one-left / exhausted → clinic + admin
+// Call after a report is created (credit consumed). The endpoint reads the LIVE
+// reports_used/reports_allowed and fires the matching alert exactly when the
+// threshold value is hit (used climbs by 1 per report, so each tier fires once).
+// ════════════════════════════════════════════════════════════════════════════════
+const DEFAULT_CLINIC_ID_ALERT = 'e34abedf-9d27-4000-a9c1-b8bad8bc8c30'; // LBL — unlimited
+
+app.post('/api/send-credit-alert', async (req, res) => {
+  try {
+    const { clinicId } = req.body || {};
+    if (!clinicId) return res.status(400).json({ success: false, message: 'clinicId is required' });
+    if (clinicId === DEFAULT_CLINIC_ID_ALERT) return res.json({ success: true, sent: false, reason: 'default clinic (unlimited)' });
+    if (!mailerConfigured) return res.status(500).json({ success: false, message: 'Email not configured' });
+
+    const { data: clinic } = await supabase
+      .from('clinics')
+      .select('name, email, reports_used, reports_allowed, clinic_type')
+      .eq('id', clinicId)
+      .single();
+
+    if (!clinic) return res.json({ success: true, sent: false, reason: 'clinic not found' });
+    const allowed = Number(clinic.reports_allowed) || 0;
+    const used = Number(clinic.reports_used) || 0;
+    if (allowed <= 0) return res.json({ success: true, sent: false, reason: 'no allowance configured (treated as unlimited)' });
+    const remaining = allowed - used;
+
+    // Determine which threshold was hit (exact, so it fires once as used climbs by 1).
+    const half = Math.floor(allowed / 2);
+    let tier = null;
+    if (remaining <= 0) tier = 'exhausted';
+    else if (remaining === 1) tier = 'one_left';
+    else if (half >= 2 && remaining === half) tier = 'half';
+    if (!tier) return res.json({ success: true, sent: false, reason: 'no threshold crossed', remaining });
+
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
+    const buyUrl = `${FRONTEND_URL}/clinic/subscription`;
+    const clinicName = clinic.name || 'your clinic';
+    const usageRows = [
+      { label: 'Reports Used', value: `${used} of ${allowed}` },
+      { label: 'Remaining', value: `${Math.max(0, remaining)}` },
+    ];
+
+    // Per-tier copy (clinic-facing).
+    const TIERS = {
+      half: {
+        subject: `Half of your report credits used — Limitless Brain Lab`,
+        heading: 'Half Credit Limit Reached',
+        subheading: 'Report Credits Update',
+        intro: `You've used <strong>half</strong> of your report credits. You can keep generating reports, but consider recharging soon to avoid interruption.`,
+        footer: 'You can top up anytime from your Subscription page.',
+      },
+      one_left: {
+        subject: `Only 1 report credit remaining — Limitless Brain Lab`,
+        heading: 'Only 1 Report Credit Left',
+        subheading: 'Action Recommended',
+        intro: `You have <strong>only 1 report credit remaining</strong>. After the next report, you won't be able to generate more until you recharge.`,
+        footer: 'Please recharge your credits to avoid interruption.',
+      },
+      exhausted: {
+        subject: `Report credits exhausted — Action required — Limitless Brain Lab`,
+        heading: 'Report Credits Exhausted',
+        subheading: 'Action Required',
+        intro: `Your report credits are <strong>fully exhausted (0 remaining)</strong>. Report generation is paused for this clinic until you recharge.`,
+        footer: 'Please recharge your credits to continue generating reports.',
+      },
+    };
+    const t = TIERS[tier];
+
+    // 1) Clinic email.
+    if (clinic.email) {
+      try {
+        await emailTransporter.sendMail(buildClinicNotificationEmail({
+          to: clinic.email,
+          subject: t.subject,
+          heading: t.heading,
+          subheading: t.subheading,
+          greetingName: clinicName,
+          intro: t.intro,
+          rows: usageRows,
+          footerNote: `${t.footer}<br/><a href="${buyUrl}" style="color:#323956;font-weight:600;">Recharge credits →</a>`,
+        }));
+      } catch (e) { console.error('⚠️ Clinic credit alert failed (non-fatal):', e.message); }
+    }
+
+    // 2) Admin copy.
+    const adminInbox = process.env.EMAIL_TO || process.env.EMAIL_USER;
+    if (adminInbox) {
+      try {
+        await emailTransporter.sendMail(buildClinicNotificationEmail({
+          to: adminInbox,
+          subject: `[Admin] ${clinicName}: ${t.heading}`,
+          heading: t.heading,
+          subheading: 'Clinic Credit Alert',
+          greetingName: 'Admin',
+          intro: `Clinic <strong>${clinicName}</strong> has hit a report-credit threshold (${tier.replace('_', ' ')}).`,
+          rows: [{ label: 'Clinic', value: clinicName }, { label: 'Email', value: clinic.email || '—' }, ...usageRows],
+          footerNote: 'Automated credit-threshold alert.',
+        }));
+      } catch (e) { console.error('⚠️ Admin credit alert failed (non-fatal):', e.message); }
+    }
+
+    console.log(`✉️ Credit alert (${tier}) sent for ${clinicName} → clinic + admin`);
+    res.json({ success: true, sent: true, tier, remaining });
+  } catch (error) {
+    console.error('❌ Error sending credit alert:', error);
+    res.status(500).json({ success: false, message: 'Failed to send credit alert' });
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════════════════
 // EMAIL DUPLICATE CHECK - CLINIC & PARTNER BOTH
 // ════════════════════════════════════════════════════════════════════════════════
 

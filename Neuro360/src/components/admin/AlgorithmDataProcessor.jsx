@@ -416,6 +416,20 @@ const AlgorithmDataProcessor = () => {
     return false;
   };
 
+  // After a report is created (a credit is consumed), let the backend check the
+  // clinic's live remaining credits and email the matching threshold alert
+  // (half / one-left / exhausted) to BOTH the clinic and the admin. Fire-and-forget.
+  const checkCreditAlert = (clinicId) => {
+    if (!clinicId) return;
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const baseUrl = apiUrl.replace(/\/api\/?$/, '');
+    fetch(`${baseUrl}/api/send-credit-alert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clinicId }),
+    }).catch(() => {}); // non-blocking
+  };
+
   const handleGenerateReport = async (patient) => {
     setSelectedPatient(patient);
     setShowProcessingUI(true);
@@ -1578,6 +1592,7 @@ const AlgorithmDataProcessor = () => {
 
 
       const savedReport = await DatabaseService.addReport(reportData);
+      checkCreditAlert(clinicId); // credit consumed → maybe alert clinic + admin
 
       // Send report emails to clinic and patient
       try {
@@ -1724,6 +1739,7 @@ const AlgorithmDataProcessor = () => {
 
 
       const savedReport = await DatabaseService.addReport(reportData);
+      checkCreditAlert(clinicId); // credit consumed → maybe alert clinic + admin
 
       // Send report emails to clinic and patient
       try {
@@ -1811,6 +1827,7 @@ const AlgorithmDataProcessor = () => {
       };
 
       await DatabaseService.addReport(reportData);
+      checkCreditAlert(clinicId); // credit consumed → maybe alert clinic + admin
 
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const baseUrl = apiUrl.replace(/\/api\/?$/, '');

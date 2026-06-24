@@ -1183,7 +1183,7 @@ const ClinicSettings = ({ clinic }) => {
             className={`px-6 py-2 rounded-lg transition-colors ${
               loading || !hasChanges
                 ? 'bg-gray-400 dark:bg-gray-600 text-white cursor-not-allowed'
-                : 'bg-primary-600 dark:bg-blue-600 text-white hover:bg-primary-700 dark:hover:bg-blue-700'
+                : 'bg-primary dark:bg-blue-600 text-white hover:bg-primary-dark dark:hover:bg-blue-700'
             }`}
           >
             {loading ? (

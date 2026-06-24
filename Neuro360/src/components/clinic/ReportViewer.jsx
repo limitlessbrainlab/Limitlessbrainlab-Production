@@ -176,68 +176,11 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
 
   const applyFilters = () => {
 
-    // Separate response reports from regular reports
-    const allResponseReports = reports.filter(report => {
-      const isResponseReport = report.reportData?.isResponseReport ||
-                              report.report_data?.isResponseReport ||
-                              report.reportData?.report_type === 'Response Report' ||
-                              report.reportData?.reportType === 'Response Report' ||
-                              report.fileName?.toLowerCase().includes('response');
-      return isResponseReport;
-    });
-
-    // Separate other documents (clinic-only documents from super admin)
-    const allOtherDocuments = reports.filter(report => {
-      const isOtherDoc = report.reportData?.report_type === 'other_document' ||
-                         report.report_data?.report_type === 'other_document' ||
-                         report.reportData?.reportType === 'other_document' ||
-                         report.report_data?.reportType === 'other_document';
-      return isOtherDoc;
-    });
-
-    const regularReports = reports.filter(report => {
-      const isResponseReport = report.reportData?.isResponseReport ||
-                              report.report_data?.isResponseReport ||
-                              report.reportData?.report_type === 'Response Report' ||
-                              report.reportData?.reportType === 'Response Report' ||
-                              report.fileName?.toLowerCase().includes('response');
-      const isOtherDoc = report.reportData?.report_type === 'other_document' ||
-                         report.report_data?.report_type === 'other_document' ||
-                         report.reportData?.reportType === 'other_document' ||
-                         report.report_data?.reportType === 'other_document';
-      return !isResponseReport && !isOtherDoc;
-    });
-
-
-    let filtered = [...regularReports];
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(report => {
-        const patient = (patients || []).find(p => p.id === report.patientId);
-        return (
-          report.fileName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          report.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          patient?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-      });
-    }
-
-    // Patient filter
-    if (selectedPatient) {
-      console.log('DEBUG: Reports before patient filter:', filtered.map(r => ({
-        id: r.id,
-        patientId: r.patientId,
-        fileName: r.fileName
-      })));
-      filtered = filtered.filter(report => report.patientId === selectedPatient);
-    }
-
-    // Date filter
+    // Compute the date cutoff once for the active date filter
+    let filterDate = null;
     if (dateFilter) {
       const today = new Date();
-      let filterDate = new Date();
-
+      filterDate = new Date();
       switch (dateFilter) {
         case '7days':
           filterDate.setDate(today.getDate() - 7);
@@ -251,11 +194,58 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
         default:
           filterDate = null;
       }
+    }
+
+    // Resolve the patient for a report across the various field name shapes
+    const findPatient = (report) => (patients || []).find(p =>
+      p.id === report.patientId ||
+      p.id === report.patient_id ||
+      p.id === report.reportData?.patientId
+    );
+
+    // Shared predicate: search term + patient + date — applied to EVERY group
+    const matchesFilters = (report) => {
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        const patient = findPatient(report);
+        const patientName = (patient?.name || patient?.fullName || patient?.full_name || '').toLowerCase();
+        const title = (report.reportData?.title || report.report_data?.title || report.title || '').toLowerCase();
+        const matchesSearch =
+          report.fileName?.toLowerCase().includes(term) ||
+          title.includes(term) ||
+          patientName.includes(term);
+        if (!matchesSearch) return false;
+      }
+
+      if (selectedPatient) {
+        const patientId = report.patientId || report.patient_id || report.reportData?.patientId;
+        if (patientId !== selectedPatient) return false;
+      }
 
       if (filterDate) {
-        filtered = filtered.filter(report => new Date(report.createdAt) >= filterDate);
+        if (!(new Date(report.createdAt) >= filterDate)) return false;
       }
-    }
+
+      return true;
+    };
+
+    const isResponseReport = (report) =>
+      report.reportData?.isResponseReport ||
+      report.report_data?.isResponseReport ||
+      report.reportData?.report_type === 'Response Report' ||
+      report.reportData?.reportType === 'Response Report' ||
+      report.fileName?.toLowerCase().includes('response');
+
+    const isOtherDoc = (report) =>
+      report.reportData?.report_type === 'other_document' ||
+      report.report_data?.report_type === 'other_document' ||
+      report.reportData?.reportType === 'other_document' ||
+      report.report_data?.reportType === 'other_document';
+
+    // Categorize AND filter each group with the same predicate
+    const allResponseReports = reports.filter(r => isResponseReport(r) && matchesFilters(r));
+    const allOtherDocuments = reports.filter(r => !isResponseReport(r) && isOtherDoc(r) && matchesFilters(r));
+    const filtered = reports.filter(r => !isResponseReport(r) && !isOtherDoc(r) && matchesFilters(r));
 
     // Sort by creation date (newest first)
     filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));

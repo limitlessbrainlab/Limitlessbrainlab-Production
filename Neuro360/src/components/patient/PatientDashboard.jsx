@@ -5120,22 +5120,6 @@ const PatientDashboard = () => {
                             <Play className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                             <span>Get Assessment</span>
                           </button>
-                        ) : assessment.id === 'brain_fitness' ? (
-                          <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-2 sm:gap-3">
-                            <div className="flex items-center space-x-1">
-                              <span className="text-base sm:text-lg font-bold text-green-600 dark:text-green-400">$2.99 USD</span>
-                              <span className="text-xs sm:text-sm text-gray-400 line-through">$9.99 USD</span>
-                            </div>
-                            <button
-                              className="px-3 sm:px-4 py-1.5 bg-gradient-to-r from-[#323956] to-[#232D3C] hover:from-[#3d4569] hover:to-[#2d3a4d] text-white text-xs sm:text-sm font-semibold rounded-lg flex items-center space-x-1.5 transition-all"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveJotForm({ title: assessment.title, link: assessment.link });
-                              }}
-                            >
-                              <span>Buy Now</span>
-                            </button>
-                          </div>
                         ) : (
                           <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-2 sm:gap-3">
                             <div className="flex items-center space-x-1">

@@ -165,6 +165,25 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
     return item.phone || item.contact_number || 'N/A';
   };
 
+  // When the contact_inquiries.source column is missing, ContactFormPopup folds
+  // the source into the message as a leading `[source:xxx]` tag. Read the source
+  // from the column when present, otherwise recover it from that tag.
+  const extractSource = (item) => {
+    if (item.source) return item.source;
+    const m = /^\[source:([^\]]+)\]/i.exec(item.message || '');
+    return m ? m[1].trim() : null;
+  };
+
+  // Strip the leading `[source:xxx]` tag so the admin sees the real message.
+  const cleanMessage = (message) =>
+    (message || '').replace(/^\[source:[^\]]+\]\s*/i, '') || null;
+
+  // Plain-text label for a source value (used in the detail modal).
+  const renderPackageLabel = (src) => {
+    const labels = { 'treat-my-brain': 'Treat My Brain', 'protect-my-brain': 'Protect My Brain' };
+    return labels[src] || 'General Inquiry';
+  };
+
   // Map the contact-form button (source) to a labeled badge for the Contact tab.
   const renderPackage = (src) => {
     const map = {
@@ -249,7 +268,7 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
             <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{item.email || 'N/A'}</td>
             <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{item.phone || 'N/A'}</td>
             <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{item.city || 'N/A'}</td>
-            <td className="px-4 py-3 text-sm">{renderPackage(item.source)}</td>
+            <td className="px-4 py-3 text-sm">{renderPackage(extractSource(item))}</td>
             <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{formatDate(item.created_at)}</td>
             <td className="px-4 py-3 text-right">{renderActions(item)}</td>
           </tr>
@@ -362,7 +381,8 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
                 <DetailRow icon={Mail} label="Email" value={selectedItem.email} />
                 <DetailRow icon={Phone} label="Phone" value={selectedItem.phone} />
                 <DetailRow icon={MapPin} label="City" value={selectedItem.city} />
-                <DetailRow icon={MessageSquare} label="Message" value={selectedItem.message} />
+                <DetailRow icon={Briefcase} label="Package" value={renderPackageLabel(extractSource(selectedItem))} />
+                <DetailRow icon={MessageSquare} label="Message" value={cleanMessage(selectedItem.message)} />
                 <DetailRow icon={Calendar} label="Submitted On" value={formatDate(selectedItem.created_at)} />
               </>
             )}

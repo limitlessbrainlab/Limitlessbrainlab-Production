@@ -171,20 +171,44 @@ const ContactFormPopup = ({ isOpen, onClose, source = null }) => {
     const selectedCity = formData.city === 'OTHER' ? formData.customCity.trim().toUpperCase() : formData.city;
 
     try {
+      // Only treat source as data when it's a real string. Some callers pass the
+      // click event (onClick={openContactForm}); ignore those.
+      const cleanSource = typeof source === 'string' && source.trim() ? source.trim() : null;
+      const rawMessage = formData.message ? formData.message.toUpperCase() : null;
+
       // Save to Supabase database — this is the source of truth for capturing
       // the lead. If this succeeds, the inquiry is recorded.
-      const { error: dbError } = await supabase
+      const baseRow = {
+        name: fullName,
+        email: formData.email,
+        phone: fullPhone,
+        city: selectedCity,
+        message: rawMessage,
+      };
+
+      let { error: dbError } = await supabase
         .from('contact_inquiries')
-        .insert([
-          {
-            name: fullName,
-            email: formData.email,
-            phone: fullPhone,
-            city: selectedCity,
-            message: formData.message ? formData.message.toUpperCase() : null,
-            source: source || null
-          }
-        ]);
+        .insert([{ ...baseRow, source: cleanSource }]);
+
+      // Some databases don't yet have the `source` column. Rather than failing
+      // the whole lead capture, retry without the column. (PostgREST returns
+      // PGRST204 / "could not find the 'source' column" when it's missing.)
+      // To avoid losing the source, fold it into the message as a tag the admin
+      // view parses back out — see WebsiteInquiries `extractSource`.
+      const isMissingSourceColumn =
+        dbError &&
+        (dbError.code === 'PGRST204' ||
+          (/source/i.test(dbError.message || '') && /column|schema cache/i.test(dbError.message || '')));
+
+      if (isMissingSourceColumn) {
+        console.warn('contact_inquiries.source column missing — folding source into message.');
+        const taggedMessage = cleanSource
+          ? `[source:${cleanSource}]${rawMessage ? ` ${rawMessage}` : ''}`
+          : rawMessage;
+        ({ error: dbError } = await supabase
+          .from('contact_inquiries')
+          .insert([{ ...baseRow, message: taggedMessage }]));
+      }
 
       if (dbError) {
         console.error('Database error:', dbError);

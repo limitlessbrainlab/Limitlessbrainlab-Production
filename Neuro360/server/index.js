@@ -5948,7 +5948,23 @@ app.post('/api/send-welcome-email', async (req, res) => {
       `
     };
 
-    const sendResult = await transporter.sendMail(mailOptions);
+    // Clinic SMTP auth/connection failures only surface at send time —
+    // createTransport never validates credentials, so a wrong value (e.g. a Gmail
+    // login password pasted in instead of a 16-char App Password) passes setup but
+    // throws here. Fall back to the default transporter so the patient still gets
+    // the email instead of receiving nothing.
+    let sendResult;
+    try {
+      sendResult = await transporter.sendMail(mailOptions);
+    } catch (sendErr) {
+      if (transporter !== emailTransporter) {
+        console.error('❌ Clinic SMTP send failed, retrying with default transporter:', sendErr.message);
+        mailOptions.from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+        sendResult = await emailTransporter.sendMail(mailOptions);
+      } else {
+        throw sendErr;
+      }
+    }
     console.log('✅ Welcome email sent successfully:', { to: email, messageId: sendResult?.messageId });
 
     // Also notify the clinic that a new patient was created. Separate template with
@@ -6159,7 +6175,20 @@ app.post('/api/send-email-update-notification', async (req, res) => {
       `
     };
 
-    const sendResult = await transporter.sendMail(mailOptions);
+    // Same send-time fallback as the welcome email: a bad clinic App Password
+    // fails only on send, so retry via the default transporter to guarantee delivery.
+    let sendResult;
+    try {
+      sendResult = await transporter.sendMail(mailOptions);
+    } catch (sendErr) {
+      if (transporter !== emailTransporter) {
+        console.error('❌ Clinic SMTP send failed, retrying with default transporter:', sendErr.message);
+        mailOptions.from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+        sendResult = await emailTransporter.sendMail(mailOptions);
+      } else {
+        throw sendErr;
+      }
+    }
     console.log('✅ Credentials update email sent successfully:', { to: newEmail, messageId: sendResult?.messageId, passwordChanged: hasNewPassword });
 
     // Also notify the clinic that a patient's login details changed (no password shown, non-fatal).

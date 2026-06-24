@@ -544,13 +544,22 @@ const ClinicDashboard = () => {
             updated_at: new Date().toISOString()
           }).eq('id', user.clinicId);
 
-          // Update organizations table
-          await supabase.from('organizations').update({
-            reports_allowed: newAllowed,
-            reports_used: 0,
-            subscription_status: 'active',
-            updated_at: new Date().toISOString()
-          }).eq('id', user.clinicId).catch(() => {});
+          // Update organizations table (best-effort — table/columns may not exist).
+          // NOTE: do not use .catch() on the query builder; it is a thenable, not a
+          // Promise, so .catch is not a function and would throw. Destructure error.
+          try {
+            const { error: orgUpdateError } = await supabase.from('organizations').update({
+              reports_allowed: newAllowed,
+              reports_used: 0,
+              subscription_status: 'active',
+              updated_at: new Date().toISOString()
+            }).eq('id', user.clinicId);
+            if (orgUpdateError) {
+              console.warn('organizations update skipped:', orgUpdateError.message);
+            }
+          } catch (orgErr) {
+            console.warn('organizations update failed:', orgErr?.message);
+          }
 
           // Save payment record
           const pendingPayment = JSON.parse(localStorage.getItem('pending_payment') || '{}');
@@ -1195,7 +1204,8 @@ const ClinicSettings = ({ clinic }) => {
         </div>
       </div>
 
-      {/* Email Configuration Section */}
+      {/* Email Configuration Section — temporarily hidden. Set to `true` to re-enable. */}
+      {false && (
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Email Configuration</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
@@ -1303,6 +1313,7 @@ const ClinicSettings = ({ clinic }) => {
           )}
         </div>
       </div>
+      )}
 
     </div>
   );

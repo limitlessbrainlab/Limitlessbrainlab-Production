@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
 import toast, { Toaster } from 'react-hot-toast';
 import {
   Wallet as WalletIcon,
@@ -48,6 +49,7 @@ import {
 
 const Wallet = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [patientEmail, setPatientEmail] = useState('');
@@ -151,7 +153,8 @@ const Wallet = () => {
         allPurchases.push(...assessments.map(a => ({
           id: a.id, date: a.purchased_at, item: a.assessment_name || 'Brain Assessment',
           category: 'Assessment', partner: 'Limitless Brain Lab', status: 'Paid',
-          amount: a.amount_paid, invoiceId: a.stripe_session_id?.slice(-8)?.toUpperCase()
+          amount: a.amount_paid, sessionId: a.stripe_session_id,
+          invoiceId: a.stripe_session_id?.slice(-8)?.toUpperCase()
         })));
       }
 
@@ -165,7 +168,8 @@ const Wallet = () => {
         allPurchases.push(...freqs.map(f => ({
           id: f.id, date: f.purchased_at, item: (f.pack_id || 'Frequency Pack').replace(/_/g, ' '),
           category: 'Frequencies', partner: 'Limitless Brain Lab', status: 'Paid',
-          amount: f.amount_paid, invoiceId: f.stripe_session_id?.slice(-8)?.toUpperCase()
+          amount: f.amount_paid, sessionId: f.stripe_session_id,
+          invoiceId: f.stripe_session_id?.slice(-8)?.toUpperCase()
         })));
       }
 
@@ -179,7 +183,8 @@ const Wallet = () => {
         allPurchases.push(...meds.map(m => ({
           id: m.id, date: m.purchased_at, item: (m.meditation_id || 'Meditation Pack').replace(/_/g, ' '),
           category: 'Meditation', partner: 'Limitless Brain Lab', status: 'Paid',
-          amount: m.amount_paid, invoiceId: m.stripe_session_id?.slice(-8)?.toUpperCase()
+          amount: m.amount_paid, sessionId: m.stripe_session_id,
+          invoiceId: m.stripe_session_id?.slice(-8)?.toUpperCase()
         })));
       }
 
@@ -193,9 +198,46 @@ const Wallet = () => {
         allPurchases.push(...payHist.map(p => ({
           id: p.id, date: p.created_at, item: `${p.tier || 'Subscription'} Plan`,
           category: 'Subscription', partner: 'Limitless Brain Lab', status: 'Paid',
-          amount: p.amount, invoiceId: p.stripe_session_id?.slice(-8)?.toUpperCase()
+          amount: p.amount, sessionId: p.stripe_session_id,
+          invoiceId: p.stripe_session_id?.slice(-8)?.toUpperCase()
         })));
       }
+
+      // 6. patient_payments — the unified table EVERY patient purchase writes to
+      // (coaching, frequency, meditation, assessment). Coaching is written ONLY
+      // here, so without this read it never appears in the Wallet. Pushed last so
+      // the more specific *_purchases rows win during de-dup below.
+      const patientPaymentCategory = (type) => ({
+        coaching: 'Session', frequency: 'Frequencies',
+        meditation: 'Meditation', assessment: 'Assessment'
+      }[type] || 'Session');
+      const { data: patientPays } = await supabase
+        .from('patient_payments')
+        .select('*')
+        .eq('patient_email', email)
+        .order('created_at', { ascending: false });
+      if (patientPays && patientPays.length > 0) {
+        allPurchases.push(...patientPays.map(p => ({
+          id: p.id, date: p.created_at,
+          item: p.item_name || (p.type ? `${p.type} purchase` : 'Purchase'),
+          category: patientPaymentCategory(p.type),
+          partner: 'Limitless Brain Lab',
+          status: (p.status === 'completed' || p.status === 'active') ? 'Paid' : (p.status || 'Paid'),
+          amount: p.amount, sessionId: p.stripe_session_id,
+          invoiceId: p.stripe_session_id?.slice(-8)?.toUpperCase()
+        })));
+      }
+
+      // De-dup across tables by Stripe session id — frequency/meditation purchases
+      // are written to BOTH their *_purchases table and patient_payments, so they
+      // would otherwise appear twice. Rows without a session id are always kept.
+      const seenSessions = new Set();
+      allPurchases = allPurchases.filter(p => {
+        if (!p.sessionId) return true;
+        if (seenSessions.has(p.sessionId)) return false;
+        seenSessions.add(p.sessionId);
+        return true;
+      });
 
       // Sort by date and set (real data only — empty if nothing purchased)
       allPurchases.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -349,8 +391,20 @@ const Wallet = () => {
 
   // Initialize
   useEffect(() => {
-    const email = localStorage.getItem('patientEmail') || sessionStorage.getItem('patientEmail');
-    const name = localStorage.getItem('patientName') || sessionStorage.getItem('patientName');
+    // Identity comes from the auth context (same source every other patient page
+    // uses), with a fallback to the persisted localStorage 'user' object. The old
+    // 'patientEmail' localStorage key is NEVER set anywhere, so reading it left the
+    // wallet permanently empty. Purchases are written with email.toLowerCase(), so
+    // normalize here too or the patient_email filters return zero rows.
+    let authUser = user;
+    if (!authUser?.email) {
+      try { authUser = JSON.parse(localStorage.getItem('user') || 'null'); } catch { authUser = null; }
+    }
+    const rawEmail = authUser?.email
+      || localStorage.getItem('patientEmail') || sessionStorage.getItem('patientEmail');
+    const email = rawEmail ? rawEmail.toLowerCase() : rawEmail;
+    const name = authUser?.name || authUser?.full_name
+      || localStorage.getItem('patientName') || sessionStorage.getItem('patientName');
     if (email) {
       setPatientEmail(email);
       setPatientName(name || '');
@@ -359,7 +413,7 @@ const Wallet = () => {
       // Not logged in — show empty wallet, no fake data
       setLoading(false);
     }
-  }, [fetchWalletData]);
+  }, [user, fetchWalletData]);
 
   // Add payment card
   const handleAddCard = async () => {

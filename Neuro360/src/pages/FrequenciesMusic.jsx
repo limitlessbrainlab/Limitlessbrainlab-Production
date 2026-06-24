@@ -189,9 +189,9 @@ const FrequenciesMusic = () => {
 
   // Check for successful payment on mount
   useEffect(() => {
-    if (!user?.email) return;
-
-    // Check URL params first
+    // Capture the payment intent to localStorage and clear the URL BEFORE requiring
+    // a hydrated user, so a redirect that lands logged-out (or before auth restores)
+    // is not lost. The DB write runs once user?.email is available (deps re-run).
     const urlParams = new URLSearchParams(window.location.search);
     let paymentPackId = urlParams.get('pack');
     let paymentSessionId = urlParams.get('session_id');
@@ -207,6 +207,7 @@ const FrequenciesMusic = () => {
     // Check localStorage for pending payment
     const pending = localStorage.getItem('pendingFreqPayment');
     if (!pending) return;
+    if (!user?.email) return; // wait for auth to hydrate; pending persists for next run
 
     const { packId: pId, sessionId: sId } = JSON.parse(pending);
     localStorage.removeItem('pendingFreqPayment');

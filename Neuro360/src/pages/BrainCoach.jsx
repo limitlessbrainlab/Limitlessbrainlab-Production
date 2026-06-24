@@ -63,14 +63,34 @@ const BrainCoach = () => {
   const [coachPaymentDetails, setCoachPaymentDetails] = useState(null);
 
   useEffect(() => {
-    if (!user?.email) return;
+    // Capture the payment intent immediately — BEFORE requiring a hydrated user —
+    // so a Stripe redirect that lands logged-out (or before auth restores), plus
+    // any later navigation, does not lose the coaching purchase. Persist to
+    // localStorage and clear the URL, then complete the DB write once a logged-in
+    // user is available (this effect re-runs when user?.email changes).
+    const paymentParam = searchParams.get('payment');
+    if (paymentParam === 'success') {
+      localStorage.setItem('pendingCoachPayment', JSON.stringify({
+        coachName: searchParams.get('coach') || '',
+        sessionId: searchParams.get('session_id') || '',
+        coachEmail: searchParams.get('coachEmail') || ''
+      }));
+      setSearchParams({});
+    } else if (paymentParam === 'cancelled') {
+      toast.error('Payment was cancelled. You can try again anytime.', { duration: 4000 });
+      setSearchParams({});
+    }
 
-    const payment = searchParams.get('payment');
-    const coachName = searchParams.get('coach');
-    const sessionId = searchParams.get('session_id');
-    const coachEmail = searchParams.get('coachEmail');
+    const pendingRaw = localStorage.getItem('pendingCoachPayment');
+    if (!pendingRaw) return;
+    if (!user?.email) return; // wait for auth to hydrate; pending stays for the next run
 
-    if (payment === 'success') {
+    let pending;
+    try { pending = JSON.parse(pendingRaw); }
+    catch { localStorage.removeItem('pendingCoachPayment'); return; }
+    const { coachName, sessionId, coachEmail } = pending;
+
+    {
       // Show success popup
       setCoachPaymentDetails({
         coachName: coachName ? decodeURIComponent(coachName) : 'Brain Coach',
@@ -88,7 +108,7 @@ const BrainCoach = () => {
           // Check duplicate
           if (sessionId) {
             const { data: existing } = await supabase.from('patient_payments').select('id').eq('stripe_session_id', sessionId).limit(1);
-            if (existing && existing.length > 0) return;
+            if (existing && existing.length > 0) { localStorage.removeItem('pendingCoachPayment'); return; }
           }
 
           // Get clinic info
@@ -108,8 +128,9 @@ const BrainCoach = () => {
             clinicName = c?.name || '';
           }
 
-          // Save to patient_payments
-          await supabase.from('patient_payments').insert({
+          // Save to patient_payments — only clear the pending marker on success so
+          // a failed insert is retried on the next load instead of being lost.
+          const { error: insertError } = await supabase.from('patient_payments').insert({
             clinic_id: clinicId, patient_id: user.id || null,
             patient_email: user.email.toLowerCase(),
             patient_name: patientRecord?.full_name || patientRecord?.name || user.name || '',
@@ -120,6 +141,11 @@ const BrainCoach = () => {
             source: 'Brain Coach',
             created_at: new Date().toISOString()
           });
+          if (insertError) {
+            console.error('patient_payments save error:', insertError.message);
+            return; // keep pendingCoachPayment so the next load retries
+          }
+          localStorage.removeItem('pendingCoachPayment');
 
           // Send admin notification
           const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -175,10 +201,6 @@ const BrainCoach = () => {
       };
 
       saveCoachPayment();
-      setSearchParams({});
-    } else if (payment === 'cancelled') {
-      toast.error('Payment was cancelled. You can try again anytime.', { duration: 4000 });
-      setSearchParams({});
     }
   }, [searchParams, user?.email]);
 

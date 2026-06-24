@@ -37,27 +37,62 @@ const PaymentHistory = ({ selectedClinic }) => {
 
   const loadData = async () => {
     try {
-      
-      let allPayments = [];
-      let clinicsData = [];
-      
-      try {
-        // Load from Supabase database
-        allPayments = await DatabaseService.get('payments') || [];
-        clinicsData = await DatabaseService.get('clinics') || [];
-      } catch (dbError) {
-        console.warn('WARNING: Supabase database error:', dbError.message);
+      // Payment records live across three tables: `payments` (clinic credit
+      // purchases), `patient_payments` and `payment_history` (patient purchases /
+      // subscriptions). Read all three so the SuperAdmin sees every payment.
+      let paymentsRaw = [], patientPaymentsRaw = [], paymentHistoryRaw = [], clinicsData = [];
 
-        // Fallback to empty arrays
-        allPayments = [];
-        clinicsData = [];
+      try {
+        [paymentsRaw, patientPaymentsRaw, paymentHistoryRaw, clinicsData] = await Promise.all([
+          DatabaseService.get('payments'),
+          DatabaseService.get('patient_payments'),
+          DatabaseService.get('payment_history'),
+          DatabaseService.get('clinics')
+        ]);
+      } catch (dbError) {
+        // Don't swallow a real DB failure into an empty table — surface it so the
+        // outer handler shows a visible error toast instead of a misleading
+        // "No payment transactions found" empty state.
+        console.error('ERROR: Supabase database error:', dbError.message);
+        throw dbError;
       }
-      
+
+      // Normalize every source (raw snake_case rows) into one common shape
+      const normalize = (rows, sourceTable) => (rows || []).map(p => ({
+        id: p.id,
+        clinicId: p.clinic_id || p.clinicId || null,
+        patientEmail: p.patient_email || p.patientEmail || null,
+        amount: Number(p.amount) || 0,
+        currency: p.currency || 'INR',
+        status: p.status || 'completed',
+        type: p.type || p.payment_type || 'payment',
+        packageName: p.package_name || p.item_name || p.tier || null,
+        createdAt: p.created_at || p.createdAt || null,
+        stripeSessionId: p.stripe_session_id || null,
+        paymentSourceTable: sourceTable
+      }));
+
+      const combined = [
+        ...normalize(paymentsRaw, 'payments'),
+        ...normalize(patientPaymentsRaw, 'patient_payments'),
+        ...normalize(paymentHistoryRaw, 'payment_history')
+      ];
+
+      // Dedup by Stripe session id — the same payment can be logged in more than
+      // one table (e.g. a subscription appears in both payments and payment_history)
+      const seen = new Set();
+      const deduped = combined.filter(p => {
+        if (!p.stripeSessionId) return true;
+        if (seen.has(p.stripeSessionId)) return false;
+        seen.add(p.stripeSessionId);
+        return true;
+      });
+
       // Filter by selected clinic if specified
-      const filteredPayments = selectedClinic 
-        ? allPayments.filter(p => p.clinicId === selectedClinic)
-        : allPayments;
-      
+      const filteredPayments = selectedClinic
+        ? deduped.filter(p => p.clinicId === selectedClinic)
+        : deduped;
+
       // Enhance payments with clinic/patient information
       const enhancedPayments = filteredPayments.map(payment => {
         const clinic = clinicsData.find(c => c.id === payment.clinicId);
@@ -69,11 +104,11 @@ const PaymentHistory = ({ selectedClinic }) => {
           clinicPhone: clinic?.phone || 'N/A',
           paymentSource: isPatientPayment ? 'Patient' : 'Clinic'
         };
-      }).sort((a, b) => new Date(b.createdAt || b.timestamp || 0) - new Date(a.createdAt || a.timestamp || 0));
-      
+      }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
       setPayments(enhancedPayments);
       setClinics(clinicsData);
-      
+
     } catch (error) {
       console.error('ERROR: SUPER ADMIN: Error loading payment data:', error);
       toast.error(getFriendlyErrorMessage(error, 'Failed to load payment data. Please try again.'));

@@ -9131,6 +9131,8 @@ const PatientDashboard = () => {
               .trim();
           };
 
+          // NOTE: keep in sync with parseCareProgramRef in utils/careProgramEntitlements.js,
+          // which mirrors this mapping to grant free access to the same packs at report time.
           const getBinauralLink = (value) => {
             const val = value.toLowerCase();
             if (val.includes('gamma')) return '/dashboard/meditations?meditation=gamma';

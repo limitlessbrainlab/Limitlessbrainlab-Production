@@ -164,6 +164,13 @@ class DatabaseService {
     }
   }
 
+  // Alias for `get` — several admin components (AdvancedAnalytics,
+  // BrandingConfiguration, AgreementManager) call getAll(). Without this they
+  // throw "getAll is not a function" and silently render empty data.
+  async getAll(table) {
+    return this.get(table);
+  }
+
   async add(table, item) {
     try {
       const actualTable = this.mapTableName(table);

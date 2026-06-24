@@ -4,6 +4,7 @@ import DatabaseService from '../../services/databaseService';
 import SupabaseService from '../../services/supabaseService';
 import toast from 'react-hot-toast';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
+import { grantCareProgramAccess } from '../../utils/careProgramEntitlements';
 
 // Always return a CURRENT Supabase access token. supabase.auth.getSession() refreshes
 // the token transparently if it's near expiry, so /api/qeeg/* calls no longer 401
@@ -1014,6 +1015,15 @@ const AlgorithmDataProcessor = () => {
 
       const addedRecord = await DatabaseService.add('algorithmResults', algorithmResult);
 
+      // Unlock the frequencies/meditations this patient's care program references, so the
+      // program updates AND its content is free for the patient. Non-blocking by design.
+      try {
+        const granted = await grantCareProgramAccess(SupabaseService.supabase, selectedPatient.email, resultData);
+        if (granted.frequencies + granted.meditations > 0) {
+          toast.success(`Care program content unlocked for patient (${granted.frequencies} frequencies, ${granted.meditations} meditations).`);
+        }
+      } catch (e) { console.warn('Care program grant skipped:', e?.message || e); }
+
       setIsSaved(true);
       setIsSaving(false);
       // Don't reset notes - keep them for PDF generation
@@ -1449,6 +1459,16 @@ const AlgorithmDataProcessor = () => {
           await DatabaseService.update('algorithmResults', savedResultId, { claude_report_url: pdfUrlResult });
         }
       } catch (e) { console.warn('Could not attach claude_report_url to history row:', e); }
+
+      // Mirror the Neurosense flow: unlock the frequencies/meditations this patient's care
+      // program references from the same Neurosense scores. Non-blocking by design.
+      try {
+        const granted = await grantCareProgramAccess(SupabaseService.supabase, selectedPatient?.email, results);
+        if (granted.frequencies + granted.meditations > 0) {
+          toast.success(`Care program content unlocked for patient (${granted.frequencies} frequencies, ${granted.meditations} meditations).`);
+        }
+      } catch (e) { console.warn('Care program grant skipped:', e?.message || e); }
+
       console.log(`[Claude Report] ✓ Done in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
       toast.success('Neurosense Performance Report ready!', { id: 'claude-report' });
     } catch (error) {

@@ -250,7 +250,7 @@ function App() {
                 href="https://wa.me/971501382897"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-[#25D366] rounded-full flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300"
+                className="fixed bottom-2 right-2 z-50 w-12 h-12 bg-[#25D366] rounded-full flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300"
                 aria-label="Chat on WhatsApp"
               >
                 <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">

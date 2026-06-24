@@ -27,14 +27,14 @@ class AnalyticsService {
         supabase.from('clinics').select('*'),
         supabase.from('profiles').select('*'),
         supabase.from('organizations').select('*'),
-        this.getMockPayments() // Payments table doesn't exist yet
+        supabase.from('payments').select('*') // real payments (empty until a checkout writes a row)
       ]);
 
       // Process results
       const clinics = clinicsResult.status === 'fulfilled' ? clinicsResult.value.data || [] : [];
       const profiles = profilesResult.status === 'fulfilled' ? profilesResult.value.data || [] : [];
       const organizations = organizationsResult.status === 'fulfilled' ? organizationsResult.value.data || [] : [];
-      const payments = paymentsResult.status === 'fulfilled' ? paymentsResult.value : [];
+      const payments = paymentsResult.status === 'fulfilled' ? paymentsResult.value.data || [] : [];
 
       console.log('DATA: Real data fetched:', {
         clinics: clinics.length,
@@ -189,19 +189,45 @@ class AnalyticsService {
    * Get time-series data for charts
    */
   async getTimeSeriesData(metric, days = 30) {
-    try {
-      const dates = this.generateDateRange(days);
+    const dates = this.generateDateRange(days);
+    const emptySeries = () => dates.map(date => ({ date, value: 0, [metric]: 0 }));
 
+    try {
       if (!supabase) {
-        return this.generateMockTimeSeries(metric, dates);
+        return emptySeries();
       }
 
-      // This would require proper time-series queries
-      // For now, return mock data with real structure
-      return this.generateMockTimeSeries(metric, dates);
+      // 'revenue' sums payments.amount per day; everything else counts reports per day.
+      const table = metric === 'revenue' ? 'payments' : 'reports';
+      const since = `${dates[0]}T00:00:00.000Z`;
+
+      const { data, error } = await supabase
+        .from(table)
+        .select('*')
+        .gte('created_at', since);
+
+      if (error) {
+        console.error('ERROR: Error fetching time series data:', error);
+        return emptySeries();
+      }
+
+      // Bucket rows by YYYY-MM-DD.
+      const buckets = {};
+      (data || []).forEach(row => {
+        const day = (row.created_at || '').split('T')[0];
+        if (!day) return;
+        const inc = metric === 'revenue' ? (Number(row.amount) || 0) : 1;
+        buckets[day] = (buckets[day] || 0) + inc;
+      });
+
+      return dates.map(date => ({
+        date,
+        value: buckets[date] || 0,
+        [metric]: buckets[date] || 0
+      }));
     } catch (error) {
       console.error('ERROR: Error fetching time series data:', error);
-      return this.generateMockTimeSeries(metric, this.generateDateRange(days));
+      return emptySeries();
     }
   }
 

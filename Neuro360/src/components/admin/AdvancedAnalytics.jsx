@@ -46,9 +46,15 @@ const AdvancedAnalytics = () => {
 
       // In a real app, this would be API calls to analytics service
       // For now, we'll generate mock data based on actual clinic data
-      const clinicsData = await DatabaseService.getAll('clinics');
+      const allClinics = await DatabaseService.getAll('clinics');
       const reportsData = await DatabaseService.getAll('reports');
       const paymentsData = await DatabaseService.getAll('payments') || [];
+
+      // Honor the clinic filter — when a specific clinic is selected, scope the
+      // analytics to just that clinic (otherwise the dropdown does nothing).
+      const clinicsData = selectedClinic === 'all'
+        ? allClinics
+        : allClinics.filter(clinic => clinic.id === selectedClinic);
 
       const analyticsData = generateAnalytics(clinicsData, reportsData, paymentsData);
       setAnalytics(analyticsData);
@@ -75,9 +81,11 @@ const AdvancedAnalytics = () => {
       new Date(payment.createdAt || payment.timestamp) >= startDate
     );
 
-    // Test metrics by clinic
+    // Test metrics by clinic. Legacy reports are stored with clinic_id = NULL but
+    // an org_id set (see databaseService.getReportsByClinic), so attribute by
+    // clinicId OR orgId — otherwise every legacy report is dropped and counts read 0.
     const testsByClinic = clinics.map(clinic => {
-      const clinicReports = filteredReports.filter(report => report.clinicId === clinic.id);
+      const clinicReports = filteredReports.filter(report => (report.clinicId || report.orgId) === clinic.id);
       return {
         clinicId: clinic.id,
         clinicName: clinic.name,

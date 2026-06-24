@@ -22,7 +22,10 @@ if (hasValidSupabaseConfig) {
     global: {
       headers: {
         'x-application-name': 'neuro360-web',
-        'Authorization': `Bearer ${supabaseAnonKey}`,
+        // NOTE: do NOT hardcode an Authorization header here. supabase-js sets the
+        // apikey + a default anon Authorization automatically, and swaps Authorization
+        // to the logged-in user's JWT once a session exists. A static Bearer anonKey
+        // pinned every read to the `anon` role (auth.uid() = null), defeating RLS.
       },
     },
     db: {

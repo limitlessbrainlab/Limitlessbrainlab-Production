@@ -19,7 +19,8 @@ import {
   Building2,
   Award,
   Users,
-  Brain
+  Brain,
+  Star
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useRealtimeRefetch from '../../hooks/useRealtimeRefetch';
@@ -31,7 +32,24 @@ const TABS = [
   { id: 'partnership', label: 'Partnership Inquiries', icon: HandMetal },
   { id: 'professional', label: 'Professional Inquiries', icon: UserPlus },
   { id: 'program', label: 'Program Inquiries', icon: GraduationCap },
+  { id: 'feedback', label: 'Patient Feedback', icon: Star },
 ];
+
+// Render a 1-5 star rating, or a muted "Not rated" when none was given.
+const renderStars = (rating) => {
+  const value = Number(rating) || 0;
+  if (!value) return <span className="text-xs text-gray-400 dark:text-gray-500">Not rated</span>;
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map(i => (
+        <Star
+          key={i}
+          className={`w-3.5 h-3.5 ${i <= value ? 'text-amber-400 fill-amber-400' : 'text-gray-300 dark:text-gray-600'}`}
+        />
+      ))}
+    </span>
+  );
+};
 
 const WebsiteInquiries = ({ subTab = 'contact' }) => {
   const [activeTab, setActiveTab] = useState(subTab);
@@ -205,6 +223,18 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
             <th className="px-4 py-3 text-right">Actions</th>
           </tr>
         );
+      case 'feedback':
+        return (
+          <tr className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            <th className="px-4 py-3">Patient</th>
+            <th className="px-4 py-3">Email</th>
+            <th className="px-4 py-3">Rating</th>
+            <th className="px-4 py-3">Category</th>
+            <th className="px-4 py-3">Message</th>
+            <th className="px-4 py-3">Submitted On</th>
+            <th className="px-4 py-3 text-right">Actions</th>
+          </tr>
+        );
       default:
         return null;
     }
@@ -255,6 +285,18 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
             <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{item.phone || 'N/A'}</td>
             <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{item.profession || 'N/A'}</td>
             <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{item.program_type || 'N/A'}</td>
+            <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{formatDate(item.created_at)}</td>
+            <td className="px-4 py-3 text-right">{renderActions(item)}</td>
+          </tr>
+        );
+      case 'feedback':
+        return (
+          <tr key={item.id} className="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+            <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{item.patient_name || 'N/A'}</td>
+            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{item.patient_email || 'N/A'}</td>
+            <td className="px-4 py-3 text-sm">{renderStars(item.rating)}</td>
+            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 capitalize">{item.category || 'general'}</td>
+            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 max-w-xs truncate" title={item.message}>{item.message || 'N/A'}</td>
             <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{formatDate(item.created_at)}</td>
             <td className="px-4 py-3 text-right">{renderActions(item)}</td>
           </tr>
@@ -359,6 +401,22 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
                 <DetailRow icon={Calendar} label="Submitted On" value={formatDate(selectedItem.created_at)} />
               </>
             )}
+            {activeTab === 'feedback' && (
+              <>
+                <DetailRow icon={Users} label="Patient Name" value={selectedItem.patient_name} />
+                <DetailRow icon={Mail} label="Email" value={selectedItem.patient_email} />
+                <div className="flex items-start gap-3 py-2.5 border-b border-gray-100 dark:border-gray-700">
+                  <Star className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Rating</p>
+                    <div className="mt-1">{renderStars(selectedItem.rating)}</div>
+                  </div>
+                </div>
+                <DetailRow icon={Briefcase} label="Category" value={selectedItem.category} />
+                <DetailRow icon={MessageSquare} label="Message" value={selectedItem.message} />
+                <DetailRow icon={Calendar} label="Submitted On" value={formatDate(selectedItem.created_at)} />
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -421,7 +479,9 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
 
       {/* Count */}
       <div className="mb-3 text-sm text-gray-500 dark:text-gray-400">
-        {filteredData.length} {filteredData.length === 1 ? 'inquiry' : 'inquiries'} found
+        {filteredData.length} {activeTab === 'feedback'
+          ? (filteredData.length === 1 ? 'feedback entry' : 'feedback entries')
+          : (filteredData.length === 1 ? 'inquiry' : 'inquiries')} found
       </div>
 
       {/* Table */}

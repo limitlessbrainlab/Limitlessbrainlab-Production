@@ -1200,7 +1200,8 @@ app.get('/api/inquiries/:type', async (req, res) => {
       'contact': 'contact_inquiries',
       'partnership': 'franchise_inquiries',
       'professional': 'professional_onboarding',
-      'program': 'program_inquiries'
+      'program': 'program_inquiries',
+      'feedback': 'patient_feedback'
     };
 
     const tableName = tableMap[req.params.type];

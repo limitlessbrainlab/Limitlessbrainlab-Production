@@ -216,6 +216,7 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
             { id: 'partnership-inquiries', label: 'Partnership Inquiries', icon: HandMetal, path: '/admin/inquiries/partnership' },
             { id: 'professional-inquiries', label: 'Professional Inquiries', icon: UserPlus, path: '/admin/inquiries/professional' },
             { id: 'program-inquiries', label: 'Program Inquiries', icon: GraduationCap, path: '/admin/inquiries/program' },
+            { id: 'feedback-inquiries', label: 'Patient Feedback', icon: Star, path: '/admin/inquiries/feedback' },
           ]
         },
         { id: 'settings', label: 'System Settings', icon: Cog, path: '/admin/settings' }

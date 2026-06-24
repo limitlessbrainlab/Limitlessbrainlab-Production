@@ -198,6 +198,7 @@ function App() {
                   <Route path="/admin/inquiries/partnership" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
                   <Route path="/admin/inquiries/professional" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
                   <Route path="/admin/inquiries/program" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
+                  <Route path="/admin/inquiries/feedback" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
                   <Route path="/admin/settings" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
                   <Route path="/admin/patient-subscriptions" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
 

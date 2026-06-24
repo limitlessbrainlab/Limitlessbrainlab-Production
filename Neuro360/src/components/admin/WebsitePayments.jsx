@@ -69,6 +69,7 @@ const WebsitePayments = () => {
       'Assessment': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
       'Frequency': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
       'Meditation': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      'Coaching': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
       'Subscription': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
     };
     return styles[type] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
@@ -212,6 +213,7 @@ const WebsitePayments = () => {
             <option value="Assessment">Assessments</option>
             <option value="Frequency">Frequencies</option>
             <option value="Meditation">Meditations</option>
+            <option value="Coaching">Coaching</option>
             <option value="Subscription">Subscriptions</option>
           </select>
         </div>

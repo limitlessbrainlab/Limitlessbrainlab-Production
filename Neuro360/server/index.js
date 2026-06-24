@@ -1362,10 +1362,50 @@ app.get('/api/website-payments', async (req, res) => {
       });
     }
 
-    // Sort all by date descending
-    allPayments.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    // Fetch patient_payments — the unified table EVERY patient purchase writes to
+    // (coaching writes ONLY here, so without this it never appears in Website
+    // Payments). Pushed last so the more specific *_purchases rows win during the
+    // de-dup below.
+    const ppType = (t) => ({
+      coaching: 'Coaching', frequency: 'Frequency',
+      meditation: 'Meditation', assessment: 'Assessment'
+    }[t] || (t ? t.charAt(0).toUpperCase() + t.slice(1) : 'Purchase'));
+    const { data: patientPayments } = await supabase
+      .from('patient_payments')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-    res.json({ success: true, data: allPayments });
+    if (patientPayments) {
+      patientPayments.forEach(item => {
+        allPayments.push({
+          id: item.id,
+          type: ppType(item.type),
+          product: item.item_name || (item.type ? `${item.type} purchase` : 'Purchase'),
+          email: item.patient_email,
+          amount: item.amount,
+          currency: item.currency || 'USD',
+          status: item.status || 'completed',
+          stripe_session_id: item.stripe_session_id,
+          date: item.created_at
+        });
+      });
+    }
+
+    // De-dup by Stripe session id — frequency/meditation purchases are written to
+    // BOTH their *_purchases table and patient_payments, so they would otherwise
+    // appear twice. Rows without a session id are always kept.
+    const seenSessionIds = new Set();
+    const dedupedPayments = allPayments.filter(p => {
+      if (!p.stripe_session_id) return true;
+      if (seenSessionIds.has(p.stripe_session_id)) return false;
+      seenSessionIds.add(p.stripe_session_id);
+      return true;
+    });
+
+    // Sort all by date descending
+    dedupedPayments.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+    res.json({ success: true, data: dedupedPayments });
   } catch (error) {
     console.error('Error fetching website payments:', error);
     res.status(500).json({ success: false, message: error.message });

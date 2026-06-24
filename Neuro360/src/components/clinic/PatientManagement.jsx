@@ -540,25 +540,60 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
 
   const handleDownloadReport = async (report) => {
     try {
-      if (report.s3Key) {
-        
-        // Generate signed URL for download
-        const downloadUrl = await StorageService.getSignedUrl(report.storagePath || report.s3Key, 300); // 5 minutes
-        
-        // Open download URL in new tab
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = report.fileName;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        toast.success(' Download started!');
-      } else {
-        // Fallback for files not stored in S3
-        toast.error('File not available for download');
+      const fileName = report.fileName || report.file_name || 'report.pdf';
+      // Reports come from the DB as raw snake_case rows; storage info may also be
+      // nested inside the report_data JSONB column. Gather every possible path
+      // location (camelCase, snake_case, and nested) and try each one.
+      const reportData = report.reportData || report.report_data || {};
+      const possiblePaths = [
+        report.storagePath,
+        report.storage_path,
+        report.s3Key,
+        report.s3_key,
+        report.filePath,
+        report.file_path,
+        reportData.storagePath,
+        reportData.s3Key,
+        reportData.filePath,
+      ].filter(Boolean);
+
+      let downloadUrl = null;
+
+      // Method 1: Generate a signed URL for each candidate storage path.
+      for (const path of possiblePaths) {
+        try {
+          downloadUrl = await StorageService.getSignedUrl(path, 300); // 5 minutes
+          if (downloadUrl) break;
+        } catch (pathError) {
+          console.warn('WARNING: Failed to get signed URL for path:', path, pathError.message);
+        }
       }
+
+      // Method 2: Fall back to a direct file URL if present.
+      if (!downloadUrl) {
+        downloadUrl = report.fileUrl || report.file_url || reportData.fileUrl || null;
+      }
+
+      if (!downloadUrl) {
+        toast.error('File not available for download');
+        return;
+      }
+
+      // Fetch the bytes and save a blob so the raw storage URL is never exposed.
+      const res = await fetch(downloadUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = fileName;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+
+      toast.success(`Downloading ${fileName}`);
     } catch (error) {
       console.error('ERROR: Error downloading file:', error);
       toast.error('Failed to download file');
@@ -918,10 +953,10 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
                                 key={latest.id}
                                 onClick={() => handleDownloadReport(latest)}
                                 className="block text-sm text-primary-600 dark:text-blue-400 hover:underline cursor-pointer"
-                                title={`Download ${latest.title || latest.fileName}`}
+                                title={`Download ${latest.title || latest.fileName || latest.file_name || 'Report'}`}
                               >
-                                {latest.fileName || 'Report'}
-                                {latest.storedInCloud && (
+                                {latest.fileName || latest.file_name || 'Report'}
+                                {(latest.storedInCloud || latest.stored_in_cloud) && (
                                   <span className="ml-1 text-xs text-[#323956] dark:text-blue-400">️</span>
                                 )}
                               </button>

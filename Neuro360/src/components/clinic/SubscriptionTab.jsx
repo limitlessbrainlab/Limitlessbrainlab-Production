@@ -120,11 +120,13 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
   const loadUsageStats = async () => {
     try {
       if (user?.clinicId) {
-        // Try organizations table first, fallback to clinics table
+        // Try organizations table first, fallback to clinics table.
+        // NOTE: there is no total_spent column on either table — total spend is
+        // derived from the payments table below.
         let clinic = null;
         const { data: orgData, error: orgError } = await supabase
           .from('organizations')
-          .select('reports_used, reports_allowed, total_spent, clinic_type, clinicType')
+          .select('reports_used, reports_allowed, clinic_type')
           .eq('id', user.clinicId)
           .single();
 
@@ -134,7 +136,7 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
           // Fallback: read from clinics table
           const { data: clinicData, error: clinicError } = await supabase
             .from('clinics')
-            .select('reports_used, reports_allowed, total_spent, clinic_type')
+            .select('reports_used, reports_allowed, clinic_type')
             .eq('id', user.clinicId)
             .single();
 
@@ -143,14 +145,28 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
           }
         }
 
+        // Derive total spent from the clinic's completed payments
+        let totalSpent = 0;
+        try {
+          const { data: payRows } = await supabase
+            .from('payments')
+            .select('amount, status')
+            .eq('clinic_id', user.clinicId);
+          totalSpent = (payRows || [])
+            .filter(p => !p.status || p.status === 'completed')
+            .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        } catch (e) {
+          console.warn('Could not load payments for total spent:', e?.message);
+        }
+
         if (clinic) {
-          const type = clinic.clinic_type || clinic.clinicType || 'lbl_partner';
+          const type = clinic.clinic_type || 'lbl_partner';
           setClinicType(type);
           setUsageStats({
             reportsUsed: clinic.reports_used || 0,
             reportsAllowed: clinic.reports_allowed || 0,
             reportsRemaining: (clinic.reports_allowed || 0) - (clinic.reports_used || 0),
-            totalSpent: clinic.total_spent || 0
+            totalSpent
           });
         }
       }

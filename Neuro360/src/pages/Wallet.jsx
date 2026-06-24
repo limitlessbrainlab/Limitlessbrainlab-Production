@@ -92,49 +92,18 @@ const Wallet = () => {
   // Invoices
   const [invoices, setInvoices] = useState([]);
 
-  // Demo data for fallback
-  const demoPaymentMethods = [
-    { id: 'demo-1', type: 'visa', last4: '4242', exp: '12/26', isDefault: true, name: 'Personal Card' },
-    { id: 'demo-2', type: 'mastercard', last4: '8888', exp: '08/25', isDefault: false, name: 'Business Card' },
-    { id: 'demo-3', type: 'rupay', last4: '5555', exp: '03/27', isDefault: false, name: 'RuPay Card' }
-  ];
+  // Percent change in spend vs last month (computed dynamically)
+  const [spendChange, setSpendChange] = useState(0);
 
-  const demoUpiIds = [
-    { id: 'demo-1', upi: 'user@paytm', isDefault: true },
-    { id: 'demo-2', upi: 'user@gpay', isDefault: false }
-  ];
-
-  const demoPurchases = [
-    { id: 1, date: '2024-01-15', item: 'Limitless Brain Lab Full Report', category: 'Report', partner: 'Limitless Brain Lab', status: 'Paid', amount: 499, invoiceId: 'INV-2024-001' },
-    { id: 2, date: '2024-01-10', item: '5 Pillars of Mastery Course', category: 'Course', partner: 'Dr. Shweta', status: 'Paid', amount: 1299, invoiceId: 'INV-2024-002' },
-    { id: 3, date: '2024-01-08', item: 'Alpha Frequencies Pack', category: 'Frequencies', partner: 'Neuro360', status: 'Paid', amount: 149, invoiceId: 'INV-2024-003' },
-    { id: 4, date: '2024-01-05', item: 'Brain Coach Session (1hr)', category: 'Session', partner: 'Dr. Roland', status: 'Paid', amount: 350, invoiceId: 'INV-2024-004' },
-    { id: 5, date: '2023-12-28', item: 'EEG Headset Rental (1 month)', category: 'Device rental', partner: 'Neurobics', status: 'Paid', amount: 299, invoiceId: 'INV-2023-089' },
-    { id: 6, date: '2023-12-20', item: 'Brain Optimization Workshop', category: 'Event', partner: 'Neuro360', status: 'Refunded', amount: 199, invoiceId: 'INV-2023-088' },
-    { id: 7, date: '2023-12-15', item: 'Neurofeedback Session Pack (5)', category: 'Session', partner: 'Dr. Roland', status: 'Paid', amount: 1500, invoiceId: 'INV-2023-087' }
-  ];
-
-  const demoSubscriptions = [
-    { id: 1, name: 'Limitless Brain Lab Pro', plan: 'Annual', renewal: '2025-01-15', status: 'Active', amount: 199, period: 'mo', icon: Star },
-    { id: 2, name: 'Frequencies Complete Pack', plan: 'Lifetime', renewal: '-', status: 'Active', amount: 499, period: 'one-time', icon: Music },
-    { id: 3, name: 'Dr. Shweta Course Access', plan: 'Monthly', renewal: '2024-02-01', status: 'Active', amount: 99, period: 'mo', icon: Video },
-    { id: 4, name: 'Brain Coach Premium', plan: 'Quarterly', renewal: '2024-03-15', status: 'Paused', amount: 249, period: 'qtr', icon: Users }
-  ];
-
-  const demoSessionPacks = [
-    { id: 1, name: 'Neurofeedback Sessions', remaining: 3, total: 5, expiry: '2024-06-15', type: 'session' },
-    { id: 2, name: 'Brain Coach Sessions', remaining: 2, total: 4, expiry: '2024-04-30', type: 'session' },
-    { id: 3, name: 'Assessment Credits', remaining: 1, total: 2, expiry: '2024-03-01', type: 'credit' },
-    { id: 4, name: 'Referral Credits', remaining: 500, total: 500, expiry: '-', type: 'rupees' }
-  ];
-
-  const demoInvoices = [
-    { id: 'INV-2024-001', date: '2024-01-15', description: 'Limitless Brain Lab Full Report', amount: 499, status: 'Paid', dueDate: '2024-01-15' },
-    { id: 'INV-2024-002', date: '2024-01-10', description: '5 Pillars of Mastery Course', amount: 1299, status: 'Paid', dueDate: '2024-01-10' },
-    { id: 'INV-2024-003', date: '2024-01-08', description: 'Alpha Frequencies Pack', amount: 149, status: 'Paid', dueDate: '2024-01-08' },
-    { id: 'INV-2024-004', date: '2024-01-05', description: 'Brain Coach Session', amount: 350, status: 'Paid', dueDate: '2024-01-05' },
-    { id: 'INV-2024-005', date: '2024-02-01', description: 'Monthly Subscription - Feb', amount: 99, status: 'Upcoming', dueDate: '2024-02-01' }
-  ];
+  // Map a card row from the DB into the shape the UI expects
+  const mapCardRow = (m) => ({
+    id: m.id,
+    type: m.card_type,
+    last4: m.last_four,
+    exp: m.expiry,
+    name: m.cardholder_name,
+    isDefault: m.is_default
+  });
 
   // Fetch wallet data
   const fetchWalletData = useCallback(async (email) => {
@@ -148,17 +117,12 @@ const Wallet = () => {
         .eq('patient_email', email)
         .order('created_at', { ascending: false });
 
-      if (methods && methods.length > 0) {
-        setPaymentMethods(methods.filter(m => m.method_type === 'card'));
-        setUpiIds(methods.filter(m => m.method_type === 'upi').map(u => ({
-          id: u.id,
-          upi: u.upi_id,
-          isDefault: u.is_default
-        })));
-      } else {
-        setPaymentMethods(demoPaymentMethods);
-        setUpiIds(demoUpiIds);
-      }
+      setPaymentMethods((methods || []).filter(m => m.method_type === 'card').map(mapCardRow));
+      setUpiIds((methods || []).filter(m => m.method_type === 'upi').map(u => ({
+        id: u.id,
+        upi: u.upi_id,
+        isDefault: u.is_default
+      })));
 
       // Fetch purchases from all real purchase tables
       let allPurchases = [];
@@ -233,20 +197,22 @@ const Wallet = () => {
         })));
       }
 
-      // Sort by date and set
+      // Sort by date and set (real data only — empty if nothing purchased)
       allPurchases.sort((a, b) => new Date(b.date) - new Date(a.date));
-      setPurchases(allPurchases.length > 0 ? allPurchases : []);
+      setPurchases(allPurchases);
 
-      // Fetch subscriptions
+      // Fetch subscriptions — prefer admin-managed wallet_subscriptions,
+      // otherwise derive from the patient's real subscription payments.
       const { data: subs } = await supabase
         .from('wallet_subscriptions')
         .select('*')
         .eq('patient_email', email)
         .order('created_at', { ascending: false });
 
+      const iconMap = { 'star': Star, 'music': Music, 'video': Video, 'users': Users };
+      let subscriptionsForUi;
       if (subs && subs.length > 0) {
-        const iconMap = { 'star': Star, 'music': Music, 'video': Video, 'users': Users };
-        setSubscriptions(subs.map(s => ({
+        subscriptionsForUi = subs.map(s => ({
           id: s.id,
           name: s.name,
           plan: s.plan,
@@ -255,10 +221,29 @@ const Wallet = () => {
           amount: s.amount,
           period: s.period,
           icon: iconMap[s.icon] || Star
-        })));
+        }));
       } else {
-        setSubscriptions(demoSubscriptions);
+        // Derive one entry per distinct subscription tier (latest payment wins)
+        const subPayments = (payHist || []).filter(p => p.payment_type === 'subscription' || p.tier);
+        const byTier = {};
+        subPayments.forEach(p => {
+          const key = p.tier || 'Subscription';
+          if (!byTier[key] || new Date(p.created_at) > new Date(byTier[key].created_at)) {
+            byTier[key] = p;
+          }
+        });
+        subscriptionsForUi = Object.entries(byTier).map(([tier, p]) => ({
+          id: p.id,
+          name: `${tier} Plan`,
+          plan: 'Subscription',
+          renewal: '-',
+          status: (p.status === 'completed' || p.status === 'active') ? 'Active' : (p.status || 'Active'),
+          amount: Number(p.amount) || 0,
+          period: 'mo',
+          icon: Star
+        }));
       }
+      setSubscriptions(subscriptionsForUi);
 
       // Fetch session packs/credits
       const { data: packs } = await supabase
@@ -266,18 +251,14 @@ const Wallet = () => {
         .select('*')
         .eq('patient_email', email);
 
-      if (packs && packs.length > 0) {
-        setSessionPacks(packs.map(p => ({
-          id: p.id,
-          name: p.name,
-          remaining: p.remaining,
-          total: p.total,
-          expiry: p.expiry_date || '-',
-          type: p.credit_type
-        })));
-      } else {
-        setSessionPacks(demoSessionPacks);
-      }
+      setSessionPacks((packs || []).map(p => ({
+        id: p.id,
+        name: p.name,
+        remaining: p.remaining,
+        total: p.total,
+        expiry: p.expiry_date || '-',
+        type: p.credit_type
+      })));
 
       // Fetch invoices
       const { data: invs } = await supabase
@@ -296,56 +277,70 @@ const Wallet = () => {
           dueDate: i.due_date
         })));
       } else {
-        setInvoices(demoInvoices);
+        // Derive invoices from the patient's real purchases
+        setInvoices(allPurchases.map((p) => ({
+          id: p.invoiceId || `INV-${String(p.id).slice(-6).toUpperCase()}`,
+          date: p.date ? new Date(p.date).toISOString().slice(0, 10) : '',
+          description: p.item,
+          amount: Number(p.amount) || 0,
+          status: p.status === 'Paid' ? 'Paid' : p.status,
+          dueDate: p.date ? new Date(p.date).toISOString().slice(0, 10) : ''
+        })));
       }
 
-      // Calculate wallet balance
-      const paidPurchases = (trans || demoPurchases).filter(p => p.status === 'Paid');
-      const totalSpent = paidPurchases.reduce((sum, p) => sum + (p.amount || 0), 0);
+      // Calculate wallet balance from REAL purchases only
+      const paidPurchases = allPurchases.filter(p => p.status === 'Paid');
+      const totalSpent = paidPurchases.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
       const now = new Date();
       const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
       const thisMonthSpent = paidPurchases
-        .filter(p => new Date(p.transaction_date || p.date) >= thisMonthStart)
-        .reduce((sum, p) => sum + (p.amount || 0), 0);
+        .filter(p => new Date(p.date) >= thisMonthStart)
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
       const lastMonthSpent = paidPurchases
         .filter(p => {
-          const d = new Date(p.transaction_date || p.date);
+          const d = new Date(p.date);
           return d >= lastMonthStart && d < thisMonthStart;
         })
-        .reduce((sum, p) => sum + (p.amount || 0), 0);
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
-      const activeSubs = (subs || demoSubscriptions).filter(s => s.status === 'Active').length;
-      const credits = (packs || demoSessionPacks).find(p => p.credit_type === 'rupees' || p.type === 'rupees');
+      const activeSubs = subscriptionsForUi.filter(s => s.status === 'Active').length;
+      const creditsRow = (packs || []).find(p => p.credit_type === 'rupees');
+
+      // Month-over-month spend change (%) — only when there is a prior baseline
+      setSpendChange(lastMonthSpent > 0
+        ? Math.round(((thisMonthSpent - lastMonthSpent) / lastMonthSpent) * 100)
+        : 0);
 
       setWalletBalance({
-        totalSpent: totalSpent || 15499,
-        thisMonth: thisMonthSpent || 2499,
-        lastMonth: lastMonthSpent || 3199,
-        credits: credits?.remaining || 500,
+        totalSpent,
+        thisMonth: thisMonthSpent,
+        lastMonth: lastMonthSpent,
+        credits: Number(creditsRow?.remaining) || 0,
         pendingRefunds: 0,
-        activeSubscriptions: activeSubs || 3
+        activeSubscriptions: activeSubs
       });
 
     } catch (error) {
       console.error('Error fetching wallet data:', error);
-      // Use demo data on error
-      setPaymentMethods(demoPaymentMethods);
-      setUpiIds(demoUpiIds);
-      setPurchases(demoPurchases);
-      setSubscriptions(demoSubscriptions);
-      setSessionPacks(demoSessionPacks);
-      setInvoices(demoInvoices);
+      // On error show empty wallet rather than fake data
+      setPaymentMethods([]);
+      setUpiIds([]);
+      setPurchases([]);
+      setSubscriptions([]);
+      setSessionPacks([]);
+      setInvoices([]);
+      setSpendChange(0);
       setWalletBalance({
-        totalSpent: 15499,
-        thisMonth: 2499,
-        lastMonth: 3199,
-        credits: 500,
+        totalSpent: 0,
+        thisMonth: 0,
+        lastMonth: 0,
+        credits: 0,
         pendingRefunds: 0,
-        activeSubscriptions: 3
+        activeSubscriptions: 0
       });
     } finally {
       setLoading(false);
@@ -361,22 +356,8 @@ const Wallet = () => {
       setPatientName(name || '');
       fetchWalletData(email);
     } else {
+      // Not logged in — show empty wallet, no fake data
       setLoading(false);
-      // Use demo data
-      setPaymentMethods(demoPaymentMethods);
-      setUpiIds(demoUpiIds);
-      setPurchases(demoPurchases);
-      setSubscriptions(demoSubscriptions);
-      setSessionPacks(demoSessionPacks);
-      setInvoices(demoInvoices);
-      setWalletBalance({
-        totalSpent: 15499,
-        thisMonth: 2499,
-        lastMonth: 3199,
-        credits: 500,
-        pendingRefunds: 0,
-        activeSubscriptions: 3
-      });
     }
   }, [fetchWalletData]);
 
@@ -391,8 +372,13 @@ const Wallet = () => {
     const cardType = newCard.number.startsWith('4') ? 'visa' :
                      newCard.number.startsWith('5') ? 'mastercard' : 'rupay';
 
+    if (!patientEmail) {
+      toast.error('Please log in to add a payment method');
+      return;
+    }
+
     const cardData = {
-      patient_email: patientEmail || 'demo@example.com',
+      patient_email: patientEmail,
       method_type: 'card',
       card_type: cardType,
       last_four: last4,
@@ -408,37 +394,14 @@ const Wallet = () => {
 
       if (error) throw error;
 
-      const newMethod = {
-        id: Date.now(),
-        type: cardType,
-        last4: last4,
-        exp: newCard.expiry,
-        isDefault: newCard.isDefault,
-        name: newCard.name
-      };
-
-      if (newCard.isDefault) {
-        setPaymentMethods(prev => prev.map(m => ({ ...m, isDefault: false })));
-      }
-      setPaymentMethods(prev => [...prev, newMethod]);
       setShowAddCard(false);
       setNewCard({ number: '', expiry: '', cvv: '', name: '', isDefault: false });
       toast.success('Card added successfully!');
+      // Reload from DB so the list reflects the persisted record
+      fetchWalletData(patientEmail);
     } catch (error) {
       console.error('Error adding card:', error);
-      // Still add locally for demo
-      const newMethod = {
-        id: Date.now(),
-        type: newCard.number.startsWith('4') ? 'visa' : 'mastercard',
-        last4: newCard.number.replace(/\s/g, '').slice(-4),
-        exp: newCard.expiry,
-        isDefault: newCard.isDefault,
-        name: newCard.name
-      };
-      setPaymentMethods(prev => [...prev, newMethod]);
-      setShowAddCard(false);
-      setNewCard({ number: '', expiry: '', cvv: '', name: '', isDefault: false });
-      toast.success('Card added successfully!');
+      toast.error('Could not save card. Please try again.');
     }
   };
 
@@ -449,11 +412,16 @@ const Wallet = () => {
       return;
     }
 
+    if (!patientEmail) {
+      toast.error('Please log in to add a UPI ID');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('wallet_payment_methods')
         .insert([{
-          patient_email: patientEmail || 'demo@example.com',
+          patient_email: patientEmail,
           method_type: 'upi',
           upi_id: newUPI.upi,
           is_default: newUPI.isDefault
@@ -461,30 +429,14 @@ const Wallet = () => {
 
       if (error) throw error;
 
-      const newUpiEntry = {
-        id: Date.now(),
-        upi: newUPI.upi,
-        isDefault: newUPI.isDefault
-      };
-
-      if (newUPI.isDefault) {
-        setUpiIds(prev => prev.map(u => ({ ...u, isDefault: false })));
-      }
-      setUpiIds(prev => [...prev, newUpiEntry]);
       setShowAddUPI(false);
       setNewUPI({ upi: '', isDefault: false });
       toast.success('UPI ID added successfully!');
+      // Reload from DB so the list reflects the persisted record
+      fetchWalletData(patientEmail);
     } catch (error) {
       console.error('Error adding UPI:', error);
-      const newUpiEntry = {
-        id: Date.now(),
-        upi: newUPI.upi,
-        isDefault: newUPI.isDefault
-      };
-      setUpiIds(prev => [...prev, newUpiEntry]);
-      setShowAddUPI(false);
-      setNewUPI({ upi: '', isDefault: false });
-      toast.success('UPI ID added successfully!');
+      toast.error('Could not save UPI ID. Please try again.');
     }
   };
 
@@ -745,10 +697,12 @@ const Wallet = () => {
                   <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                     <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
                   </div>
-                  <span className="flex items-center text-[10px] sm:text-xs text-green-600 dark:text-green-400">
-                    <ArrowDownRight className="h-3 w-3" />
-                    22%
-                  </span>
+                  {spendChange !== 0 && (
+                    <span className={`flex items-center text-[10px] sm:text-xs ${spendChange < 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {spendChange < 0 ? <ArrowDownRight className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
+                      {Math.abs(spendChange)}%
+                    </span>
+                  )}
                 </div>
                 <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">₹{walletBalance.thisMonth.toLocaleString()}</p>
                 <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-1">This Month</p>
@@ -822,6 +776,9 @@ const Wallet = () => {
                 </button>
               </div>
               <div className="space-y-2 sm:space-y-3">
+                {purchases.length === 0 && (
+                  <p className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400 py-6">No transactions yet.</p>
+                )}
                 {purchases.slice(0, 4).map((purchase) => {
                   const CategoryIcon = getCategoryIcon(purchase.category);
                   return (
@@ -871,6 +828,9 @@ const Wallet = () => {
               </div>
 
               <div className="space-y-2 sm:space-y-3">
+                {paymentMethods.length === 0 && (
+                  <p className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400 py-6">No cards added yet.</p>
+                )}
                 {paymentMethods.map((method) => (
                   <div
                     key={method.id}
@@ -936,6 +896,9 @@ const Wallet = () => {
               </div>
 
               <div className="space-y-2 sm:space-y-3">
+                {upiIds.length === 0 && (
+                  <p className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400 py-6">No UPI IDs added yet.</p>
+                )}
                 {upiIds.map((upi) => (
                   <div
                     key={upi.id}
@@ -988,6 +951,9 @@ const Wallet = () => {
             </div>
 
             <div className="space-y-3 sm:space-y-4">
+              {subscriptions.length === 0 && (
+                <p className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400 py-6">No active subscriptions.</p>
+              )}
               {subscriptions.map((sub) => {
                 const SubIcon = sub.icon;
                 return (
@@ -1095,6 +1061,9 @@ const Wallet = () => {
                 <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Session Packs & Credits</h2>
               </div>
 
+              {sessionPacks.length === 0 && (
+                <p className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400 py-6">No session packs or credits yet.</p>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 {sessionPacks.map((pack) => {
                   const isLow = pack.type !== 'rupees' && pack.remaining <= 1;
@@ -1194,6 +1163,11 @@ const Wallet = () => {
                   </tr>
                 </thead>
                 <tbody>
+                  {invoices.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-6 text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">No invoices yet.</td>
+                    </tr>
+                  )}
                   {invoices.map((invoice) => (
                     <tr key={invoice.id} className="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30">
                       <td className="py-3 sm:py-4 px-3 sm:px-4 text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400">{invoice.id}</td>
@@ -1338,6 +1312,11 @@ const Wallet = () => {
                   </tr>
                 </thead>
                 <tbody>
+                  {filteredPurchases.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-6 text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400">No purchases found.</td>
+                    </tr>
+                  )}
                   {filteredPurchases.map((purchase) => {
                     const CategoryIcon = getCategoryIcon(purchase.category);
                     return (

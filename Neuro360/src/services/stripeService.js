@@ -337,6 +337,8 @@ class StripeService {
       // Log the payment
       await supabase.from('payment_history').insert({
         patient_id: patient.id,
+        patient_email: userEmail.toLowerCase(),
+        payment_type: 'subscription',
         amount: paymentInfo.amount,
         currency: paymentInfo.currency || 'USD',
         payment_provider: 'stripe',

@@ -892,13 +892,13 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
                 <th className="w-[22%] px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Patient
                 </th>
-                <th className="w-[20%] px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="w-[18%] px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Contact
                 </th>
-                <th className="w-[14%] px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Demographics
                 </th>
-                <th className="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="w-[16%] px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Reports
                 </th>
                 <th className="w-[18%] px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -942,7 +942,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
                         )}
                         <div className="text-sm text-gray-500 dark:text-gray-400 capitalize">{patient.gender || 'N/A'}</div>
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
+                      <td className="px-3 py-4 align-top">
                         <div className="space-y-1">
                           {reports.length > 0 ? (() => {
                             const latest = [...reports].sort((a, b) =>
@@ -952,7 +952,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
                               <button
                                 key={latest.id}
                                 onClick={() => handleDownloadReport(latest)}
-                                className="block text-sm text-primary-600 dark:text-blue-400 hover:underline cursor-pointer"
+                                className="block w-full truncate text-left text-sm text-primary-600 dark:text-blue-400 hover:underline cursor-pointer"
                                 title={`Download ${latest.title || latest.fileName || latest.file_name || 'Report'}`}
                               >
                                 {latest.fileName || latest.file_name || 'Report'}

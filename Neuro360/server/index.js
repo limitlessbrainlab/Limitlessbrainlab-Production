@@ -128,7 +128,7 @@ function getEmailFooterHtml() {
               <p style="margin:14px 0 0; color:#555; font-size:14px; font-style:italic;">&ldquo;A healthy brain is the foundation of a limitless life.&rdquo;</p>
               ${sig}
               <p style="margin:0 0 16px; color:#323956; font-size:14px;">Access all the brain health courses &nbsp;<a href="https://www.limitlessbrainacademy.com" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">www.limitlessbrainacademy.com</a></p>
-              <p style="margin:0 0 12px; color:#323956; font-size:14px;">&#128222; &nbsp;WhatsApp: <a href="https://wa.me/971501382897" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">+971 50 138 2897</a></p>
+              <p style="margin:0 0 12px; color:#323956; font-size:14px;">&#128222; &nbsp;WhatsApp: <a href="https://w.app/labchat" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">+971 50 138 2897</a></p>
               <p style="margin:0 0 10px; color:#323956; font-size:14px;">Social Media:</p>
               <table cellpadding="0" cellspacing="0"><tr>
                 <td style="padding-right:14px;"><a href="https://www.instagram.com/drsweta.adatia/?hl=en" target="_blank"><img src="https://img.icons8.com/fluency/48/instagram-new.png" alt="Instagram" width="30" height="30" style="display:block; border:0;"/></a></td>

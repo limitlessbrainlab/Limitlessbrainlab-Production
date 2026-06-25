@@ -2066,14 +2066,7 @@ const PatientDashboard = () => {
             Connect with Neurosense Coach
           </button>
           <button
-            onClick={() => {
-              const phone = '971501382897';
-              const patientName = patientData?.profile?.name || 'Patient';
-              const weakAreas = algorithmResults?.data?.filter(item => item.score < 60).map(item => item.parameter);
-              const focusText = weakAreas?.length > 0 ? `\n\nMy areas needing attention: ${weakAreas.join(', ')}` : '';
-              const message = encodeURIComponent(`Hi NeuroSense Team,\n\nI'm ${patientName} from NeuroSense platform. I'd like to connect with you for personalized brain health guidance and support.${focusText}\n\nLooking forward to hearing from you.`);
-              window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
-            }}
+            onClick={() => window.open('https://w.app/labchat', '_blank')}
             className="px-2 sm:px-4 py-1.5 sm:py-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 transition-colors text-sm flex items-center gap-1"
           >
             <MessageCircle className="h-4 w-4" />

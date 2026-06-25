@@ -314,7 +314,7 @@ const NeuroCoaching = () => {
           </div>
           <div className="flex gap-2 sm:gap-3">
             <a
-              href="https://wa.me/971501382897?text=Hi%20Dr.%20Shweta,%0AI%27m%20interested%20in%20the%205%20Pillars%20of%20Mastery%20program.%0APlease%20schedule%20an%20info%20call."
+              href="https://w.app/labchat"
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1 sm:flex-none px-3 sm:px-6 py-2 sm:py-3 bg-white text-[#323956] font-semibold rounded-lg sm:rounded-xl hover:bg-blue-50 transition-colors flex items-center justify-center text-xs sm:text-base"

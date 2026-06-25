@@ -273,12 +273,7 @@ const Photobiomodulation = () => {
 
   // Open WhatsApp for Dr Roland
   const handleWhatsAppDrRoland = () => {
-    const phone = '971501382897';
-    const name = patientName || user?.name || 'a patient';
-    const message = encodeURIComponent(
-      `Hi Dr. Roland, I'm ${name} from Limitless Brain Lab. I'm interested in Photobiomodulation (PBM) therapy for brain health.`
-    );
-    window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
+    window.open('https://w.app/labchat', '_blank');
     toast.success('Opening WhatsApp...', { icon: '💬' });
   };
 

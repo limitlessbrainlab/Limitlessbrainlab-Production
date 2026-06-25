@@ -1990,7 +1990,7 @@ const BrainCoach = () => {
                 Inquire Now
               </button>
               <button
-                onClick={() => window.open('https://wa.me/971501382897?text=' + encodeURIComponent('Hi, I would like to request a consultation with a Psychologist from Limitless Brain Lab. Please share the available slots.'), '_blank')}
+                onClick={() => window.open('https://w.app/labchat', '_blank')}
                 className="px-5 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors text-sm flex items-center gap-2"
               >
                 <UserCheck className="h-4 w-4" />

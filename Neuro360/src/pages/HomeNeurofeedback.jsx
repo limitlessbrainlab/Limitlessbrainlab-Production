@@ -420,12 +420,7 @@ const HomeNeurofeedback = () => {
 
   // Open WhatsApp for Dr Roland / Neurobics
   const handleWhatsAppDrRoland = () => {
-    const phone = '971501382897';
-    const focusArea = lowestParameters.length > 0 ? lowestParameters[0].label.toLowerCase() : '[focus / stress / sleep / mood / performance]';
-    const message = encodeURIComponent(
-      `Hi Dr. Roland / Neurobics team — I'm completely new to neurofeedback and would love guidance on whether it's a fit.\n\nMy top goal is: ${focusArea}.\n\nA few details: age [ ], main challenge [ ].`
-    );
-    window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
+    window.open('https://w.app/labchat', '_blank');
     toast.success('Opening WhatsApp...', { icon: '💬' });
   };
 

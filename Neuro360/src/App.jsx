@@ -247,7 +247,7 @@ function App() {
 
               {/* WhatsApp Floating Button */}
               <a
-                href="https://wa.me/971501382897"
+                href="https://w.app/labchat"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="fixed bottom-2 right-2 z-50 w-12 h-12 bg-[#25D366] rounded-full flex items-center justify-center shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300"

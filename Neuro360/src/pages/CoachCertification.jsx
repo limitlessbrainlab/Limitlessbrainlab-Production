@@ -417,7 +417,7 @@ const CoachCertification = () => {
                 Apply Now
               </button>
               <a
-                href="https://wa.me/971501382897?text=Hi,%20I'm%20interested%20in%20the%20Brain%20Health%20Coach%20Certification%20program."
+                href="https://w.app/labchat"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-6 py-3 bg-white/20 text-white font-semibold rounded-xl hover:bg-white/30 transition-colors whitespace-nowrap flex items-center justify-center"

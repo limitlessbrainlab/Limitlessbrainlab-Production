@@ -73,7 +73,9 @@ const BrainCoach = () => {
       localStorage.setItem('pendingCoachPayment', JSON.stringify({
         coachName: searchParams.get('coach') || '',
         sessionId: searchParams.get('session_id') || '',
-        coachEmail: searchParams.get('coachEmail') || ''
+        coachEmail: searchParams.get('coachEmail') || '',
+        amount: searchParams.get('amount') || '',
+        currency: searchParams.get('currency') || 'inr'
       }));
       setSearchParams({});
     } else if (paymentParam === 'cancelled') {
@@ -88,13 +90,22 @@ const BrainCoach = () => {
     let pending;
     try { pending = JSON.parse(pendingRaw); }
     catch { localStorage.removeItem('pendingCoachPayment'); return; }
-    const { coachName, sessionId, coachEmail } = pending;
+    const { coachName, sessionId, coachEmail, amount: paidAmount, currency: paidCurrency } = pending;
+
+    // Actual charged amount, carried back from the Stripe success URL.
+    const numericAmount = Number(paidAmount);
+    const hasAmount = Number.isFinite(numericAmount) && numericAmount > 0;
+    const currencyCode = (paidCurrency || 'inr').toLowerCase();
+    const currencySymbol = currencyCode === 'inr' ? '₹' : '$';
+    const formattedAmount = hasAmount
+      ? `${currencySymbol}${numericAmount.toLocaleString('en-IN')}`
+      : '—';
 
     {
       // Show success popup
       setCoachPaymentDetails({
         coachName: coachName ? decodeURIComponent(coachName) : 'Brain Coach',
-        amount: '₹2,500',
+        amount: formattedAmount,
         email: user?.email || '',
         date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
         time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
@@ -134,7 +145,7 @@ const BrainCoach = () => {
             clinic_id: clinicId, patient_id: user.id || null,
             patient_email: user.email.toLowerCase(),
             patient_name: patientRecord?.full_name || patientRecord?.name || user.name || '',
-            amount: 2500, currency: 'INR', status: 'completed', type: 'coaching',
+            amount: hasAmount ? numericAmount : null, currency: currencyCode.toUpperCase(), status: 'completed', type: 'coaching',
             item_name: `Brain Coaching - ${coachName ? decodeURIComponent(coachName) : 'Session'}`,
             assessment_id: coachName ? decodeURIComponent(coachName) : 'coaching',
             stripe_session_id: sessionId || null,
@@ -155,7 +166,7 @@ const BrainCoach = () => {
               customerEmail: user.email,
               customerName: patientRecord?.full_name || patientRecord?.name || user.name || '',
               assessmentName: `Brain Coaching Session - ${coachName ? decodeURIComponent(coachName) : 'Coach'}`,
-              assessmentLink: 'no_link', amountPaid: '2500.00', currency: 'INR',
+              assessmentLink: 'no_link', amountPaid: hasAmount ? numericAmount.toFixed(2) : '', currency: currencyCode.toUpperCase(),
               transactionId: sessionId || '', source: 'patient_dashboard',
               // Admin notification only (patient gets the Calendly "Schedule Now" email below);
               // dedupeKey ensures the admin isn't also emailed by the Stripe webhook for this session.
@@ -967,6 +978,10 @@ const BrainCoach = () => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+      // Coach's real session price (parsed from the display value, e.g. "₹6,500/session")
+      const coachPriceNum = parseInt(String(coach.price ?? '').replace(/[^0-9]/g, ''), 10);
+      const hasCoachPrice = Number.isFinite(coachPriceNum) && coachPriceNum > 0;
+
       // If using free credit, deduct it
       if (useFreeCredit && user?.email) {
         await fetch(`${API_URL}/coaching-credits/use`, {
@@ -1022,7 +1037,7 @@ const BrainCoach = () => {
           customerName: user?.name || 'Patient',
           assessmentName: `Brain Coaching Session - ${coach.name}`,
           assessmentLink: 'no_link',
-          amountPaid: useFreeCredit ? '0.00' : '2500.00', currency: 'INR',
+          amountPaid: useFreeCredit ? '0.00' : (hasCoachPrice ? coachPriceNum.toFixed(2) : ''), currency: 'INR',
           source: 'patient_dashboard',
           adminOnly: true
         })
@@ -1044,7 +1059,7 @@ const BrainCoach = () => {
       // Show booking confirmation popup
       setCoachPaymentDetails({
         coachName: coach.name,
-        amount: useFreeCredit ? 'Free credit' : '₹2,500',
+        amount: useFreeCredit ? 'Free credit' : (hasCoachPrice ? `₹${coachPriceNum.toLocaleString('en-IN')}` : '—'),
         email: user?.email || '',
         date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
         time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),

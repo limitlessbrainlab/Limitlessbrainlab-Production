@@ -2400,7 +2400,7 @@ app.post('/api/create-coaching-checkout', async (req, res) => {
       ],
       mode: 'payment',
       customer_email: patientEmail,
-      success_url: `${FRONTEND_URL}/dashboard/brain-coach?payment=success&coach=${encodeURIComponent(coachName)}&calendly=${encodeURIComponent(resolvedCalendlyUrl)}&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${FRONTEND_URL}/dashboard/brain-coach?payment=success&coach=${encodeURIComponent(coachName)}&calendly=${encodeURIComponent(resolvedCalendlyUrl)}&amount=${price}&currency=${currency.toLowerCase()}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${FRONTEND_URL}/dashboard/brain-coach?payment=cancelled`,
       metadata: {
         type: 'coaching_session',

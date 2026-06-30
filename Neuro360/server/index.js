@@ -7788,6 +7788,24 @@ setupErrorHandling(app);
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`, { environment: process.env.NODE_ENV });
   logger.info(`CORS enabled for: ${allowedOrigins.join(', ')}`);
+
+  // Keep-alive self-ping: Render's free tier spins the instance down after ~15 min of
+  // no inbound requests (cold start of 50s+). Pinging our own PUBLIC url on a timer
+  // counts as inbound activity and keeps the instance warm. Only active on Render
+  // (RENDER_EXTERNAL_URL is injected there), so local/dev is unaffected. Zero added cost.
+  const keepAliveUrl = process.env.RENDER_EXTERNAL_URL;
+  if (keepAliveUrl) {
+    const intervalMs = Number(process.env.KEEP_ALIVE_MS) || 10 * 60 * 1000; // default 10 min (< 15-min sleep window)
+    setInterval(async () => {
+      try {
+        const res = await fetch(`${keepAliveUrl}/api/health`);
+        logger.info(`Keep-alive ping ${res.status}`);
+      } catch (err) {
+        logger.warn(`Keep-alive ping failed: ${err.message}`);
+      }
+    }, intervalMs).unref();
+    logger.info(`Keep-alive enabled: pinging ${keepAliveUrl}/api/health every ${intervalMs / 60000} min`);
+  }
 });
 
 module.exports = app;

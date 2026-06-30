@@ -46,12 +46,23 @@ const metricNorm = (m) => {
   const v = m?.value;
   const rule = METRIC_RULES.find((r) => name.includes(r.match));
   if (rule && typeof v === 'number' && isFinite(v)) {
-    const scale = Math.max(Math.abs(rule.threshold) * 0.5, 1e-6);
+    // Gentler slope: the full 0–1 range spans ±1.5× the threshold (was ±0.5×,
+    // which saturated moderately-poor metrics to exactly 0). The 0.08 floor
+    // keeps a real-but-poor reading from rendering as a hard 0% (which looked
+    // broken to clients) — e.g. a deeply abnormal stress/burnout profile now
+    // reads ~8–20% instead of 0%. Display granularity only; clinical pass/fail
+    // scoring in algorithmCalculator.js is unchanged.
+    const scale = Math.max(Math.abs(rule.threshold) * 1.5, 1e-6);
     const dir = rule.better === 'greater' ? 1 : -1;
     const n = 0.5 + (0.5 * dir * (v - rule.threshold)) / scale;
-    return Math.max(0, Math.min(1, n));
+    return Math.max(0.08, Math.min(1, n));
   }
   // Band / non-numeric metric (Alpha:Theta Balance, Alpha Asymmetry) → use pass/fail.
+  // If a RULE metric (arousal/relaxation/regeneration/…) arrives non-numeric
+  // (e.g. 'Indeterminate' from a failed extraction), still apply the 0.08 floor so
+  // it can't sneak a hard 0% back into the snapshot via displayPercents. True
+  // band/pass-fail metrics (no rule) keep their hard 0.
+  if (rule) return Math.max(0.08, (m?.score >= 1) ? 1 : 0);
   return (m?.score >= 1) ? 1 : 0;
 };
 const paramPercent = (param) => {
@@ -75,6 +86,16 @@ const computeParameterPercents = (resultsArr) => {
     if (v != null) out[key] = v;
   }
   return out;
+};
+
+// Build the NeuroSense Performance Report download name: NPR-<ReportID>-<YYYYMMDD>.pdf
+// ReportID = the 7-digit number from the report id (e.g. "NS-1773769" -> "1773769");
+// date = the assessment/processed date (falls back to today).
+const buildNprFilename = (reportId, dateLike) => {
+  const id = String(reportId || '').replace(/\D/g, '') || 'report';
+  const d = dateLike ? new Date(dateLike) : new Date();
+  const ymd = isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10).replace(/-/g, '');
+  return ymd ? `NPR-${id}-${ymd}.pdf` : `NPR-${id}.pdf`;
 };
 
 // Default LBL clinic — unlimited report credits (never blocked).
@@ -143,6 +164,7 @@ const AlgorithmDataProcessor = () => {
   // (NeuroSense report kept private to Super Admin; Claude report generated & sent instead)
   const [reportMode, setReportMode] = useState('neurosense');
   const [claudeReportUrl, setClaudeReportUrl] = useState(null); // Supabase public URL of the generated Claude report
+  const [claudeReportId, setClaudeReportId] = useState(null); // report id (e.g. NS-1773769) for the NPR-<id>-<date>.pdf download name
   const [savedResultId, setSavedResultId] = useState(null); // id of the saved algorithm_results row (for attaching claude_report_url)
   const [isSendingClaudeReport, setIsSendingClaudeReport] = useState(false); // State for sending Claude report
 
@@ -522,6 +544,7 @@ const AlgorithmDataProcessor = () => {
     // Reset NeuroSense Performance (Claude) report state
     setClaudeReportSent(false);
     setClaudeReportUrl(null);
+    setClaudeReportId(null);
     setClaudeReportError(null);
     setClaudeReportFileName('');
     setClaudeProgress(0);
@@ -1317,6 +1340,7 @@ const AlgorithmDataProcessor = () => {
     const stageStartRef = { current: performance.now() };
     setIsGeneratingClaudeReport(true);
     setClaudeReportUrl(null);
+    setClaudeReportId(null);
     setClaudeReportError(null);
     setClaudeProgress(5);
     setClaudeStages(CLAUDE_STAGE_ORDER.map((s, i) => ({ ...s, status: i === 0 ? 'active' : 'pending', elapsedMs: null })));
@@ -1400,6 +1424,7 @@ const AlgorithmDataProcessor = () => {
       const decoder = new TextDecoder();
       let buffer = '';
       let pdfUrlResult = null;
+      let reportIdResult = null;
       let streamError = null;
       let gotDone = false;
 
@@ -1437,6 +1462,7 @@ const AlgorithmDataProcessor = () => {
           } else if (event === 'done') {
             gotDone = true;
             pdfUrlResult = payload.pdfUrl;
+            reportIdResult = payload.reportId || null;
           } else if (event === 'error') {
             streamError = payload.message || 'Report generation failed.';
           }
@@ -1453,10 +1479,19 @@ const AlgorithmDataProcessor = () => {
       setClaudeProgress(100);
       setClaudeStages((prev) => prev.map((s) => (s.status === 'active' ? { ...s, status: 'done', elapsedMs: performance.now() - (stageStartRef.current || performance.now()) } : s)));
       setClaudeReportUrl(pdfUrlResult);
+      setClaudeReportId(reportIdResult);
       try {
         if (savedResultId) {
           console.log('[Claude Report] Attaching claude_report_url to history row:', savedResultId);
+          // Persist the URL on its own first — known-safe column, must never regress.
           await DatabaseService.update('algorithmResults', savedResultId, { claude_report_url: pdfUrlResult });
+          // Then the report id in a separate call, so a missing column (migration
+          // not yet applied) only loses the id, not the URL.
+          if (reportIdResult) {
+            try {
+              await DatabaseService.update('algorithmResults', savedResultId, { claude_report_id: reportIdResult });
+            } catch (e2) { console.warn('Could not attach claude_report_id (column may be missing — run the migration):', e2?.message); }
+          }
         }
       } catch (e) { console.warn('Could not attach claude_report_url to history row:', e); }
 
@@ -1732,6 +1767,11 @@ const AlgorithmDataProcessor = () => {
           fileName = lastPart.split('?')[0];
         }
       }
+      // Prefer the standard NPR-<ReportID>-<YYYYMMDD>.pdf name so the patient-side
+      // download matches the admin-side download (PatientDashboard uses this fileName).
+      if (claudeReportId) {
+        fileName = buildNprFilename(claudeReportId, new Date().toISOString());
+      }
 
       const reportData = {
         clinicId: clinicId,
@@ -1824,10 +1864,13 @@ const AlgorithmDataProcessor = () => {
       // Hard block when the clinic has no report credits left.
       if (await blockIfNoCredits(clinicId)) return;
 
+      // Standard NPR-<ReportID>-<YYYYMMDD>.pdf name (matches the download buttons).
+      const nprName = buildNprFilename(record.claude_report_id || claudeReportId, record.processed_at || record.created_at || selectedPatient?.lastProcessed);
+
       const reportData = {
         clinicId: clinicId,
         patientId: record.patientId || selectedPatient?.id,
-        fileName: 'claude-brain-report.pdf',
+        fileName: nprName,
         filePath: url,
         reportType: 'Claude Report',
         reportData: {
@@ -1866,7 +1909,7 @@ const AlgorithmDataProcessor = () => {
           clinicName: clinicName,
           clinicEmail: clinicEmail,
           reportUrl: url,
-          reportFileName: 'claude-brain-report.pdf',
+          reportFileName: nprName,
           reportType: 'claude',
           generatedAt: record.processed_at || record.processedAt || record.created_at || record.createdAt || new Date().toISOString()
         })
@@ -3199,7 +3242,7 @@ const AlgorithmDataProcessor = () => {
                   {claudeReportUrl && (
                     <>
                       <button
-                        onClick={() => downloadPdfFromUrl(claudeReportUrl, `Claude-Brain-Report-${getPatientName(selectedPatient).replace(/[^a-z0-9]/gi, '-')}.pdf`)}
+                        onClick={() => downloadPdfFromUrl(claudeReportUrl, buildNprFilename(claudeReportId, new Date().toISOString()))}
                         className="w-full py-3 px-4 rounded-lg font-medium flex items-center justify-center space-x-2 transition-colors shadow-md bg-green-600 hover:bg-green-700 text-white"
                         title="Download the generated Claude report"
                       >
@@ -3603,7 +3646,7 @@ const AlgorithmDataProcessor = () => {
                     {/* Claude Report buttons - Show only if this record has a Claude report */}
                     {(record.claude_report_url || record.claudeReportUrl) && (
                       <button
-                        onClick={() => downloadPdfFromUrl(record.claude_report_url || record.claudeReportUrl, `Claude-Brain-Report-${getPatientName(selectedPatient).replace(/[^a-z0-9]/gi, '-')}.pdf`)}
+                        onClick={() => downloadPdfFromUrl(record.claude_report_url || record.claudeReportUrl, buildNprFilename(record.claude_report_id || claudeReportId, record.processed_at || record.created_at || selectedPatient?.lastProcessed))}
                         className="px-3 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex items-center justify-center space-x-1"
                         title="Download the Neurosense Performance Report"
                       >

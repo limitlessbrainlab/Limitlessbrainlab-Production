@@ -167,6 +167,16 @@ function parseGatewayJson(responseData) {
  * Fetch the last N saved report examples from the VPS for few-shot prompting.
  * Returns [] on any error — never blocks report generation.
  */
+// Reports generated while the scoring bug was live described stress/burnout as
+// "0% / zero regulation / critically low recovery". Those narratives were saved
+// to the VPS example store and would otherwise be fed back as "match this style"
+// few-shot examples, propagating the broken framing even after the numbers are
+// fixed. Drop any such poisoned example before it reaches the prompt.
+function isPoisonedExample(ex) {
+  const s = typeof ex === 'string' ? ex : JSON.stringify(ex || '');
+  return /zero stress regulation|stress regulation at 0|burnout resistance at 0|0%\s*means|critically low recovery/i.test(s);
+}
+
 async function fetchReportExamples() {
   if (!MASTER_KEY || !GATEWAY_URL) return [];
   try {
@@ -174,7 +184,12 @@ async function fetchReportExamples() {
       headers: { 'X-Nexaproc-Key': MASTER_KEY },
       timeout: 10000,
     });
-    return Array.isArray(response.data?.examples) ? response.data.examples : [];
+    const examples = Array.isArray(response.data?.examples) ? response.data.examples : [];
+    const clean = examples.filter((ex) => !isPoisonedExample(ex));
+    if (clean.length !== examples.length) {
+      console.warn(`[fetchReportExamples] dropped ${examples.length - clean.length} poisoned (0%-stress) example(s) from few-shot set`);
+    }
+    return clean;
   } catch (e) {
     console.warn('[fetchReportExamples] could not fetch examples:', e.message);
     return [];
@@ -187,6 +202,11 @@ async function fetchReportExamples() {
  */
 function saveReportExample(narrative, patient) {
   if (!MASTER_KEY || !GATEWAY_URL) return;
+  // Never feed a broken 0%-stress narrative back into the learned-example store.
+  if (isPoisonedExample(narrative)) {
+    console.warn('[saveReportExample] skipped saving a poisoned (0%-stress) narrative as a learned example');
+    return;
+  }
   axios.post(
     `${GATEWAY_URL}/api/save-example`,
     { narrative, patient },

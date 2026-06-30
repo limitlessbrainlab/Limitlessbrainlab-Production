@@ -251,7 +251,7 @@ class DatabaseService {
       'algorithm_results': [
         'id', 'patient_id', 'patient_name', 'clinic_id',
         'algorithm_name', 'input_data', 'output_data', 'results',
-        'eyes_open_file', 'eyes_closed_file', 'pdf_url', 'claude_report_url', 'status', 'error_message',
+        'eyes_open_file', 'eyes_closed_file', 'pdf_url', 'claude_report_url', 'claude_report_id', 'status', 'error_message',
         'parameter_notes', 'report_mode', 'processed_at', 'processed_by', 'created_at', 'updated_at'
       ],
       'clinical_reports': [

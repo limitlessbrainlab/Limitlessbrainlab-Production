@@ -139,7 +139,12 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
     // onProgress fires 'narrative' then 'render' from inside the generator.
     const { pdf } = await generateBrainReportPdf(reportData, undefined, progress);
 
-    const base = (reportData.patient.name || req.file.originalname || 'report').replace(/[^a-z0-9]/gi, '-');
+    // Storage key + download name use the report id (e.g. NS-1773769 -> 1773769)
+    // so files are short and unique per patient+assessment: NPR-<id>-<ts>.pdf.
+    const reportIdDigits = String(reportData.patient.reportId || '').replace(/\D/g, '');
+    const base = reportIdDigits
+      ? `NPR-${reportIdDigits}`
+      : (reportData.patient.name || req.file.originalname || 'report').replace(/[^a-z0-9]/gi, '-');
 
     // Upload the generated PDF to the same 'neurosense-reports' bucket the QEEG
     // flow uses, then stream its public URL in the terminal `done` event. A
@@ -154,7 +159,7 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
         throw new Error('Supabase upload returned an invalid result');
       }
       console.log('🔗 Claude Report uploaded to Supabase:', uploadResult.url);
-      send('done', { success: true, pdfUrl: uploadResult.url });
+      send('done', { success: true, pdfUrl: uploadResult.url, reportId: reportData.patient.reportId });
     } finally {
       fs.unlink(outPath, () => {});
     }

@@ -92,8 +92,11 @@ function buildReportData(qeegData, algoResults, patient = {}, displayPercents = 
   const learning = score(params, 'Learning');
   const creativity = score(params, 'Creativity');
 
-  const pct = (s) => Math.round((s / 3) * 100);
-  const invPct = (red) => Math.round(((3 - red) / 3) * 100);
+  // 8% floor so a fully-failed marker never renders as a hard 0% (which looked
+  // broken). Only the fallback path when no continuous displayPercents arrive;
+  // clinical pass/fail scoring is unchanged.
+  const pct = (s) => Math.max(8, Math.round((s / 3) * 100));
+  const invPct = (red) => Math.max(8, Math.round(((3 - red) / 3) * 100));
 
   // Continuous display percentages (0–100) computed upstream from the real metric
   // margins. When present, the snapshot bars use these instead of the coarse

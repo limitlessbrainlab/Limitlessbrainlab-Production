@@ -11,6 +11,7 @@ const {
   loginLimiter,
   uploadLimiter,
   emailLimiter,
+  paymentLimiter,
   reportLimiter,
   passwordResetLimiter
 } = require('./rateLimiter');
@@ -96,6 +97,7 @@ const setupRateLimiters = (app) => {
     loginLimiter,
     uploadLimiter,
     emailLimiter,
+    paymentLimiter,
     reportLimiter,
     passwordResetLimiter
   };

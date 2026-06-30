@@ -60,7 +60,10 @@ const emailTransporter = nodemailer.createTransport(
   process.env.BREVO_SMTP_USER
     ? {
         host: 'smtp-relay.brevo.com',
-        port: 587,
+        // Render's free plan blocks outbound SMTP on 25/465/587, but NOT 2525 (which
+        // Brevo also serves). Default to 2525 so email works on Render free; override
+        // with BREVO_SMTP_PORT if needed.
+        port: Number(process.env.BREVO_SMTP_PORT) || 2525,
         secure: false,
         auth: {
           user: process.env.BREVO_SMTP_USER,

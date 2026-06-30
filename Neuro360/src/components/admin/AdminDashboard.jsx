@@ -15,8 +15,9 @@ import {
   Database
 } from 'lucide-react';
 import DatabaseService from '../../services/databaseService';
+import { buildRecentActivities, getIconColor } from './recentActivitiesHelpers';
 
-const AdminDashboard = ({ analytics = {}, onRefresh }) => {
+const AdminDashboard = ({ analytics = {} }) => {
   const navigate = useNavigate();
   const [realTimeData, setRealTimeData] = useState({});
   const [allClinics, setAllClinics] = useState([]);
@@ -117,76 +118,8 @@ const AdminDashboard = ({ analytics = {}, onRefresh }) => {
     }
   ];
 
-
-  // Generate real-time activities from actual data
-  const generateRecentActivities = () => {
-    const activities = [];
-    
-    // Recent clinics
-    const recentClinics = allClinics
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 3);
-    
-    recentClinics.forEach((clinic, index) => {
-      activities.push({
-        id: `clinic-${clinic.id}`,
-        type: 'clinic',
-        message: `New clinic "${clinic.name}" registered`,
-        time: `${index + 1} ${index === 0 ? 'hour' : 'hours'} ago`,
-        icon: Building2,
-        color: 'blue'
-      });
-    });
-
-    // Recent reports
-    const recentReports = allReports
-      .sort((a, b) => new Date(b.createdAt || b.uploadedAt) - new Date(a.createdAt || a.uploadedAt))
-      .slice(0, 2);
-    
-    recentReports.forEach((report, index) => {
-      const clinic = allClinics.find(c => c.id === report.clinicId);
-      activities.push({
-        id: `report-${report.id}`,
-        type: 'report',
-        message: `New report uploaded by ${clinic ? clinic.name : 'Unknown Clinic'}`,
-        time: `${index + 2} hours ago`,
-        icon: FileText,
-        color: 'green'
-      });
-    });
-
-    // Recent payments
-    const recentPayments = allPayments
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 2);
-    
-    recentPayments.forEach((payment, index) => {
-      const clinic = allClinics.find(c => c.id === payment.clinicId);
-      activities.push({
-        id: `payment-${payment.id}`,
-        type: 'payment',
-        message: `Payment of ₹${payment.amount} received from ${clinic ? clinic.name : 'Unknown Clinic'}`,
-        time: `${index + 3} hours ago`,
-        icon: DollarSign,
-        color: 'purple'
-      });
-    });
-
-    return activities.slice(0, 6); // Show only last 6 activities
-  };
-
-  const recentActivities = generateRecentActivities();
-
-  const getIconColor = (color) => {
-    const colors = {
-      blue: 'bg-[#323956]',
-      green: 'bg-[#323956]',
-      purple: 'bg-purple-500',
-      yellow: 'bg-yellow-500',
-      red: 'bg-red-500'
-    };
-    return colors[color] || 'bg-gray-500';
-  };
+  // Real-time activities from actual data, newest first (widget shows 6).
+  const recentActivities = buildRecentActivities(allClinics, allReports, allPayments, 6).slice(0, 6);
 
   return (
     <div className="space-y-6">
@@ -326,7 +259,7 @@ const AdminDashboard = ({ analytics = {}, onRefresh }) => {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activities</h3>
             </div>
             <button
-              onClick={onRefresh}
+              onClick={() => navigate('/admin/activities')}
               className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
             >
               View All

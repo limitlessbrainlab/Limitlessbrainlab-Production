@@ -547,15 +547,98 @@ const Wallet = () => {
     }
   };
 
-  // Download invoice
-  const handleDownloadInvoice = (invoiceId) => {
-    toast.success(`Downloading ${invoiceId}...`);
-    // In production, this would trigger actual PDF download
+  // Build a printable, self-contained HTML invoice/receipt from an invoice-like record
+  const buildInvoiceHtml = (inv) => {
+    const amount = Number(inv.amount) || 0;
+    const issued = inv.date ? new Date(inv.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const esc = (v) => String(v ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${esc(inv.id)}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: #1f2937; margin: 0; padding: 40px; }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2563eb; padding-bottom: 16px; }
+  .brand { font-size: 22px; font-weight: 700; color: #2563eb; }
+  .muted { color: #6b7280; font-size: 13px; }
+  h1 { font-size: 18px; margin: 24px 0 4px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+  th { background: #f9fafb; text-transform: uppercase; font-size: 11px; color: #6b7280; }
+  .right { text-align: right; }
+  .total { font-size: 18px; font-weight: 700; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: #dcfce7; color: #15803d; }
+  .foot { margin-top: 32px; color: #6b7280; font-size: 12px; text-align: center; }
+  @media print { body { padding: 0; } }
+</style></head>
+<body><div class="wrap">
+  <div class="head">
+    <div><div class="brand">Neuro360</div><div class="muted">Brain Health & Wellness</div></div>
+    <div class="right"><div style="font-weight:700">INVOICE</div><div class="muted">${esc(inv.id)}</div><div class="muted">${esc(issued)}</div></div>
+  </div>
+  <h1>Billed To</h1>
+  <div class="muted">${esc(patientName || 'Patient')}<br>${esc(patientEmail || '')}</div>
+  <table>
+    <thead><tr><th>Description</th><th class="right">Amount</th></tr></thead>
+    <tbody>
+      <tr><td>${esc(inv.description || 'Purchase')}</td><td class="right">$${amount.toFixed(2)}</td></tr>
+    </tbody>
+    <tfoot>
+      <tr><td class="right total">Total</td><td class="right total">$${amount.toFixed(2)} USD</td></tr>
+      <tr><td class="right">Status</td><td class="right"><span class="badge">${esc(inv.status || 'Paid')}</span></td></tr>
+    </tfoot>
+  </table>
+  <div class="foot">Thank you for choosing Neuro360. This is a computer-generated invoice.</div>
+</div></body></html>`;
   };
 
-  // Email invoice
-  const handleEmailInvoice = (invoiceId) => {
-    toast.success(`Invoice ${invoiceId} sent to your email`);
+  // View invoice — open the rendered invoice in a new tab/window (printable)
+  const handleViewInvoice = (inv) => {
+    const w = window.open('', '_blank');
+    if (!w) { toast.error('Please allow pop-ups to view the invoice'); return; }
+    w.document.write(buildInvoiceHtml(inv));
+    w.document.close();
+  };
+
+  // Download invoice — save the rendered invoice as a real file
+  const handleDownloadInvoice = (inv) => {
+    try {
+      const blob = new Blob([buildInvoiceHtml(inv)], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Invoice-${inv.id}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`Invoice ${inv.id} downloaded`);
+    } catch (e) {
+      console.error('Invoice download failed:', e);
+      toast.error('Could not download the invoice');
+    }
+  };
+
+  // Email invoice — render server-side and send via the backend mailer
+  const handleEmailInvoice = async (inv) => {
+    if (!patientEmail) { toast.error('Please log in to email your invoice'); return; }
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const t = toast.loading(`Emailing invoice ${inv.id}...`);
+    try {
+      const res = await fetch(`${API_URL}/wallet/invoice-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: patientEmail,
+          name: patientName || '',
+          invoice: { id: inv.id, date: inv.date, description: inv.description, amount: Number(inv.amount) || 0, status: inv.status || 'Paid' }
+        })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast.success(`Invoice ${inv.id} sent to ${patientEmail}`, { id: t });
+    } catch (e) {
+      console.error('Invoice email failed:', e);
+      toast.error('Could not email the invoice. Please try again.', { id: t });
+    }
   };
 
   // Use session pack
@@ -742,7 +825,7 @@ const Wallet = () => {
                   </div>
                   <span className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">Total Spent</span>
                 </div>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">₹{walletBalance.totalSpent.toLocaleString()}</p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">${walletBalance.totalSpent.toLocaleString()}</p>
                 <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-1">All time</p>
               </div>
 
@@ -758,7 +841,7 @@ const Wallet = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">₹{walletBalance.thisMonth.toLocaleString()}</p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">${walletBalance.thisMonth.toLocaleString()}</p>
                 <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-1">This Month</p>
               </div>
 
@@ -847,7 +930,7 @@ const Wallet = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">₹{purchase.amount}</p>
+                        <p className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">${purchase.amount}</p>
                         <span className={`text-[10px] sm:text-xs ${purchase.status === 'Paid' ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                           {purchase.status}
                         </span>
@@ -984,9 +1067,15 @@ const Wallet = () => {
               <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mb-4">Digital Wallets</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {['Paytm', 'PhonePe', 'Google Pay', 'Amazon Pay'].map((wallet) => (
-                  <div key={wallet} className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg sm:rounded-xl border border-gray-200 dark:border-gray-600 text-center">
+                  <div key={wallet} className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg sm:rounded-xl border border-gray-200 dark:border-gray-600 text-center opacity-75">
                     <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">{wallet}</p>
-                    <button className="mt-2 text-[10px] sm:text-xs text-blue-600 dark:text-blue-400 hover:underline">Link</button>
+                    <button
+                      disabled
+                      title="Coming soon"
+                      className="mt-2 text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                    >
+                      Coming soon
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1042,7 +1131,7 @@ const Wallet = () => {
                           <span>Plan: <strong>{sub.plan}</strong></span>
                           {sub.renewal !== '-' && <span>Renewal: <strong>{sub.renewal}</strong></span>}
                           <span>
-                            <strong>₹{sub.amount}</strong>
+                            <strong>${sub.amount}</strong>
                             {sub.period !== 'one-time' && <span>/{sub.period}</span>}
                           </span>
                         </div>
@@ -1195,7 +1284,10 @@ const Wallet = () => {
                 <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">Invoices</h2>
               </div>
               <button
-                onClick={() => toast.success('Downloading all invoices...')}
+                onClick={() => {
+                  if (!invoices.length) { toast.error('No invoices to download'); return; }
+                  invoices.forEach(inv => handleDownloadInvoice(inv));
+                }}
                 className="flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-xs sm:text-sm font-medium self-end sm:self-auto"
               >
                 <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
@@ -1237,25 +1329,25 @@ const Wallet = () => {
                           {invoice.status}
                         </span>
                       </td>
-                      <td className="py-3 sm:py-4 px-3 sm:px-4 text-right text-xs sm:text-sm font-medium text-gray-900 dark:text-white">₹{invoice.amount}</td>
+                      <td className="py-3 sm:py-4 px-3 sm:px-4 text-right text-xs sm:text-sm font-medium text-gray-900 dark:text-white">${invoice.amount}</td>
                       <td className="py-3 sm:py-4 px-3 sm:px-4 text-right">
                         <div className="flex items-center justify-end space-x-1 sm:space-x-2">
                           <button
-                            onClick={() => toast.success(`Viewing ${invoice.id}...`)}
+                            onClick={() => handleViewInvoice(invoice)}
                             className="p-1.5 sm:p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                             title="View"
                           >
                             <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           </button>
                           <button
-                            onClick={() => handleDownloadInvoice(invoice.id)}
+                            onClick={() => handleDownloadInvoice(invoice)}
                             className="p-1.5 sm:p-2 text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition-colors"
                             title="Download"
                           >
                             <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           </button>
                           <button
-                            onClick={() => handleEmailInvoice(invoice.id)}
+                            onClick={() => handleEmailInvoice(invoice)}
                             className="p-1.5 sm:p-2 text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
                             title="Email"
                           >
@@ -1403,10 +1495,20 @@ const Wallet = () => {
                           </span>
                         </td>
                         <td className="py-3 sm:py-4 px-3 sm:px-4 text-right text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
-                          ₹{purchase.amount}
+                          ${purchase.amount}
                         </td>
                         <td className="py-3 sm:py-4 px-3 sm:px-4 text-right">
-                          <button className="p-1.5 sm:p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                          <button
+                            onClick={() => handleDownloadInvoice({
+                              id: purchase.invoiceId || `INV-${String(purchase.id).slice(-6).toUpperCase()}`,
+                              date: purchase.date,
+                              description: purchase.item,
+                              amount: purchase.amount,
+                              status: purchase.status
+                            })}
+                            className="p-1.5 sm:p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                            title="Download receipt"
+                          >
                             <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           </button>
                         </td>

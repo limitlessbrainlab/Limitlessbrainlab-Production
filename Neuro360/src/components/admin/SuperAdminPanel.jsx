@@ -9,6 +9,7 @@ import AlertDashboard from './AlertDashboard';
 import DashboardLayout from '../layout/DashboardLayout';
 import DDOLink from '../DDOLink';
 import AdminDashboard from './AdminDashboard';
+import RecentActivities from './RecentActivities';
 import SystemSettings from './SystemSettings';
 import PaymentHistory from './PaymentHistory';
 import DataAccess from './DataAccess';
@@ -133,7 +134,9 @@ const SuperAdminPanel = () => {
       
       switch (activeTab) {
         case 'dashboard':
-          return <AdminDashboard analytics={analytics} onRefresh={loadAnalytics} />;
+          return <AdminDashboard analytics={analytics} />;
+        case 'activities':
+          return <RecentActivities />;
         case 'clinics':
           return <ClinicManagement onUpdate={loadAnalytics} />;
         case 'reports':
@@ -173,7 +176,7 @@ const SuperAdminPanel = () => {
         case 'settings':
           return <SystemSettings />;
         default:
-          return <AdminDashboard analytics={analytics} onRefresh={loadAnalytics} />;
+          return <AdminDashboard analytics={analytics} />;
       }
     } catch (error) {
       console.error('ERROR: Error rendering content:', error);
@@ -211,6 +214,7 @@ const SuperAdminPanel = () => {
   const getPageTitle = () => {
     switch (activeTab) {
       case 'dashboard': return 'Super Admin Dashboard';
+      case 'activities': return 'Recent Activities';
       case 'clinics': return 'Clinic/Partner Management';
       case 'reports': return selectedClinic ? `Patient Reports - ${clinics.find(c => c.id === selectedClinic)?.name || 'Selected Clinic'}` : 'Patient Reports';
       case 'payments': return selectedClinic ? `Payment History - ${clinics.find(c => c.id === selectedClinic)?.name || 'Selected Clinic'}` : 'Payment History';

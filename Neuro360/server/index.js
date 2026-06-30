@@ -805,10 +805,31 @@ app.use((req, res, next) => {
   next();
 });
 
+// Wire route-specific rate limiters (previously defined but never applied).
+// Placed after body parsing so email-keyed limiters can read req.body.
+app.use([
+  '/api/send-otp', '/api/verify-otp', '/api/send-password-reset', '/api/send-password-email',
+  '/api/send-welcome-email', '/api/send-report-email', '/api/send-assessment-email',
+  '/api/send-no-credit-email', '/api/send-partner-welcome-email', '/api/send-partner-email-update',
+  '/api/notifications/send', '/api/check-email-exists', '/api/wallet/invoice-email'
+], rateLimiters.emailLimiter);
+app.use(['/api/send-password-reset', '/api/send-password-email'], rateLimiters.passwordResetLimiter);
+app.use([
+  '/api/create-frequency-checkout', '/api/create-meditation-checkout', '/api/create-report-checkout',
+  '/api/create-coaching-checkout', '/api/create-assessment-checkout',
+  '/api/coaching-credits/grant', '/api/coaching-credits/use'
+], rateLimiters.paymentLimiter);
+
 // Custom route to serve PDFs with download headers
 app.get('/uploads/:filename', (req, res) => {
-  const filename = req.params.filename;
-  const filePath = path.join(__dirname, 'uploads', filename);
+  // Prevent path traversal: collapse any directory components and confine to uploads/
+  const filename = path.basename(req.params.filename);
+  const uploadsDir = path.join(__dirname, 'uploads');
+  const filePath = path.join(uploadsDir, filename);
+  if (filePath !== path.join(uploadsDir, path.basename(filePath)) ||
+      !path.resolve(filePath).startsWith(path.resolve(uploadsDir) + path.sep)) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
 
   // Check if file exists
   if (!fs.existsSync(filePath)) {
@@ -2530,6 +2551,61 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
 });
 
 // Send assessment JotForm link email after successful purchase
+// Email a wallet invoice/receipt to the patient
+app.post('/api/wallet/invoice-email', async (req, res) => {
+  try {
+    const { email, name, invoice } = req.body || {};
+    if (!email || !invoice || !invoice.id) {
+      return res.status(400).json({ success: false, message: 'email and invoice are required' });
+    }
+
+    const esc = (v) => String(v ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    const amount = Number(invoice.amount) || 0;
+    const issued = invoice.date
+      ? new Date(invoice.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+      : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      to: email,
+      subject: `Your Neuro360 Invoice ${invoice.id}`,
+      attachments: getLogoAttachment(),
+      html: `
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"></head>
+        <body style="margin:0;padding:20px;font-family:Arial,sans-serif;background:#f4f7fa;">
+          <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+            <div style="background:linear-gradient(135deg,#323956 0%,#1a1f36 100%);padding:24px;text-align:center;">
+              <img src="cid:company-logo" alt="Neuro360" style="width:70px;height:70px;border-radius:50%;object-fit:cover;margin-bottom:8px;" />
+              <h1 style="color:#fff;margin:0;font-size:20px;">Invoice ${esc(invoice.id)}</h1>
+            </div>
+            <div style="padding:24px;color:#1f2937;">
+              <p style="margin:0 0 4px;">Hi ${esc(name || 'there')},</p>
+              <p style="margin:0 0 16px;color:#6b7280;font-size:14px;">Here is your invoice from Neuro360, issued ${esc(issued)}.</p>
+              <table style="width:100%;border-collapse:collapse;font-size:14px;">
+                <tr><td style="padding:10px 0;border-bottom:1px solid #e5e7eb;">${esc(invoice.description || 'Purchase')}</td>
+                    <td style="padding:10px 0;border-bottom:1px solid #e5e7eb;text-align:right;">$${amount.toFixed(2)}</td></tr>
+                <tr><td style="padding:12px 0;font-weight:700;">Total</td>
+                    <td style="padding:12px 0;font-weight:700;text-align:right;">$${amount.toFixed(2)} USD</td></tr>
+                <tr><td style="padding:4px 0;color:#6b7280;">Status</td>
+                    <td style="padding:4px 0;text-align:right;color:#15803d;font-weight:600;">${esc(invoice.status || 'Paid')}</td></tr>
+              </table>
+              <p style="margin:24px 0 0;color:#6b7280;font-size:12px;text-align:center;">Thank you for choosing Neuro360. This is a computer-generated invoice.</p>
+            </div>
+          </div>
+        </body></html>
+      `
+    };
+
+    await emailTransporter.sendMail(mailOptions);
+    console.log(`SUCCESS: Wallet invoice ${invoice.id} emailed to ${email}`);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Wallet invoice email error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to send invoice email' });
+  }
+});
+
 app.post('/api/send-assessment-email', async (req, res) => {
   try {
     let { customerEmail, customerName, assessmentName, assessmentLink, amountPaid, currency, transactionId, source, clinicName, clinicId, patientPhone, patientDob, patientGender, patientUid, adminOnly, dedupeKey } = req.body;
@@ -2992,13 +3068,14 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
   let event;
 
+  if (!webhookSecret) {
+    // Never trust an unsigned webhook body — refuse rather than process forged events.
+    console.error('Stripe webhook rejected: STRIPE_WEBHOOK_SECRET is not configured');
+    return res.status(500).send('Webhook secret not configured');
+  }
+
   try {
-    if (webhookSecret) {
-      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-    } else {
-      // For testing without webhook secret
-      event = JSON.parse(req.body);
-    }
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
   } catch (err) {
     console.error('Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -7603,7 +7680,8 @@ app.post('/api/send-partner-email-update', async (req, res) => {
     };
 
     await emailTransporter.sendMail(mailOptions);
-    res.json({ success: true, message: 'Email update notification sent', password: newPassword });
+    // Do not return the generated password in the API response; it is delivered by email only.
+    res.json({ success: true, message: 'Email update notification sent' });
 
   } catch (error) {
     console.error('❌ Error:', error);

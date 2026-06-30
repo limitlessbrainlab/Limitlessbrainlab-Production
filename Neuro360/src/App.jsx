@@ -182,6 +182,7 @@ function App() {
 
                   {/* Super Admin Routes */}
                   <Route path="/admin" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
+                  <Route path="/admin/activities" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
                   <Route path="/admin/clinics" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
                   <Route path="/admin/reports" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
                   <Route path="/admin/payments" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />

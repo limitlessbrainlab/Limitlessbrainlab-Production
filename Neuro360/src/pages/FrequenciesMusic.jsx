@@ -212,20 +212,12 @@ const FrequenciesMusic = () => {
     const { packId: pId, sessionId: sId } = JSON.parse(pending);
     localStorage.removeItem('pendingFreqPayment');
 
-    const packNames = {
-      delta: 'Delta Binaural Beats', theta: 'Theta Binaural Beats',
-      alpha: 'Alpha Binaural Beats', beta: 'Beta Binaural Beats',
-      '285hz': '285Hz Tissue Healing', '396hz': '396Hz Release Fear',
-      '417hz': '417Hz Facilitating Change', '528hz': '528Hz Love Frequency',
-      '639hz': '639Hz Connecting Relationships', '741hz': '741Hz Awakening Intuition'
-    };
-    const packPrices = {
-      delta: 22, theta: 29, alpha: 29, beta: 29,
-      '285hz': 29, '396hz': 29, '417hz': 29, '528hz': 29, '639hz': 29, '741hz': 29
-    };
-
-    const amount = packPrices[pId] || 29;
-    const packName = packNames[pId] || 'Frequency Pack';
+    // Derive the price/name from the canonical frequencyPacks source of truth so the
+    // recorded amount always matches the offered (and Stripe-charged) price. Keying off a
+    // separate map previously caused gamma/solfeggio packs to fall back to a wrong $29.
+    const purchasedPack = frequencyPacks.find(p => p.id === pId);
+    const amount = purchasedPack?.price ?? 29;
+    const packName = purchasedPack?.name || 'Frequency Pack';
 
     // Show success popup immediately and optimistically unlock the pack
     setPurchasedPackId(pId);
@@ -277,8 +269,7 @@ const FrequenciesMusic = () => {
             clinicNameForEmail = clinicRow?.name || '';
           }
 
-          const amt = packPrices[pId] || 29;
-          const packName = packNames[pId] || 'Frequency Pack';
+          const amt = amount;
 
           // Save to patient_payments
           await supabase.from('patient_payments').insert({

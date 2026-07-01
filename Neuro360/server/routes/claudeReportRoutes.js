@@ -66,50 +66,6 @@ const STAGE_LABELS = {
 };
 const STAGE_PCT = { reading: 10, extract: 25, build: 55, narrative: 60, render: 88, saving: 95 };
 
-function parseJsonField(value) {
-  if (!value || typeof value !== 'string') return null;
-  try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === 'object' ? parsed : null;
-  } catch (_) {
-    return null;
-  }
-}
-
-function hasAnyValue(obj) {
-  return !!obj && Object.values(obj).some((v) => v !== null && v !== undefined);
-}
-
-function mergeReportSources(extractedSource, clientSource) {
-  const extracted = extractedSource && typeof extractedSource === 'object' ? extractedSource : {};
-  const client = clientSource && typeof clientSource === 'object' ? clientSource : {};
-
-  return {
-    ...extracted,
-    ...client,
-    patient: {
-      ...(extracted.patient || {}),
-      ...(client.patient || {}),
-      // The uploaded NeuroSense PDF is the authority for the printed assessment
-      // date / report id. The client-side source is primarily for scores.
-      assessmentDate: extracted.patient?.assessmentDate || client.patient?.assessmentDate || null,
-      reportId: extracted.patient?.reportId || client.patient?.reportId || null,
-    },
-    brainwave: {
-      ...(client.brainwave || {}),
-      ...(extracted.brainwave || {}),
-    },
-    markers: {
-      ...(extracted.markers || {}),
-      ...(client.markers || {}),
-    },
-    deepDive: {
-      ...(extracted.deepDive || {}),
-      ...(client.deepDive || {}),
-    },
-  };
-}
-
 router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
   const tempPath = req.file?.path;
 
@@ -160,43 +116,22 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
     }
     if (text.length > MAX_TEXT_CHARS) text = text.slice(0, MAX_TEXT_CHARS);
 
-    const clientSource = parseJsonField(req.body && req.body.reportSource);
-
-    // Call 1: transcribe context off the uploaded report (fast, small output).
-    // If the browser sent result-card data, those scores override the PDF/Claude
-    // transcription below. The transcription is only fallback/context.
+    // Call 1: transcribe the numbers off the uploaded report (fast, small output).
     progress('extract');
-    let extractedSource = null;
-    try {
-      extractedSource = await extractReportSource(text);
-    } catch (extractError) {
-      if (!clientSource) throw extractError;
-      console.warn('[Claude Report] PDF number transcription failed; using client result-card source:', extractError.message);
-    }
-    if (extractedSource) {
-      const idMatch = text.match(/\bNS-\d{5,}\b/i);
-      if (idMatch) {
-        extractedSource.patient = { ...(extractedSource.patient || {}), reportId: idMatch[0].toUpperCase() };
-      }
-    }
-    const source = mergeReportSources(extractedSource, clientSource);
-    if (!hasAnyValue(source.markers)) {
-      throw new Error('Could not read the report: no performance scores were found in the uploaded PDF or result-card source.');
-    }
+    const source = await extractReportSource(text);
 
-    // Official per-parameter display percentages computed by the caller from the
-    // result-card score mapping. When present, the snapshot bars use these exact
-    // numbers instead of any recalculation.
+    // Continuous per-parameter display percentages computed by the caller from the
+    // real algorithm metrics. When present, the snapshot bars use these instead of the
+    // coarse score/3 buckets (which pinned almost every patient at 67%).
     let displayPercents = null;
     if (req.body && req.body.displayPercents) {
-      displayPercents = parseJsonField(req.body.displayPercents);
+      try { displayPercents = JSON.parse(req.body.displayPercents); } catch (_) { displayPercents = null; }
     }
 
     // Deterministic build (derives %s, statuses, 5-type classification, profile).
     progress('build');
     const reportData = buildReportDataFromSource(source, {
       name: (req.body && req.body.patientName) || undefined,
-      id: (req.body && req.body.patientId) || undefined,
       clinicName: (req.body && req.body.clinicName) || undefined,
     }, displayPercents);
 

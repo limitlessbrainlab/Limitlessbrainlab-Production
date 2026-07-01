@@ -24,116 +24,68 @@ const parseResultsData = (data) => {
   return [];
 };
 
-// ── Official NeuroSense Performance Report display % mapping ────────────────
-// The report is a template view of the deterministic Algorithm Data Processor
-// result cards. Do not recalculate smooth percentages from raw metric margins:
-// that made Tejas 50/100 instead of the correct 32/100. The clinic-approved
-// display scale is score-bucket based:
-// healthy score 0/3 → 10%, 1/3 → 20%, 2/3 → 55%, 3/3 → 90%.
-// Stress and Burnout store RED-count scores, so convert to healthy score first.
-const OFFICIAL_SCORE_PERCENT = { 0: 10, 1: 20, 2: 55, 3: 90 };
-const RESULT_NAME_BY_KEY = {
-  cognition: 'cognition',
-  stress: 'stress',
-  focus: 'focus & attention',
-  learning: 'learning',
-  burnout: 'burnout & fatigue',
-  emotional: 'emotional regulation',
-  creativity: 'creativity',
-};
-const isStressOrBurnoutName = (name = '') => {
-  const n = String(name).toLowerCase();
-  return n === 'stress' || n === 'burnout & fatigue';
-};
-const parseRawScore = (rawScore, fallbackScore = 0, fallbackMax = 3) => {
-  if (typeof rawScore === 'string' && rawScore.includes('/')) {
-    const [score, maxScore] = rawScore.split('/').map(Number);
-    return {
-      score: Number.isFinite(score) ? score : fallbackScore,
-      maxScore: Number.isFinite(maxScore) && maxScore > 0 ? maxScore : fallbackMax,
-    };
+// ── Continuous per-parameter display % (fixes "everything 67%") ──────────────
+// Each parameter = 3 pass/fail sub-metrics summed 0–3, previously shown as
+// score/3 (only 0/33/67/100) which pinned most patients at 67%. Here we derive a
+// smooth 0–100% from how far each metric sits from its clinical threshold
+// (threshold = 50% midpoint, scaled by margin). Clinical pass/fail thresholds are
+// NOT changed — display granularity only. Sub-metric value is in the "healthy
+// direction" so the average is directly the displayed % (higher = better), which
+// also gives Stress→Regulation and Burnout→Resistance correctly.
+const METRIC_RULES = [
+  { match: 'arousal', threshold: 1, better: 'less' },
+  { match: 'relaxation', threshold: 8, better: 'greater' },
+  { match: 'alpha peak', threshold: 9, better: 'greater' },
+  { match: 'theta:beta', threshold: 1.5, better: 'less' },
+  { match: 'focus theta', threshold: 20, better: 'less' },
+  { match: 'excessive delta', threshold: 20, better: 'less' },
+  { match: 'regeneration', threshold: 30, better: 'greater' },
+];
+const metricNorm = (m) => {
+  const name = (m?.name || '').toLowerCase();
+  const v = m?.value;
+  const rule = METRIC_RULES.find((r) => name.includes(r.match));
+  if (rule && typeof v === 'number' && isFinite(v)) {
+    // Gentler slope: the full 0–1 range spans ±1.5× the threshold (was ±0.5×,
+    // which saturated moderately-poor metrics to exactly 0). The 0.08 floor
+    // keeps a real-but-poor reading from rendering as a hard 0% (which looked
+    // broken to clients) — e.g. a deeply abnormal stress/burnout profile now
+    // reads ~8–20% instead of 0%. Display granularity only; clinical pass/fail
+    // scoring in algorithmCalculator.js is unchanged.
+    const scale = Math.max(Math.abs(rule.threshold) * 1.5, 1e-6);
+    const dir = rule.better === 'greater' ? 1 : -1;
+    const n = 0.5 + (0.5 * dir * (v - rule.threshold)) / scale;
+    return Math.max(0.08, Math.min(1, n));
   }
-  return { score: fallbackScore, maxScore: fallbackMax };
+  // Band / non-numeric metric (Alpha:Theta Balance, Alpha Asymmetry) → use pass/fail.
+  // If a RULE metric (arousal/relaxation/regeneration/…) arrives non-numeric
+  // (e.g. 'Indeterminate' from a failed extraction), still apply the 0.08 floor so
+  // it can't sneak a hard 0% back into the snapshot via displayPercents. True
+  // band/pass-fail metrics (no rule) keep their hard 0.
+  if (rule) return Math.max(0.08, (m?.score >= 1) ? 1 : 0);
+  return (m?.score >= 1) ? 1 : 0;
 };
-const officialPercentForResult = (param) => {
-  if (!param) return null;
-  const { score, maxScore } = parseRawScore(param.rawScore, param.score, 3);
-  const boundedScore = Math.max(0, Math.min(maxScore, score));
-  const healthyScore = isStressOrBurnoutName(param.parameter || param.name)
-    ? maxScore - boundedScore
-    : boundedScore;
-  return OFFICIAL_SCORE_PERCENT[Math.max(0, Math.min(3, healthyScore))] ?? null;
+const paramPercent = (param) => {
+  const ms = (param && param.metrics) || [];
+  if (!ms.length) return null;
+  const avg = ms.reduce((a, m) => a + metricNorm(m), 0) / ms.length;
+  return Math.round(avg * 100);
 };
 const computeParameterPercents = (resultsArr) => {
   const byName = {};
   (resultsArr || []).forEach((p) => { byName[String(p.parameter || p.name || '').toLowerCase()] = p; });
+  const map = {
+    cognition: 'cognition', stress: 'stress', focus: 'focus & attention',
+    learning: 'learning', burnout: 'burnout & fatigue',
+    emotional: 'emotional regulation', creativity: 'creativity',
+  };
   const out = {};
-  for (const [key, pname] of Object.entries(RESULT_NAME_BY_KEY)) {
+  for (const [key, pname] of Object.entries(map)) {
     const p = byName[pname];
-    const v = officialPercentForResult(p);
+    const v = p ? paramPercent(p) : null;
     if (v != null) out[key] = v;
   }
   return out;
-};
-const numberValue = (value) => (
-  typeof value === 'number' && Number.isFinite(value) ? value : null
-);
-const metricByName = (resultsArr, match) => {
-  const needle = match.toLowerCase();
-  for (const p of resultsArr || []) {
-    for (const m of p.metrics || []) {
-      if (String(m.name || '').toLowerCase().includes(needle)) {
-        return m;
-      }
-    }
-  }
-  return null;
-};
-const metricValueByName = (resultsArr, match) => numberValue(metricByName(resultsArr, match)?.value);
-const numericLike = (value) => {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string') {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-};
-const alphaThetaBalanceFromResults = (resultsArr) => {
-  const metric = metricByName(resultsArr, 'Alpha:Theta Balance');
-  const fromValue = metric?.value && typeof metric.value === 'object' ? metric.value : {};
-  const fromDetails = metric?.details && typeof metric.details === 'object' ? metric.details : {};
-  const fz = numericLike(fromValue.fz ?? fromDetails.fzRatio);
-  const cz = numericLike(fromValue.cz ?? fromDetails.czRatio);
-  const pz = numericLike(fromValue.pz ?? fromDetails.pzRatio);
-  return (fz == null && cz == null && pz == null) ? null : { fz, cz, pz };
-};
-const buildReportSourceFromResults = (resultsArr, patientMeta = {}) => {
-  const displayPercents = computeParameterPercents(resultsArr);
-  return {
-    patient: {
-      name: patientMeta.name || null,
-      assessmentDate: patientMeta.assessmentDate || new Date().toISOString(),
-    },
-    markers: {
-      stressRegulation: displayPercents.stress ?? null,
-      cognition: displayPercents.cognition ?? null,
-      focusAttention: displayPercents.focus ?? null,
-      learning: displayPercents.learning ?? null,
-      burnoutResistance: displayPercents.burnout ?? null,
-      emotionalRegulation: displayPercents.emotional ?? null,
-      creativity: displayPercents.creativity ?? null,
-    },
-    deepDive: {
-      alphaPeak: metricValueByName(resultsArr, 'alpha peak'),
-      arousal: metricValueByName(resultsArr, 'arousal score'),
-      relaxation: metricValueByName(resultsArr, 'relaxation score'),
-      regeneration: metricValueByName(resultsArr, 'regeneration'),
-      frontalAsymmetry: metricValueByName(resultsArr, 'alpha asymmetry'),
-      daytimeDelta: metricValueByName(resultsArr, 'excessive delta'),
-      focusScore: metricValueByName(resultsArr, 'Focus Score (Theta:Beta)'),
-      alphaThetaBalance: alphaThetaBalanceFromResults(resultsArr),
-    },
-  };
 };
 
 // Build the NeuroSense Performance Report download name: NPR-<ReportID>-<YYYYMMDD>.pdf
@@ -1405,24 +1357,13 @@ const AlgorithmDataProcessor = () => {
       console.log(`[Claude Report] Step 2: NeuroSense PDF loaded (${(blob.size / 1024).toFixed(1)} KB), building upload payload…`);
       const formData = new FormData();
       formData.append('pdf', new File([blob], 'neurosense-report.pdf', { type: 'application/pdf' }));
-      if (selectedPatient) {
-        formData.append('patientName', getPatientName(selectedPatient));
-        formData.append('clinicName', selectedPatient.clinicName || '');
-        formData.append('patientId', selectedPatient.id || '');
-      }
-      // Send the official NeuroSense score-bucket display percentages and the
-      // result-card source values. The performance report must preserve these
-      // exact numbers; Claude is only allowed to write narrative prose.
+      // Send continuous per-parameter % from the real algorithm metrics so the
+      // performance report shows distinct values instead of the pinned 67% buckets.
       try {
         const dp = computeParameterPercents(results);
         if (dp && Object.keys(dp).length) formData.append('displayPercents', JSON.stringify(dp));
-        const source = buildReportSourceFromResults(results, {
-          name: selectedPatient ? getPatientName(selectedPatient) : null,
-          assessmentDate: new Date().toISOString(),
-        });
-        formData.append('reportSource', JSON.stringify(source));
       } catch (dpErr) {
-        console.warn('Could not build deterministic report source:', dpErr?.message);
+        console.warn('Could not compute display percents:', dpErr?.message);
       }
       console.log(`[Claude Report] Step 3: POST ${apiUrl}/qeeg/claude-report (streaming progress)…`);
       // Cap the request at 20 min. The full pipeline (extract → narrative → render)

@@ -78,16 +78,34 @@ const computeParameterPercents = (resultsArr) => {
 const numberValue = (value) => (
   typeof value === 'number' && Number.isFinite(value) ? value : null
 );
-const metricValueByName = (resultsArr, match) => {
+const metricByName = (resultsArr, match) => {
   const needle = match.toLowerCase();
   for (const p of resultsArr || []) {
     for (const m of p.metrics || []) {
       if (String(m.name || '').toLowerCase().includes(needle)) {
-        return numberValue(m.value);
+        return m;
       }
     }
   }
   return null;
+};
+const metricValueByName = (resultsArr, match) => numberValue(metricByName(resultsArr, match)?.value);
+const numericLike = (value) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+};
+const alphaThetaBalanceFromResults = (resultsArr) => {
+  const metric = metricByName(resultsArr, 'Alpha:Theta Balance');
+  const fromValue = metric?.value && typeof metric.value === 'object' ? metric.value : {};
+  const fromDetails = metric?.details && typeof metric.details === 'object' ? metric.details : {};
+  const fz = numericLike(fromValue.fz ?? fromDetails.fzRatio);
+  const cz = numericLike(fromValue.cz ?? fromDetails.czRatio);
+  const pz = numericLike(fromValue.pz ?? fromDetails.pzRatio);
+  return (fz == null && cz == null && pz == null) ? null : { fz, cz, pz };
 };
 const buildReportSourceFromResults = (resultsArr, patientMeta = {}) => {
   const displayPercents = computeParameterPercents(resultsArr);
@@ -112,6 +130,8 @@ const buildReportSourceFromResults = (resultsArr, patientMeta = {}) => {
       regeneration: metricValueByName(resultsArr, 'regeneration'),
       frontalAsymmetry: metricValueByName(resultsArr, 'alpha asymmetry'),
       daytimeDelta: metricValueByName(resultsArr, 'excessive delta'),
+      focusScore: metricValueByName(resultsArr, 'Focus Score (Theta:Beta)'),
+      alphaThetaBalance: alphaThetaBalanceFromResults(resultsArr),
     },
   };
 };

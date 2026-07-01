@@ -115,14 +115,24 @@ function renderReportHtml(reportData, narrative = {}) {
     </div>`;
   }).join('');
 
-  const brainwaveCards = (n.brainwaveCards && n.brainwaveCards.length)
-    ? n.brainwaveCards
-    : [
-        { title: 'Alpha peak', body: `Your alpha rhythm peaks at ${fmt(prof.alphaPeakHz, 'Hz')}. A healthy peak supports clear thinking and relaxed focus.` },
-        { title: 'Beta & hi-beta', body: 'Higher fast-wave activity reflects an active, planning brain — productive in short bursts, depleting when sustained.' },
-        { title: 'Theta', body: `Theta sits at ${fmt(prof.theta, '%')} — relevant to creativity and memory consolidation.` },
-        { title: 'Delta', body: `Daytime delta of ${fmt(dd.daytimeDelta.value, '%')} relates to recovery and sleep quality.` },
-      ];
+  const brainwaveCards = [
+    {
+      title: `Strong, healthy alpha (peak ${fmt(prof.alphaPeakHz, 'Hz')})`,
+      body: `Your alpha rhythm is ${fmt(prof.alpha, '%')} and peaks in the optimal range. This supports clear processing, working memory, and relaxed focus.`,
+    },
+    {
+      title: `${dd.daytimeDelta.value >= 20 ? 'Elevated delta — recovery debt' : 'Delta — within range'}`,
+      body: `Daytime delta reads ${fmt(dd.daytimeDelta.value, '%')}. Combined with regeneration at ${fmt(dd.regeneration.value, '%')}, this points to the brain's current recovery load.`,
+    },
+    {
+      title: 'Moderate theta & alpha:theta balance',
+      body: `Theta sits at ${fmt(prof.theta, '%')}. ${dd.alphaTheta?.optimal || 'Alpha:theta ratios'} provide the learning and memory context behind this marker.`,
+    },
+    {
+      title: `${prof.beta < 8 || prof.hiBeta < 8 ? 'Low beta — depletion, not over-drive' : 'Beta & hi-beta activity'}`,
+      body: `Fast-wave activity is beta ${fmt(prof.beta, '%')} and hi-beta ${fmt(prof.hiBeta, '%')}. Interpret this with arousal (${fmt(dd.arousal.value)}) and asymmetry (${fmt(dd.frontalAsymmetry.value)}) instead of replacing the values with a label.`,
+    },
+  ];
 
   // 30-day daily anchors from the type's strategy, plus a generic 4-week build.
   const anchors = (bt.strategy.doMore || []).slice(0, 4);
@@ -137,8 +147,8 @@ function renderReportHtml(reportData, narrative = {}) {
     bar('Delta', '0.5–4 Hz · Deep rest', fmt(prof.delta, '%'), prof.delta, 'good'),
     bar('Theta', '4–7 Hz · Creativity', fmt(prof.theta, '%'), prof.theta, 'warn'),
     bar('Alpha', '8–12 Hz · Calm focus', `Peak ${fmt(prof.alphaPeakHz, 'Hz')}`, prof.alpha, 'good'),
-    bar('Beta', '13–20 Hz · Active thinking', dd.arousal.status === 'Elevated' ? 'Elevated' : 'Normal', prof.beta, 'warn'),
-    bar('Hi-Beta', '20–30 Hz · Vigilance', dd.arousal.status === 'Elevated' ? 'Elevated' : 'Normal', prof.hiBeta, 'bad'),
+    bar('Beta', '13–20 Hz · Active thinking', fmt(prof.beta, '%'), prof.beta, 'warn'),
+    bar('Hi-Beta', '20–30 Hz · Vigilance', fmt(prof.hiBeta, '%'), prof.hiBeta, 'warn'),
   ].join('');
 
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><style>
@@ -370,6 +380,7 @@ function renderReportHtml(reportData, narrative = {}) {
       ${metricCard(dd.alphaPeak)}${metricCard(dd.arousal)}
       ${metricCard(dd.relaxation)}${metricCard(dd.regeneration)}
       ${metricCard(dd.frontalAsymmetry)}${metricCard(dd.daytimeDelta)}
+      ${metricCard(dd.focusScore)}${metricCard(dd.alphaTheta)}
     </div>
     <div class="listbox box-info mt14"><h4>① Reading these numbers</h4><p style="font-size:11.5px;color:#41506c;line-height:1.6;">${esc(n.deepDive?.readingPattern || 'No single metric tells the story — look at the pattern they form together.')}</p></div>
     ${pageFooter('Page 10 • Deep-Dive Metrics')}

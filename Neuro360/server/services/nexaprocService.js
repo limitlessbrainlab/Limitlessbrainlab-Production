@@ -298,7 +298,9 @@ Return ONE pure JSON object (no markdown, no code fences, no prose):
     "relaxation": <number or null>,
     "regeneration": <percent or null>,
     "frontalAsymmetry": <number, keep sign, or null>,
-    "daytimeDelta": <percent or null>
+    "daytimeDelta": <percent or null>,
+    "focusScore": <number or null>,
+    "alphaThetaBalance": { "fz": <number or null>, "cz": <number or null>, "pz": <number or null> }
   },
   "brainwave": { "delta": <% or null>, "theta": <% or null>, "alpha": <% or null>, "beta": <% or null>, "hiBeta": <% or null>, "alphaPeakHz": <Hz or null> }
 }
@@ -317,7 +319,7 @@ Rules:
     3/3 red→10%.
 - "deepDive" values are raw numbers wherever they appear (Alpha Peak in Hz, Arousal,
   Relaxation, Regeneration %, Frontal Alpha Asymmetry keeping its +/- sign, Daytime
-  or Excessive Delta %).
+  or Excessive Delta %, Focus Score / Theta:Beta, and Alpha:Theta Balance fz/cz/pz).
 
 Here is the report text:
 ${pdfText}`;

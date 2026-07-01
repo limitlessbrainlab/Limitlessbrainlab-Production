@@ -42,6 +42,51 @@ function metricValue(parameters, includes) {
   return null;
 }
 
+function metricObjectValue(parameters, includes) {
+  for (const p of parameters || []) {
+    for (const m of p.metrics || []) {
+      if (m.name && m.name.toLowerCase().includes(includes.toLowerCase())) {
+        return m.value && typeof m.value === 'object' ? m.value : null;
+      }
+    }
+  }
+  return null;
+}
+
+function numLike(value) {
+  if (typeof value === 'number' && isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const n = Number(value);
+    return isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function cleanAlphaTheta(value) {
+  if (!value || typeof value !== 'object') return null;
+  const fz = numLike(value.fz ?? value.fzRatio);
+  const cz = numLike(value.cz ?? value.czRatio);
+  const pz = numLike(value.pz ?? value.pzRatio);
+  return (fz == null && cz == null && pz == null) ? null : { fz, cz, pz };
+}
+
+function formatAlphaTheta(value) {
+  const v = cleanAlphaTheta(value);
+  if (!v) return 'fz — · cz — · pz —';
+  const fmtRatio = (n) => (n == null ? '—' : (Math.round(n * 100) / 100).toFixed(2));
+  return `fz ${fmtRatio(v.fz)} · cz ${fmtRatio(v.cz)} · pz ${fmtRatio(v.pz)}`;
+}
+
+function isHealthyAlphaTheta(value) {
+  const v = cleanAlphaTheta(value);
+  return !!v
+    && v.fz != null
+    && v.cz != null
+    && v.pz != null
+    && v.fz < v.cz
+    && v.cz < v.pz;
+}
+
 function score(parameters, name) {
   const p = (parameters || []).find((x) => x.name === name);
   return p ? p.score : 0;
@@ -140,6 +185,9 @@ function buildReportData(qeegData, algoResults, patient = {}, displayPercents = 
   const regeneration = metricValue(params, 'Regeneration');
   const asymmetry = metricValue(params, 'Alpha Asymmetry');
   const daytimeDelta = metricValue(params, 'Excessive Delta');
+  const focusScore = metricValue(params, 'Focus Score (Theta:Beta)');
+  const alphaThetaBalance = cleanAlphaTheta(metricObjectValue(params, 'Alpha:Theta Balance'));
+  const alphaThetaHealthy = isHealthyAlphaTheta(alphaThetaBalance);
 
   const deepDive = {
     alphaPeak: {
@@ -163,8 +211,16 @@ function buildReportData(qeegData, algoResults, patient = {}, displayPercents = 
       status: asymmetry == null ? 'N/A' : asymmetry < 0 ? 'Right-Shifted' : asymmetry > 0 ? 'Left-Shifted' : 'Balanced',
     },
     daytimeDelta: {
-      label: 'Daytime Delta', value: daytimeDelta, unit: '%', optimal: '< 20%',
-      status: daytimeDelta == null ? 'N/A' : daytimeDelta < 20 ? 'Normal' : daytimeDelta <= 30 ? 'Borderline' : 'Elevated',
+      label: 'Excessive / Daytime Delta', value: daytimeDelta, unit: '%', optimal: '< 20%',
+      status: daytimeDelta == null ? 'N/A' : daytimeDelta < 20 ? 'Normal' : 'Elevated',
+    },
+    focusScore: {
+      label: 'Focus Score', value: focusScore, unit: '', optimal: '< 1.5',
+      status: focusScore == null ? 'N/A' : focusScore < 1.5 ? 'Healthy' : 'Elevated',
+    },
+    alphaTheta: {
+      label: 'Alpha:Theta Balance', value: alphaThetaBalance ? 'HEALTHY' : null, unit: '', optimal: formatAlphaTheta(alphaThetaBalance),
+      status: alphaThetaBalance == null ? 'N/A' : alphaThetaHealthy ? 'Healthy' : 'Needs Attention',
     },
   };
 
@@ -235,6 +291,16 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null)
 
   const dd = source.deepDive || {};
   const mk = (name, value) => ({ name, value: num(value), score: 0 });
+  const alphaTheta = cleanAlphaTheta(dd.alphaThetaBalance || dd.alphaTheta);
+  const alphaThetaHealthyForSource = isHealthyAlphaTheta(alphaTheta);
+  const alphaThetaMetric = {
+    name: 'Alpha:Theta Balance',
+    value: alphaTheta,
+    score: alphaThetaHealthyForSource ? 1 : 0,
+    description: alphaTheta ? `Alpha:Theta Balance = ${formatAlphaTheta(alphaTheta)}` : 'Alpha:Theta Balance = Indeterminate',
+    details: alphaTheta ? { fzRatio: alphaTheta.fz, czRatio: alphaTheta.cz, pzRatio: alphaTheta.pz } : null,
+  };
+  const focusMetric = mk('Focus Score (Theta:Beta)', dd.focusScore);
   const sourceDisplayPercents = {
     stress: num(markers.stressRegulation),
     cognition: num(markers.cognition),
@@ -256,16 +322,19 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null)
   // 5-type classifier and the deep-dive page have what they need).
   const parameters = [
     { name: 'Cognition', score: pctToScore(markers.cognition), maxScore: 3,
-      metrics: [mk('Alpha Peak', dd.alphaPeak)] },
+      metrics: [mk('Alpha Peak', dd.alphaPeak), alphaThetaMetric] },
     { name: 'Stress', score: redFromPct(markers.stressRegulation), maxScore: 3,
       metrics: [mk('Arousal Score', dd.arousal), mk('Relaxation Score', dd.relaxation), mk('Regeneration (Alpha Modulation)', dd.regeneration)] },
-    { name: 'Focus & Attention', score: pctToScore(markers.focusAttention), maxScore: 3, metrics: [] },
+    { name: 'Focus & Attention', score: pctToScore(markers.focusAttention), maxScore: 3,
+      metrics: [alphaThetaMetric, focusMetric] },
     { name: 'Burnout & Fatigue', score: redFromPct(markers.burnoutResistance), maxScore: 3,
       metrics: [mk('Excessive Delta', dd.daytimeDelta)] },
     { name: 'Emotional Regulation', score: pctToScore(markers.emotionalRegulation), maxScore: 3,
       metrics: [mk('Alpha Asymmetry (Frontal)', dd.frontalAsymmetry), mk('Arousal Score', dd.arousal), mk('Regeneration (Alpha Modulation)', dd.regeneration)] },
-    { name: 'Learning', score: pctToScore(markers.learning), maxScore: 3, metrics: [] },
-    { name: 'Creativity', score: pctToScore(markers.creativity), maxScore: 3, metrics: [] },
+    { name: 'Learning', score: pctToScore(markers.learning), maxScore: 3,
+      metrics: [focusMetric, alphaThetaMetric] },
+    { name: 'Creativity', score: pctToScore(markers.creativity), maxScore: 3,
+      metrics: [focusMetric] },
   ];
 
   // Overall /21 (Stress & Burnout scores are RED counts → inverted for health).

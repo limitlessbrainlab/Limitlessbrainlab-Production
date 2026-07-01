@@ -107,10 +107,10 @@ function buildReportData(qeegData, algoResults, patient = {}, displayPercents = 
     const v = dp[key];
     return (typeof v === 'number' && isFinite(v)) ? Math.max(0, Math.min(100, Math.round(v))) : fallback;
   };
-  // Status derived from the continuous % so the bar and label stay coherent.
+  // Status derived from the supplied official display % so the bar and label stay coherent.
   const posStatusPct = (p) => (p >= 75 ? 'Excellent' : p >= 45 ? 'Moderate' : 'Needs Attention');
-  const stressStatusPct = (p) => (p >= 75 ? 'Excellent' : p >= 50 ? 'Good' : p >= 30 ? 'Moderate' : 'Low');
-  const burnoutStatusPct = (p) => (p >= 75 ? 'Strong' : p >= 50 ? 'Mild Load' : p >= 30 ? 'Moderate Load' : 'High Load');
+  const stressStatusPct = (p) => (p >= 75 ? 'Excellent' : p >= 50 ? 'Good' : p >= 30 ? 'Moderate' : 'Needs Attention');
+  const burnoutStatusPct = (p) => (p >= 75 ? 'Strong' : p >= 50 ? 'Mild Load' : p >= 30 ? 'Moderate Load' : 'Needs Attention');
   const hasDp = Object.keys(dp).length > 0;
 
   // Snapshot bars in the report's display order.
@@ -185,7 +185,7 @@ function buildReportData(qeegData, algoResults, patient = {}, displayPercents = 
   return {
     patient: {
       name: patient.name || 'Patient',
-      reportId: makeReportId(patient.id, assessmentDate),
+      reportId: patient.reportId || makeReportId(patient.id, assessmentDate),
       assessmentDate,
       clinicName: patient.clinicName || 'Limitless Brain Lab',
       firstName: (patient.name || 'Patient').split(/\s+/)[0],
@@ -235,6 +235,22 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null)
 
   const dd = source.deepDive || {};
   const mk = (name, value) => ({ name, value: num(value), score: 0 });
+  const sourceDisplayPercents = {
+    stress: num(markers.stressRegulation),
+    cognition: num(markers.cognition),
+    focus: num(markers.focusAttention),
+    learning: num(markers.learning),
+    burnout: num(markers.burnoutResistance),
+    emotional: num(markers.emotionalRegulation),
+    creativity: num(markers.creativity),
+  };
+  const cleanDisplayPercents = Object.fromEntries(
+    Object.entries(sourceDisplayPercents).filter(([, v]) => v != null)
+  );
+  const effectiveDisplayPercents =
+    displayPercents && typeof displayPercents === 'object' && Object.keys(displayPercents).length
+      ? displayPercents
+      : cleanDisplayPercents;
 
   // Assemble the algorithmCalculator-shaped parameters (with metric values so the
   // 5-type classifier and the deep-dive page have what they need).
@@ -275,9 +291,10 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null)
   const rd = buildReportData(qeegData, algoResults, {
     name: (source.patient && source.patient.name) || patient.name || 'Patient',
     id: patient.id,
+    reportId: (source.patient && source.patient.reportId) || patient.reportId,
     clinicName: patient.clinicName,
     processedAt,
-  }, displayPercents);
+  }, effectiveDisplayPercents);
 
   // If a deep-dive metric was missing but the brainwave block had alpha peak,
   // surface it on the profile so page 4 still shows the peak.

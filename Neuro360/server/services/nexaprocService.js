@@ -305,10 +305,16 @@ Return ONE pure JSON object (no markdown, no code fences, no prose):
 
 Rules:
 - "markers" are the seven performance percentages exactly as shown on the report's
-  snapshot/markers pages (e.g. "Stress Regulation 100%", "Cognition 67%", "Burnout
-  Resistance 67%", "Emotional Regulation 33%"). Copy the number shown — do NOT invert
-  or recompute. If the report shows a 0-3 score instead of a %, convert 3→100, 2→67,
-  1→33, 0→0.
+  snapshot/markers pages (e.g. "Stress Regulation 10%", "Cognition 55%", "Burnout
+  Resistance 10%", "Emotional Regulation 20%"). Copy the number shown — do NOT invert
+  or recompute.
+- If the report/result log shows only a 0-3 score instead of a %, use the official
+  NeuroSense Performance Report display scale:
+  * Positive parameters (Cognition, Focus & Attention, Learning, Emotional Regulation,
+    Creativity): 0/3→10%, 1/3→20%, 2/3→55%, 3/3→90%.
+  * Stress and Burnout/Fatigue are RED-count scores where higher is worse. Convert to
+    the displayed healthy-side score first: 0/3 red→90%, 1/3 red→55%, 2/3 red→20%,
+    3/3 red→10%.
 - "deepDive" values are raw numbers wherever they appear (Alpha Peak in Hz, Arousal,
   Relaxation, Regeneration %, Frontal Alpha Asymmetry keeping its +/- sign, Daytime
   or Excessive Delta %).

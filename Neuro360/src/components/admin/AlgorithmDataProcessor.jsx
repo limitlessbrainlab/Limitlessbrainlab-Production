@@ -531,6 +531,9 @@ const AlgorithmDataProcessor = () => {
     setEyesClosedFile(null);
     setEyesOpenUrl(null);
     setEyesClosedUrl(null);
+    // Also clear the "Upload Other Documents" (logo-replace) state.
+    setProcessedDocBlob(null);
+    setProcessedDocName('');
     setResults(null);
     setProcessingComplete(false);
     setConsoleLog([]);

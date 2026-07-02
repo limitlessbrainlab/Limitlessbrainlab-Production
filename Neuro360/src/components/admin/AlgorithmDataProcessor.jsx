@@ -1374,6 +1374,9 @@ const AlgorithmDataProcessor = () => {
     setClaudeStages(CLAUDE_STAGE_ORDER.map((s, i) => ({ ...s, status: i === 0 ? 'active' : 'pending', elapsedMs: null })));
     startClaudeCreep(10);
     toast.loading('Building your 12-page Neurosense Performance Report (≈3–6 min, please keep this tab open)…', { id: 'claude-report' });
+    // Function-scoped so the finally can always clear it (avoids the /health poll leaking if the
+    // stream throws before the inline clearInterval runs).
+    let sidecarMonitor = null;
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
       const token = import.meta.env.VITE_CLAUDE_REPORT_TOKEN;
@@ -1430,7 +1433,7 @@ const AlgorithmDataProcessor = () => {
       // Start 2-minute sidecar health monitor — logs to console panel and aborts fast if VPS goes down.
       sidecarAbortReasonRef.current = null;
       const sidecarPollUrl = `${apiUrl}/qeeg/claude-report/health`;
-      const sidecarMonitor = setInterval(async () => {
+      sidecarMonitor = setInterval(async () => {
         try {
           const hRes = await fetch(sidecarPollUrl);
           const hData = await hRes.json();
@@ -1508,38 +1511,52 @@ const AlgorithmDataProcessor = () => {
       setClaudeStages((prev) => prev.map((s) => (s.status === 'active' ? { ...s, status: 'done', elapsedMs: performance.now() - (stageStartRef.current || performance.now()) } : s)));
       setClaudeReportUrl(pdfUrlResult);
       setClaudeReportId(reportIdResult);
-      try {
-        if (savedResultId) {
-          console.log('[Claude Report] Attaching claude_report_url to history row:', savedResultId);
-          // Persist the URL on its own first — known-safe column, must never regress.
-          await DatabaseService.update('algorithmResults', savedResultId, { claude_report_url: pdfUrlResult });
-          // Then the report id in a separate call, so a missing column (migration
-          // not yet applied) only loses the id, not the URL.
-          if (reportIdResult) {
-            try {
-              await DatabaseService.update('algorithmResults', savedResultId, { claude_report_id: reportIdResult });
-            } catch (e2) { console.warn('Could not attach claude_report_id (column may be missing — run the migration):', e2?.message); }
-          }
-        }
-      } catch (e) { console.warn('Could not attach claude_report_url to history row:', e); }
 
-      // Mirror the Neurosense flow: unlock the frequencies/meditations this patient's care
-      // program references from the same Neurosense scores. Non-blocking by design.
-      try {
-        const granted = await grantCareProgramAccess(SupabaseService.supabase, selectedPatient?.email, results);
-        if (granted.frequencies + granted.meditations > 0) {
-          toast.success(`Care program content unlocked for patient (${granted.frequencies} frequencies, ${granted.meditations} meditations).`);
-        }
-      } catch (e) { console.warn('Care program grant skipped:', e?.message || e); }
-
+      // The report is produced and saved server-side — the user-visible work is DONE. Reset the
+      // button NOW so it can't stay stuck on "Generating…" if the follow-up DB writes stall on a
+      // flaky network. (Download/Send only need claudeReportUrl, already set above.)
+      stopClaudeCreep();
+      setIsGeneratingClaudeReport(false);
       console.log(`[Claude Report] ✓ Done in ${((performance.now() - t0) / 1000).toFixed(1)}s`);
       toast.success('Neurosense Performance Report ready!', { id: 'claude-report' });
+
+      // Best-effort, time-boxed, fire-and-forget: persisting the report URL/id and unlocking care
+      // content must never block or freeze the UI. An ~8s cap ensures a stalled Supabase socket
+      // can't leave a pending promise hanging around.
+      const withTimeout = (p, ms = 8000) => {
+        let t;
+        const race = Promise.race([
+          p,
+          new Promise((_, reject) => { t = setTimeout(() => reject(new Error('timeout')), ms); }),
+        ]);
+        return race.finally(() => clearTimeout(t));
+      };
+      if (savedResultId) {
+        withTimeout(DatabaseService.update('algorithmResults', savedResultId, { claude_report_url: pdfUrlResult }))
+          .then(() => {
+            if (reportIdResult) {
+              return withTimeout(DatabaseService.update('algorithmResults', savedResultId, { claude_report_id: reportIdResult }))
+                .catch((e2) => console.warn('Could not attach claude_report_id (column may be missing — run the migration):', e2?.message));
+            }
+          })
+          .catch((e) => console.warn('Could not attach claude_report_url to history row:', e?.message || e));
+      }
+      // Mirror the Neurosense flow: unlock the frequencies/meditations this patient's care program
+      // references from the same Neurosense scores.
+      withTimeout(grantCareProgramAccess(SupabaseService.supabase, selectedPatient?.email, results))
+        .then((granted) => {
+          if (granted && granted.frequencies + granted.meditations > 0) {
+            toast.success(`Care program content unlocked for patient (${granted.frequencies} frequencies, ${granted.meditations} meditations).`);
+          }
+        })
+        .catch((e) => console.warn('Care program grant skipped:', e?.message || e));
     } catch (error) {
       console.error(`[Claude Report] ✗ Failed after ${((performance.now() - t0) / 1000).toFixed(1)}s:`, error);
       stopClaudeCreep();
       setClaudeReportError(getFriendlyErrorMessage(error, 'The report could not be generated. Please try again.'));
       toast.error(getFriendlyErrorMessage(error, 'The Neurosense Performance Report could not be generated. Please try again.'), { id: 'claude-report' });
     } finally {
+      if (sidecarMonitor) clearInterval(sidecarMonitor);
       stopClaudeCreep();
       setIsGeneratingClaudeReport(false);
     }

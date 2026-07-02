@@ -516,9 +516,9 @@ const AlgorithmDataProcessor = () => {
     loadPatients();
   };
 
-  // Switching the Report Mode radio resets the generated report state so the SA regenerates
-  // for the newly selected mode. The uploaded Eyes-Open/Closed files are PRESERVED across the
-  // switch — clearing them forced a needless re-upload and looked like the files "disappeared".
+  // Switching the Report Mode radio must start a fresh report: clear the uploaded files,
+  // processing results, and any already-generated NeuroSense/Performance report so the SA
+  // re-uploads and regenerates for the newly selected mode.
   const handleReportModeChange = (mode) => {
     if (mode === reportMode) return; // no-op when unchanged
     if (isProcessing || isGeneratingClaudeReport) {
@@ -526,7 +526,11 @@ const AlgorithmDataProcessor = () => {
       return;
     }
     setReportMode(mode);
-    // Reset processing results only — keep the uploaded EO/EC files & URLs intact.
+    // Reset uploads + processing — force the SA to re-upload for the newly selected mode.
+    setEyesOpenFile(null);
+    setEyesClosedFile(null);
+    setEyesOpenUrl(null);
+    setEyesClosedUrl(null);
     setResults(null);
     setProcessingComplete(false);
     setConsoleLog([]);

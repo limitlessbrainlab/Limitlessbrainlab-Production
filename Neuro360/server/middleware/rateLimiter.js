@@ -2,11 +2,22 @@ const rateLimit = require('express-rate-limit');
 
 /**
  * General API rate limiter
- * 100 requests per hour per IP
+ * 1000 requests per hour per real client IP (or per authenticated user).
+ *
+ * NOTE: this only works correctly when `app.set('trust proxy', 1)` is configured (see
+ * server/index.js) so req.ip is the real client, not the shared Render/Vercel proxy IP.
+ * Lightweight endpoints that the frontend polls on a fixed interval (health + version checks,
+ * ~2 req/min/tab) are skipped so they never exhaust the bucket.
  */
+const POLLED_PATHS = new Set([
+  '/api/health',
+  '/api/app-version',
+  '/api/qeeg/claude-report/health',
+]);
+
 const apiLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 100,
+  max: 1000,
   message: {
     success: false,
     error: 'Too many requests from this IP, please try again later',
@@ -14,6 +25,8 @@ const apiLimiter = rateLimit({
   },
   standardHeaders: true, // Return rate limit info in the RateLimit-* headers
   legacyHeaders: false, // Disable the X-RateLimit-* headers
+  // Never rate-limit the high-frequency health/version pollers.
+  skip: (req) => POLLED_PATHS.has(req.path) || req.path.endsWith('/version.json'),
   // Skip rate limiting for authenticated users (use their ID as the key)
   keyGenerator: (req) => req.user?.id || req.ip
 });

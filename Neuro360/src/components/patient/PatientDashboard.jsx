@@ -141,6 +141,11 @@ const PatientDashboard = () => {
   const [profileImageUrl, setProfileImageUrl] = useState(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [algorithmResults, setAlgorithmResults] = useState(null);
+  // Score data that drives the Customized Care Program. Unlike algorithmResults (which excludes
+  // super-admin-only Claude/Performance-mode rows from the report list), this includes the latest
+  // scan REGARDLESS of report_mode, so a patient whose scan was processed in Performance mode still
+  // gets a care program. It carries only the 7 scores, not the Claude report itself.
+  const [careProgramScores, setCareProgramScores] = useState(null);
   const [scanCount, setScanCount] = useState(0);
   const [showClinicalReportForm, setShowClinicalReportForm] = useState(false);
   const [brainParameters, setBrainParameters] = useState(null);
@@ -825,54 +830,55 @@ const PatientDashboard = () => {
       // instead of pulling the whole table and filtering in JS. Fall back to a full scan +
       // email/name match only for legacy rows that lack patient_id.
       const notClaude = (r) => (r.report_mode || r.reportMode || 'neurosense') !== 'claude';
-      let patientResults = [];
+      const matchesPatient = (r) => {
+        // Match by patient ID - check all possible field name variations
+        const rid = r.patient_id || r.patientId || r.patientid;
+        const matchById = rid && rid === patientDbId;
+        // Match by email - check all possible field name variations
+        const remail = r.patient_email || r.patientEmail || r.patientemail;
+        const matchByEmail = patientEmail && remail &&
+          remail.toLowerCase().trim() === patientEmail.toLowerCase().trim();
+        // Match by patient name (fallback) - check inputData.patientName too
+        const rname = r.patient_name || r.patientName || r.patientname || r.inputData?.patientName;
+        const matchByName = patientName && rname &&
+          rname.toLowerCase().trim() === patientName.toLowerCase().trim();
+        return matchById || matchByEmail || matchByName;
+      };
+
+      // allMatched includes Claude/Performance-mode rows; patientResults excludes them (report list
+      // stays super-admin-only). The care program derives its scores from allMatched so a
+      // Performance-mode scan still populates it.
+      let allMatched = [];
       try {
         const byId = await DatabaseService.findBy('algorithmResults', 'patient_id', patientDbId);
-        patientResults = (byId || []).filter(notClaude);
+        allMatched = byId || [];
       } catch (e) {
-        patientResults = [];
+        allMatched = [];
       }
 
-      if (patientResults.length === 0) {
+      // Fall back to a full scan (legacy rows lacking patient_id) only when the id lookup yielded
+      // no visible (non-Claude) rows.
+      if (allMatched.filter(notClaude).length === 0) {
         const allResults = await DatabaseService.get('algorithmResults');
-        patientResults = (allResults || []).filter(r => {
-          // Match by patient ID - check all possible field name variations
-          const rid = r.patient_id || r.patientId || r.patientid;
-          const matchById = rid && rid === patientDbId;
-
-          // Match by email - check all possible field name variations
-          const remail = r.patient_email || r.patientEmail || r.patientemail;
-          const matchByEmail = patientEmail && remail &&
-            remail.toLowerCase().trim() === patientEmail.toLowerCase().trim();
-
-          // Match by patient name (fallback) - check inputData.patientName too
-          const rname = r.patient_name || r.patientName || r.patientname || r.inputData?.patientName;
-          const matchByName = patientName && rname &&
-            rname.toLowerCase().trim() === patientName.toLowerCase().trim();
-
-          // Exclude Claude-mode results — super-admin-only until explicitly shared.
-          return (matchById || matchByEmail || matchByName) && notClaude(r);
-        });
+        allMatched = (allResults || []).filter(matchesPatient);
       }
 
+      const patientResults = allMatched.filter(notClaude);
 
-      // Set the scan count (total algorithm results for this patient)
+
+      // Set the scan count (total visible algorithm results for this patient)
       setScanCount(patientResults.length);
 
+      const latestOf = (rows) => (rows || []).slice().sort((a, b) =>
+        new Date(b.processed_at || b.createdAt || b.created_at || 0) -
+        new Date(a.processed_at || a.createdAt || a.created_at || 0)
+      )[0] || null;
+      const scoresOf = (r) => r && (r.results || r.outputData || r.output_data);
+
       if (patientResults.length > 0) {
-        // Get the most recent result (sorted by createdAt/processed_at)
-        const sortedResults = patientResults.sort((a, b) =>
-          new Date(b.processed_at || b.createdAt || b.created_at || 0) -
-          new Date(a.processed_at || a.createdAt || a.created_at || 0)
-        );
-        const latestResult = sortedResults[0];
-
-        // Get the results data - can be in 'results', 'outputData', or 'output_data'
-        const outputData = latestResult.results || latestResult.outputData || latestResult.output_data;
-
-
+        const latestResult = latestOf(patientResults);
         setAlgorithmResults({
-          data: outputData,
+          data: scoresOf(latestResult),
           pdfUrl: latestResult.pdfUrl || latestResult.pdf_url,
           processedAt: latestResult.processed_at || latestResult.createdAt || latestResult.created_at,
           patientName: latestResult.patient_name || latestResult.patientName
@@ -880,9 +886,14 @@ const PatientDashboard = () => {
       } else {
         setAlgorithmResults(null);
       }
+
+      // Care program scores: latest scan regardless of report_mode (includes Performance-mode rows).
+      const latestAny = latestOf(allMatched);
+      setCareProgramScores(latestAny ? scoresOf(latestAny) : null);
     } catch (error) {
       console.error('ERROR: Failed to fetch algorithm results:', error);
       setAlgorithmResults(null);
+      setCareProgramScores(null);
     }
   };
 
@@ -8871,7 +8882,7 @@ const PatientDashboard = () => {
 
     // Get parameter-specific protocol data from P123 structure
     const getParameterProtocolData = () => {
-      const ksbProtocol = getCareProtocol(algorithmResults?.data);
+      const ksbProtocol = getCareProtocol(algorithmResults?.data || careProgramScores);
       if (!ksbProtocol) return null;
 
       const protocolData = KSB_27_PROTOCOLS_P123[ksbProtocol.code];
@@ -9072,7 +9083,7 @@ const PatientDashboard = () => {
 
         {/* KSB Protocol Card — dynamic care protocol from NeuroSense scan */}
         {(() => {
-          const ksbProtocol = getCareProtocol(algorithmResults?.data);
+          const ksbProtocol = getCareProtocol(algorithmResults?.data || careProgramScores);
           if (!ksbProtocol) return (
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 text-center">
               <div className="text-5xl mb-4">🧠</div>

@@ -516,10 +516,9 @@ const AlgorithmDataProcessor = () => {
     loadPatients();
   };
 
-  // Switching the Report Mode radio must start a fresh report: clear the uploaded
-  // files, processing results, and any already-generated NeuroSense/Performance
-  // report so the SA re-uploads and regenerates for the newly selected mode,
-  // instead of reusing the previous run's data.
+  // Switching the Report Mode radio resets the generated report state so the SA regenerates
+  // for the newly selected mode. The uploaded Eyes-Open/Closed files are PRESERVED across the
+  // switch — clearing them forced a needless re-upload and looked like the files "disappeared".
   const handleReportModeChange = (mode) => {
     if (mode === reportMode) return; // no-op when unchanged
     if (isProcessing || isGeneratingClaudeReport) {
@@ -527,11 +526,7 @@ const AlgorithmDataProcessor = () => {
       return;
     }
     setReportMode(mode);
-    // Reset uploads + processing
-    setEyesOpenFile(null);
-    setEyesClosedFile(null);
-    setEyesOpenUrl(null);
-    setEyesClosedUrl(null);
+    // Reset processing results only — keep the uploaded EO/EC files & URLs intact.
     setResults(null);
     setProcessingComplete(false);
     setConsoleLog([]);
@@ -654,7 +649,13 @@ const AlgorithmDataProcessor = () => {
         };
       }
 
-      const response = await fetch(`${apiUrl}/qeeg/replace-logo-download`, fetchOptions);
+      // Long timeout (logo replacement is heavier) + one retry so a slow/3G link or a transient
+      // rate-limit blip doesn't fail the upload outright.
+      const response = await fetchWithRetry(
+        `${apiUrl}/qeeg/replace-logo-download`,
+        fetchOptions,
+        { timeoutMs: 90000, retries: 1 }
+      );
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
@@ -1317,13 +1318,33 @@ const AlgorithmDataProcessor = () => {
     // Hard block performance-report generation when the clinic has no credits left.
     if (await blockIfNoCredits(selectedPatient?.clinicId || selectedPatient?.clinic_id || selectedPatient?.org_id)) return;
 
-    // Pre-flight: check sidecar is alive before starting the long upload
+    // Pre-flight: check sidecar is alive before starting the long upload.
+    // A single transient failure (429 from the API rate limiter, brief network blip) must not
+    // hard-block report generation, so we time-box each attempt and retry once before giving up.
     const preflightApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
     setConsoleLog(prev => [...prev, '🔍 Checking sidecar health...']);
+    const checkSidecarHealth = async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      try {
+        const hRes = await fetch(`${preflightApiUrl}/qeeg/claude-report/health`, { signal: controller.signal });
+        const hData = await hRes.json().catch(() => ({}));
+        if (hRes.status === 429) throw new Error('The report service is busy. Retrying…');
+        if (!hRes.ok || !hData.ok) throw new Error(hData.error || 'Sidecar offline');
+        return hData;
+      } finally {
+        clearTimeout(timer);
+      }
+    };
     try {
-      const hRes = await fetch(`${preflightApiUrl}/qeeg/claude-report/health`);
-      const hData = await hRes.json();
-      if (!hRes.ok || !hData.ok) throw new Error(hData.error || 'Sidecar offline');
+      let hData;
+      try {
+        hData = await checkSidecarHealth();
+      } catch (firstErr) {
+        setConsoleLog(prev => [...prev, `⏳ Health check failed (${firstErr.message}); retrying once…`]);
+        await new Promise(r => setTimeout(r, 1500));
+        hData = await checkSidecarHealth();
+      }
       setConsoleLog(prev => [...prev,
         `✅ Sidecar online | busy: ${hData.busy} | uptime: ${Math.round((hData.uptimeSec || 0) / 3600 * 10) / 10}h`
       ]);
@@ -2127,13 +2148,35 @@ const AlgorithmDataProcessor = () => {
     }
   };
 
-  // Download a PDF by fetching its bytes and saving a blob, so the raw storage
-  // URL is never opened in a browser tab or shared with the user.
-  const downloadPdfFromUrl = async (url, filename) => {
-    if (!url) { toast.error('Report not available yet.'); return; }
+  // Fetch with an AbortController timeout and exponential-backoff retry. Retries on network
+  // error / 5xx / 429 so downloads survive flaky 3G/4G links and transient rate limits.
+  const fetchWithRetry = async (url, opts = {}, { timeoutMs = 45000, retries = 2 } = {}) => {
+    let lastErr;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, { ...opts, signal: controller.signal });
+        clearTimeout(timer);
+        if (res.status === 429 || res.status >= 500) throw new Error(`HTTP ${res.status}`);
+        return res;
+      } catch (e) {
+        clearTimeout(timer);
+        lastErr = e;
+        if (attempt < retries) await new Promise(r => setTimeout(r, 500 * Math.pow(3, attempt)));
+      }
+    }
+    throw lastErr;
+  };
+
+  // Download a PDF by fetching its bytes and saving a blob, so the raw storage URL is never
+  // opened/shared. Retries on flaky networks; if every retry fails, falls back to opening the
+  // URL directly so the user still gets the file on a poor connection.
+  const downloadViaBlob = async (url, filename, toastId = 'download-pdf') => {
+    if (!url) { toast.error('Report not available yet.', { id: toastId }); return; }
     try {
-      toast.loading('Downloading PDF…', { id: 'download-pdf' });
-      const res = await fetch(url);
+      toast.loading('Downloading PDF…', { id: toastId });
+      const res = await fetchWithRetry(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
       const objectUrl = window.URL.createObjectURL(blob);
@@ -2144,12 +2187,21 @@ const AlgorithmDataProcessor = () => {
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(objectUrl);
-      toast.success('PDF download started!', { id: 'download-pdf' });
+      toast.success('PDF download started!', { id: toastId });
     } catch (e) {
-      console.error('downloadPdfFromUrl failed:', e);
-      toast.error('Could not download the PDF. Please try again.', { id: 'download-pdf' });
+      console.error('downloadViaBlob failed, falling back to direct open:', e);
+      // Last resort: open the URL directly so a flaky link still delivers the file.
+      try {
+        window.open(url, '_blank', 'noopener');
+        toast.success('Opening PDF…', { id: toastId });
+      } catch (_) {
+        toast.error('Could not download the PDF. Please try again.', { id: toastId });
+      }
     }
   };
+
+  // Backwards-compatible alias used by the report-download buttons.
+  const downloadPdfFromUrl = (url, filename) => downloadViaBlob(url, filename);
 
   const handleDownloadPDF = async () => {
     if (!pdfUrl) {
@@ -2885,27 +2937,14 @@ const AlgorithmDataProcessor = () => {
               <span className="text-xs text-gray-600 dark:text-gray-400 w-full mb-1">Download Modified QEEG Reports:</span>
               {eyesOpenUrl && (
                 <button
-                  onClick={async () => {
-                    try {
-                      toast.loading('Downloading Eyes Open PDF...', { id: 'eo-main-download' });
-                      const downloadFromUrl = eyesOpenUrl;
-                      if (!downloadFromUrl) throw new Error('No Eyes Open PDF available');
-                      const response = await fetch(downloadFromUrl);
-                      if (!response.ok) throw new Error('Failed to fetch PDF');
-                      const blob = await response.blob();
-                      const downloadUrl = window.URL.createObjectURL(blob);
-                      const link = document.createElement('a');
-                      link.href = downloadUrl;
-                      link.download = `EyesOpen-${selectedPatient?.firstName || 'patient'}.pdf`;
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                      window.URL.revokeObjectURL(downloadUrl);
-                      toast.success('Eyes Open PDF downloaded!', { id: 'eo-main-download' });
-                    } catch (error) {
-                      console.error('Download error:', error);
-                      toast.error('Failed to download Eyes Open PDF', { id: 'eo-main-download' });
+                  onClick={() => {
+                    let downloadFromUrl = eyesOpenUrl;
+                    if (!downloadFromUrl) { toast.error('No Eyes Open PDF available', { id: 'eo-main-download' }); return; }
+                    if (downloadFromUrl.startsWith('/')) {
+                      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                      downloadFromUrl = apiUrl.replace(/\/api\/?$/, '') + downloadFromUrl;
                     }
+                    downloadViaBlob(downloadFromUrl, `EyesOpen-${selectedPatient?.firstName || 'patient'}.pdf`, 'eo-main-download');
                   }}
                   className="px-3 py-1.5 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors flex items-center space-x-1"
                   title="Download modified Eyes Open PDF with Limitless Brain Lab logo"
@@ -2916,35 +2955,14 @@ const AlgorithmDataProcessor = () => {
               )}
               {eyesClosedUrl && (
                 <button
-                  onClick={async () => {
-                    try {
-                      toast.loading('Downloading Eyes Closed PDF...', { id: 'ec-main-download' });
-                      let downloadFromUrl = eyesClosedUrl;
-                      if (!downloadFromUrl) throw new Error('No Eyes Closed PDF available');
-
-                      // Construct full URL if relative path is returned
-                      if (downloadFromUrl.startsWith('/')) {
-                        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-                        const baseUrl = apiUrl.replace(/\/api\/?$/, '');
-                        downloadFromUrl = baseUrl + downloadFromUrl;
-                      }
-
-                      const response = await fetch(downloadFromUrl);
-                      if (!response.ok) throw new Error('Failed to fetch PDF');
-                      const blob = await response.blob();
-                      const downloadUrl = window.URL.createObjectURL(blob);
-                      const link = document.createElement('a');
-                      link.href = downloadUrl;
-                      link.download = `EyesClosed-${selectedPatient?.firstName || 'patient'}.pdf`;
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                      window.URL.revokeObjectURL(downloadUrl);
-                      toast.success('Eyes Closed PDF downloaded!', { id: 'ec-main-download' });
-                    } catch (error) {
-                      console.error('Download error:', error);
-                      toast.error('Failed to download Eyes Closed PDF', { id: 'ec-main-download' });
+                  onClick={() => {
+                    let downloadFromUrl = eyesClosedUrl;
+                    if (!downloadFromUrl) { toast.error('No Eyes Closed PDF available', { id: 'ec-main-download' }); return; }
+                    if (downloadFromUrl.startsWith('/')) {
+                      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                      downloadFromUrl = apiUrl.replace(/\/api\/?$/, '') + downloadFromUrl;
                     }
+                    downloadViaBlob(downloadFromUrl, `EyesClosed-${selectedPatient?.firstName || 'patient'}.pdf`, 'ec-main-download');
                   }}
                   className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center space-x-1"
                   title="Download modified Eyes Closed PDF with Limitless Brain Lab logo"
@@ -3550,36 +3568,15 @@ const AlgorithmDataProcessor = () => {
                     {/* Download Eyes Open PDF Button - Show if URL in record OR bucket has files */}
                     {(record.inputData?.eyesOpenUrl || patientQeegFiles.eyesOpen.length > 0) && (
                       <button
-                        onClick={async () => {
-                          try {
-                            toast.loading('Downloading Eyes Open PDF...', { id: 'eo-download' });
-                            // Use URL from record if available, otherwise use latest from bucket
-                            let downloadFromUrl = record.inputData?.eyesOpenUrl || patientQeegFiles.eyesOpen[0]?.url;
-                            if (!downloadFromUrl) throw new Error('No Eyes Open PDF URL available');
-
-                            // Construct full URL if relative path is returned
-                            if (downloadFromUrl.startsWith('/')) {
-                              const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-                              const baseUrl = apiUrl.replace(/\/api\/?$/, '');
-                              downloadFromUrl = baseUrl + downloadFromUrl;
-                            }
-
-                            const response = await fetch(downloadFromUrl);
-                            if (!response.ok) throw new Error('Failed to fetch PDF');
-                            const blob = await response.blob();
-                            const downloadUrl = window.URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = downloadUrl;
-                            link.download = `EyesOpen-${record.inputData?.patientName || 'patient'}.pdf`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            window.URL.revokeObjectURL(downloadUrl);
-                            toast.success('Eyes Open PDF downloaded!', { id: 'eo-download' });
-                          } catch (error) {
-                            console.error('Download error:', error);
-                            toast.error('Failed to download Eyes Open PDF', { id: 'eo-download' });
+                        onClick={() => {
+                          // Use URL from record if available, otherwise use latest from bucket
+                          let downloadFromUrl = record.inputData?.eyesOpenUrl || patientQeegFiles.eyesOpen[0]?.url;
+                          if (!downloadFromUrl) { toast.error('No Eyes Open PDF URL available', { id: 'eo-download' }); return; }
+                          if (downloadFromUrl.startsWith('/')) {
+                            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                            downloadFromUrl = apiUrl.replace(/\/api\/?$/, '') + downloadFromUrl;
                           }
+                          downloadViaBlob(downloadFromUrl, `EyesOpen-${record.inputData?.patientName || 'patient'}.pdf`, 'eo-download');
                         }}
                         className="px-3 py-2 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors flex items-center justify-center space-x-1"
                         title="Download modified Eyes Open PDF with Limitless Brain Lab logo"
@@ -3592,36 +3589,15 @@ const AlgorithmDataProcessor = () => {
                     {/* Download Eyes Closed PDF Button - Show if URL in record OR bucket has files */}
                     {(record.inputData?.eyesClosedUrl || patientQeegFiles.eyesClosed.length > 0) && (
                       <button
-                        onClick={async () => {
-                          try {
-                            toast.loading('Downloading Eyes Closed PDF...', { id: 'ec-download' });
-                            // Use URL from record if available, otherwise use latest from bucket
-                            let downloadFromUrl = record.inputData?.eyesClosedUrl || patientQeegFiles.eyesClosed[0]?.url;
-                            if (!downloadFromUrl) throw new Error('No Eyes Closed PDF URL available');
-
-                            // Construct full URL if relative path is returned
-                            if (downloadFromUrl.startsWith('/')) {
-                              const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-                              const baseUrl = apiUrl.replace(/\/api\/?$/, '');
-                              downloadFromUrl = baseUrl + downloadFromUrl;
-                            }
-
-                            const response = await fetch(downloadFromUrl);
-                            if (!response.ok) throw new Error('Failed to fetch PDF');
-                            const blob = await response.blob();
-                            const downloadUrl = window.URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = downloadUrl;
-                            link.download = `EyesClosed-${record.inputData?.patientName || 'patient'}.pdf`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            window.URL.revokeObjectURL(downloadUrl);
-                            toast.success('Eyes Closed PDF downloaded!', { id: 'ec-download' });
-                          } catch (error) {
-                            console.error('Download error:', error);
-                            toast.error('Failed to download Eyes Closed PDF', { id: 'ec-download' });
+                        onClick={() => {
+                          // Use URL from record if available, otherwise use latest from bucket
+                          let downloadFromUrl = record.inputData?.eyesClosedUrl || patientQeegFiles.eyesClosed[0]?.url;
+                          if (!downloadFromUrl) { toast.error('No Eyes Closed PDF URL available', { id: 'ec-download' }); return; }
+                          if (downloadFromUrl.startsWith('/')) {
+                            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                            downloadFromUrl = apiUrl.replace(/\/api\/?$/, '') + downloadFromUrl;
                           }
+                          downloadViaBlob(downloadFromUrl, `EyesClosed-${record.inputData?.patientName || 'patient'}.pdf`, 'ec-download');
                         }}
                         className="px-3 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center justify-center space-x-1"
                         title="Download modified Eyes Closed PDF with Limitless Brain Lab logo"

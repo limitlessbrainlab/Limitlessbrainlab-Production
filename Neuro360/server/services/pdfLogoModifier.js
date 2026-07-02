@@ -3,109 +3,72 @@
  * Replaces EEG machine logo with NeuroSense logo in uploaded PDFs
  */
 
-const { PDFDocument, rgb } = require('pdf-lib');
 const fs = require('fs');
 const path = require('path');
+const { Worker } = require('worker_threads');
 
 // NeuroSense logo path
 const NEUROSENSE_LOGO_PATH = path.resolve(__dirname, '../../public/NeuroSense_Version_7_White_BG-removebg-preview.png');
 
+const LOGO_WORKER_PATH = path.resolve(__dirname, 'pdfLogoModifier.worker.js');
+
 /**
- * Replace EEG logo with NeuroSense logo on all pages of a PDF
+ * Replace EEG logo with NeuroSense logo on all pages of a PDF.
+ *
+ * The CPU-bound pdf-lib work runs in a worker thread so it does NOT block the main event loop —
+ * critical on the 0.1-CPU Render free tier, where blocking here stalls health checks and other
+ * downloads (→ ERR_TIMED_OUT). Falls back to the original PDF path on any failure.
+ *
  * @param {string} inputPdfPath - Path to the input PDF file
  * @param {string} outputPdfPath - Optional output path (defaults to temp file)
- * @returns {Promise<string>} - Path to the modified PDF
+ * @returns {Promise<string>} - Path to the modified PDF (or the original on failure)
  */
 async function replaceLogo(inputPdfPath, outputPdfPath = null) {
-  console.log('🔄 Starting logo replacement for:', inputPdfPath);
+  console.log('🔄 Starting logo replacement (worker) for:', inputPdfPath);
 
-  try {
-    // Read the input PDF
-    const pdfBytes = fs.readFileSync(inputPdfPath);
-    const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
-
-    // Embed the NeuroSense logo
-    let logoImage = null;
-    if (fs.existsSync(NEUROSENSE_LOGO_PATH)) {
-      const logoBytes = fs.readFileSync(NEUROSENSE_LOGO_PATH);
-      logoImage = await pdfDoc.embedPng(logoBytes);
-      console.log('   ✅ NeuroSense logo embedded successfully');
-    } else {
-      console.warn('   ⚠️ NeuroSense logo not found at:', NEUROSENSE_LOGO_PATH);
-    }
-
-    // Get all pages
-    const pages = pdfDoc.getPages();
-    console.log(`   📄 Processing ${pages.length} pages...`);
-
-    // Process each page
-    for (let i = 0; i < pages.length; i++) {
-      const page = pages[i];
-      const { width, height } = page.getSize();
-
-      console.log(`   Page ${i + 1}: Size ${width}x${height}`);
-
-      // Cover ONLY the qEEGpro logo in the top-right corner
-      // Page 1 has larger S.A.R.A + qEEGpro logo, other pages have smaller qEEGpro logo
-      const isFirstPage = (i === 0);
-      const coverWidth = isFirstPage ? 280 : 180;
-      const coverHeight = isFirstPage ? 120 : 80;
-      page.drawRectangle({
-        x: width - coverWidth,
-        y: height - coverHeight,
-        width: coverWidth,
-        height: coverHeight,
-        color: rgb(1, 1, 1), // White
-      });
-
-      console.log(`   Page ${i + 1}: Covered qEEGpro logo area (top-right ${coverWidth}x${coverHeight})`);
-
-      // Draw NeuroSense logo on top of the white rectangle
-      if (logoImage) {
-        const logoDims = logoImage.scale(1);
-        // Scale logo to fit in the covered area
-        const maxLogoWidth = isFirstPage ? 250 : 160;
-        const maxLogoHeight = isFirstPage ? 110 : 70;
-        const scale = Math.min(maxLogoWidth / logoDims.width, maxLogoHeight / logoDims.height);
-        const drawWidth = logoDims.width * scale;
-        const drawHeight = logoDims.height * scale;
-
-        // Position logo in the top-right corner with small padding
-        const padding = 5;
-        const logoX = width - drawWidth - padding;
-        const logoY = height - drawHeight - padding;
-
-        page.drawImage(logoImage, {
-          x: logoX,
-          y: logoY,
-          width: drawWidth,
-          height: drawHeight,
-        });
-
-        console.log(`   Page ${i + 1}: NeuroSense logo drawn (${Math.round(drawWidth)}x${Math.round(drawHeight)})`);
-      }
-    }
-
-    // Generate output path if not provided
-    if (!outputPdfPath) {
-      const inputDir = path.dirname(inputPdfPath);
-      const inputBasename = path.basename(inputPdfPath, '.pdf');
-      outputPdfPath = path.join(inputDir, `${inputBasename}_modified.pdf`);
-    }
-
-    // Save the modified PDF
-    const modifiedPdfBytes = await pdfDoc.save();
-    fs.writeFileSync(outputPdfPath, modifiedPdfBytes);
-
-    console.log(`   ✅ Logo replaced successfully. Output: ${outputPdfPath}`);
-    return outputPdfPath;
-
-  } catch (error) {
-    console.error('   ❌ Error replacing logo:', error.message);
-    // Return original path if modification fails (fallback)
-    console.log('   ⚠️ Falling back to original PDF');
-    return inputPdfPath;
+  // Generate output path if not provided
+  if (!outputPdfPath) {
+    const inputDir = path.dirname(inputPdfPath);
+    const inputBasename = path.basename(inputPdfPath, '.pdf');
+    outputPdfPath = path.join(inputDir, `${inputBasename}_modified.pdf`);
   }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (result) => { if (!settled) { settled = true; resolve(result); } };
+
+    let worker;
+    try {
+      worker = new Worker(LOGO_WORKER_PATH, { workerData: { inputPdfPath, outputPdfPath } });
+    } catch (spawnErr) {
+      console.error('   ❌ Could not spawn logo worker:', spawnErr.message);
+      console.log('   ⚠️ Falling back to original PDF');
+      return finish(inputPdfPath);
+    }
+
+    worker.on('message', (msg) => {
+      if (msg && msg.ok) {
+        console.log(`   ✅ Logo replaced successfully. Output: ${msg.outputPdfPath}`);
+        finish(msg.outputPdfPath);
+      } else {
+        console.error('   ❌ Error replacing logo:', msg && msg.error);
+        console.log('   ⚠️ Falling back to original PDF');
+        finish(inputPdfPath);
+      }
+    });
+    worker.on('error', (err) => {
+      console.error('   ❌ Logo worker error:', err.message);
+      console.log('   ⚠️ Falling back to original PDF');
+      finish(inputPdfPath);
+    });
+    worker.on('exit', (code) => {
+      if (code !== 0) {
+        console.error(`   ❌ Logo worker exited with code ${code}`);
+        console.log('   ⚠️ Falling back to original PDF');
+        finish(inputPdfPath);
+      }
+    });
+  });
 }
 
 /**

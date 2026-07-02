@@ -197,6 +197,12 @@ emailTransporter.verify((error, success) => {
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust the first proxy hop (Render's load balancer / Vercel edge) so req.ip resolves to the
+// real client IP instead of the shared upstream proxy IP. Without this, express-rate-limit keys
+// every unauthenticated request into a single global bucket → the whole app gets 429'd. Use a
+// specific hop count (1), not `true`, to satisfy express-rate-limit's proxy validation.
+app.set('trust proxy', 1);
+
 // Per-deploy backend version — changes on every Render deploy (each deploy restarts the
 // process → new boot timestamp). The frontend polls /api/app-version and forces logout +
 // reload when this changes since the user's session started.

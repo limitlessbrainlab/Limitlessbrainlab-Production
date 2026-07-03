@@ -22,7 +22,6 @@ const STATUS_COLORS = {
 
 const PatientSubscriptions = () => {
   const [patients, setPatients] = useState([]);
-  const [paymentHistory, setPaymentHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [tierFilter, setTierFilter] = useState('all');
@@ -54,14 +53,6 @@ const PatientSubscriptions = () => {
       const clinicMap = {};
       (clinicsData || []).forEach((c) => { clinicMap[c.id] = c.name; });
 
-      // Fetch all payment history
-      const { data: payments, error: paymentsErr } = await supabase
-        .from('payment_history')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (paymentsErr) console.error('Payment history fetch error:', paymentsErr);
-
       const enriched = (patientsData || []).map((p) => ({
         ...p,
         displayName: p.full_name || p.name || 'Unknown',
@@ -71,7 +62,6 @@ const PatientSubscriptions = () => {
       }));
 
       setPatients(enriched);
-      setPaymentHistory(payments || []);
     } catch (err) {
       console.error('Error loading patient subscriptions:', err);
       toast.error('Failed to load patient subscriptions');
@@ -80,13 +70,93 @@ const PatientSubscriptions = () => {
     }
   };
 
-  const viewPatientHistory = (patient) => {
+  const viewPatientHistory = async (patient) => {
     setSelectedPatient(patient);
-    const history = paymentHistory.filter(
-      (p) => p.patient_email?.toLowerCase() === patient.email?.toLowerCase()
-    );
-    setPatientPayments(history);
     setShowHistoryModal(true);
+    setPatientPayments([]);
+
+    const email = patient.email?.toLowerCase();
+    if (!email) return;
+
+    // Patient purchases are spread across several tables (the same ones the
+    // Wallet reads). payment_history holds ONLY subscription events, so reading
+    // it alone left this modal empty for patients who bought coaching /
+    // assessments / frequencies / meditations. Fetch them all and merge.
+    try {
+      const [payHist, patientPays, assessments, freqs, meds] = await Promise.all([
+        supabase.from('payment_history').select('*').eq('patient_email', email),
+        supabase.from('patient_payments').select('*').eq('patient_email', email),
+        supabase.from('assessment_purchases').select('*').eq('patient_email', email),
+        supabase.from('frequency_purchases').select('*').eq('patient_email', email),
+        supabase.from('meditation_purchases').select('*').eq('patient_email', email),
+      ]);
+
+      const rows = [];
+
+      // Subscription events (already in the shape the modal expects)
+      (payHist.data || []).forEach((p) => rows.push({ ...p, rowKey: `payHist-${p.id}` }));
+
+      // Unified purchases table — coaching is written ONLY here
+      (patientPays.data || []).forEach((p) => rows.push({
+        rowKey: `patientPays-${p.id}`,
+        id: p.id,
+        payment_type: p.item_name || (p.type ? `${p.type} purchase` : 'Payment'),
+        amount: p.amount,
+        currency: p.currency,
+        created_at: p.created_at,
+        payment_provider: p.payment_provider,
+        status: p.status,
+        stripe_session_id: p.stripe_session_id,
+      }));
+
+      // Specific purchase tables
+      (assessments.data || []).forEach((a) => rows.push({
+        rowKey: `assessment-${a.id}`,
+        id: a.id,
+        payment_type: a.assessment_name || 'Brain Assessment',
+        amount: a.amount_paid,
+        currency: a.currency,
+        created_at: a.purchased_at,
+        status: 'completed',
+        stripe_session_id: a.stripe_session_id,
+      }));
+      (freqs.data || []).forEach((f) => rows.push({
+        rowKey: `frequency-${f.id}`,
+        id: f.id,
+        payment_type: (f.pack_id || 'Frequency Pack').replace(/_/g, ' '),
+        amount: f.amount_paid,
+        currency: f.currency,
+        created_at: f.purchased_at,
+        status: 'completed',
+        stripe_session_id: f.stripe_session_id,
+      }));
+      (meds.data || []).forEach((m) => rows.push({
+        rowKey: `meditation-${m.id}`,
+        id: m.id,
+        payment_type: (m.meditation_id || 'Meditation Pack').replace(/_/g, ' '),
+        amount: m.amount_paid,
+        currency: m.currency,
+        created_at: m.purchased_at,
+        status: 'completed',
+        stripe_session_id: m.stripe_session_id,
+      }));
+
+      // De-dup rows written to more than one table (by Stripe session id);
+      // rows without a session id are always kept.
+      const seen = new Set();
+      const merged = rows.filter((r) => {
+        if (!r.stripe_session_id) return true;
+        if (seen.has(r.stripe_session_id)) return false;
+        seen.add(r.stripe_session_id);
+        return true;
+      });
+
+      merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      setPatientPayments(merged);
+    } catch (err) {
+      console.error('Error loading patient payment history:', err);
+      toast.error('Failed to load payment history');
+    }
   };
 
   const filtered = patients.filter((p) => {
@@ -328,7 +398,7 @@ const PatientSubscriptions = () => {
               ) : (
                 <div className="space-y-3">
                   {patientPayments.map((payment) => (
-                    <div key={payment.id} className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 border dark:border-gray-700">
+                    <div key={payment.rowKey || payment.id} className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 border dark:border-gray-700">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-gray-900 dark:text-white text-sm">
                           {payment.payment_type === 'subscription' ? `${(payment.tier || 'Plan').toUpperCase()} Subscription` : payment.payment_type || 'Payment'}

@@ -24,9 +24,72 @@ const PricingManagement = () => {
     sort_order: 0
   });
 
+  // Live INR-per-USD rate so the two price fields can auto-convert. Uses free, key-less FX
+  // endpoints (no added cost) with a backup source. Falls back to a current-ish constant only if
+  // both live sources fail, so editing still works — the indicator makes clear when that happens.
+  const FALLBACK_USD_RATE = 95; // INR per 1 USD (approx market fallback if live fetch fails)
+  const [usdRate, setUsdRate] = useState(null); // INR per 1 USD (null until first attempt resolves)
+  const [rateStatus, setRateStatus] = useState('loading'); // 'loading' | 'live' | 'fallback'
+
+  // Try primary source, then backup. Returns INR-per-USD or null if both fail.
+  const fetchUsdInrRate = async () => {
+    // 1) open.er-api.com — { rates: { INR } }
+    try {
+      const res = await fetch('https://open.er-api.com/v6/latest/USD');
+      const data = await res.json();
+      if (data?.rates?.INR > 0) return data.rates.INR;
+    } catch (_) { /* try backup */ }
+    // 2) frankfurter.dev (ECB) — { rates: { INR } }
+    try {
+      const res = await fetch('https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR');
+      const data = await res.json();
+      if (data?.rates?.INR > 0) return data.rates.INR;
+    } catch (_) { /* both failed */ }
+    return null;
+  };
+
+  const refreshUsdRate = async () => {
+    setRateStatus('loading');
+    const rate = await fetchUsdInrRate();
+    if (rate) {
+      setUsdRate(rate);
+      setRateStatus('live');
+    } else {
+      console.warn('Live USD/INR rate unavailable from both sources, using fallback');
+      setUsdRate(FALLBACK_USD_RATE);
+      setRateStatus('fallback');
+    }
+  };
+
   useEffect(() => {
     loadPackages();
+    refreshUsdRate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Retry the live rate each time the modal opens, so a transient mount-time failure doesn't leave
+  // the admin editing against a stale fallback.
+  useEffect(() => {
+    if (showModal && rateStatus !== 'live') refreshUsdRate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showModal]);
+
+  // Editing INR recomputes USD (and vice versa) from the current live rate. If the rate hasn't
+  // loaded yet, just set the edited field and leave the other untouched.
+  const handleInrChange = (val) => {
+    setFormData(prev => {
+      const next = { ...prev, price_inr: val };
+      if (usdRate && val !== '' && !isNaN(val)) next.price_usd = Math.round(Number(val) / usdRate);
+      return next;
+    });
+  };
+  const handleUsdChange = (val) => {
+    setFormData(prev => {
+      const next = { ...prev, price_usd: val };
+      if (usdRate && val !== '' && !isNaN(val)) next.price_inr = Math.round(Number(val) * usdRate);
+      return next;
+    });
+  };
 
   const loadPackages = async () => {
     setLoading(true);
@@ -334,7 +397,7 @@ const PricingManagement = () => {
                     <input
                       type="number"
                       value={formData.price_inr}
-                      onChange={e => setFormData(prev => ({ ...prev, price_inr: e.target.value }))}
+                      onChange={e => handleInrChange(e.target.value)}
                       min="0"
                       className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#323956] focus:border-transparent"
                     />
@@ -347,13 +410,20 @@ const PricingManagement = () => {
                     <input
                       type="number"
                       value={formData.price_usd}
-                      onChange={e => setFormData(prev => ({ ...prev, price_usd: e.target.value }))}
+                      onChange={e => handleUsdChange(e.target.value)}
                       min="0"
                       className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#323956] focus:border-transparent"
                     />
                   </div>
                 </div>
               </div>
+
+              {/* Live conversion rate indicator — editing either field auto-updates the other */}
+              <p className="text-xs text-gray-500 -mt-2">
+                {rateStatus === 'loading'
+                  ? 'Loading live exchange rate…'
+                  : `Auto-converts at ${rateStatus === 'live' ? 'live' : 'fallback'} rate: $1 = ${'₹'}${usdRate?.toFixed(2)}`}
+              </p>
 
               {/* Per-report price preview */}
               {formData.reports > 0 && formData.price_inr > 0 && (

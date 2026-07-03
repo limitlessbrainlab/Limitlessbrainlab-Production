@@ -140,6 +140,8 @@ function buildReportData(qeegData, algoResults, patient = {}, displayPercents = 
   const regeneration = metricValue(params, 'Regeneration');
   const asymmetry = metricValue(params, 'Alpha Asymmetry');
   const daytimeDelta = metricValue(params, 'Excessive Delta');
+  const focusScore = metricValue(params, 'Focus Score');
+  const alphaTheta = metricValue(params, 'Alpha:Theta Balance');
 
   const deepDive = {
     alphaPeak: {
@@ -163,8 +165,16 @@ function buildReportData(qeegData, algoResults, patient = {}, displayPercents = 
       status: asymmetry == null ? 'N/A' : asymmetry < 0 ? 'Right-Shifted' : asymmetry > 0 ? 'Left-Shifted' : 'Balanced',
     },
     daytimeDelta: {
-      label: 'Daytime Delta', value: daytimeDelta, unit: '%', optimal: '< 20%',
+      label: 'Excessive / Daytime Delta', value: daytimeDelta, unit: '%', optimal: '< 20%',
       status: daytimeDelta == null ? 'N/A' : daytimeDelta < 20 ? 'Normal' : daytimeDelta <= 30 ? 'Borderline' : 'Elevated',
+    },
+    focusScore: {
+      label: 'Focus Score', value: focusScore, unit: '', optimal: '< 1.5',
+      status: focusScore == null ? 'N/A' : focusScore < 1.5 ? 'Good' : 'Above Target',
+    },
+    alphaTheta: {
+      label: 'Alpha:Theta Balance', value: alphaTheta, unit: '', optimal: '> 1.0 (healthy)',
+      status: alphaTheta == null ? 'N/A' : alphaTheta >= 1 ? 'Healthy' : 'Low',
     },
   };
 

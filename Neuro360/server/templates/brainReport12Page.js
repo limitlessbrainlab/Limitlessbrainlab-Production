@@ -35,6 +35,33 @@ const KIND_COLOR = { good: '#16a34a', warn: '#d97706', bad: '#ea580c' };
 const KIND_BG = { good: '#dcfce7', warn: '#fef3c7', bad: '#ffedd5' };
 const KIND_FG = { good: '#15803d', warn: '#b45309', bad: '#c2410c' };
 
+// Percent-driven colour scale used for the performance markers (matches the
+// reference report): high = green, mid = blue, low = orange, very low = red.
+function pctColor(p) {
+  const n = Number(p) || 0;
+  if (n >= 75) return '#16a34a';
+  if (n >= 40) return '#2563eb';
+  if (n >= 15) return '#ea580c';
+  return '#dc2626';
+}
+function pctTint(p) {
+  const n = Number(p) || 0;
+  if (n >= 75) return '#dcfce7';
+  if (n >= 40) return '#dbeafe';
+  if (n >= 15) return '#ffedd5';
+  return '#fee2e2';
+}
+function pctFg(p) {
+  const n = Number(p) || 0;
+  if (n >= 75) return '#15803d';
+  if (n >= 40) return '#1e40af';
+  if (n >= 15) return '#c2410c';
+  return '#b91c1c';
+}
+function pctBadge(text, p) {
+  return `<span class="badge" style="background:${pctTint(p)};color:${pctFg(p)}">${esc(String(text).toUpperCase())}</span>`;
+}
+
 // White brain glyph used inside the blue logo badge ({S} = pixel size).
 const BRAIN_SVG =
   '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="#fff" ' +
@@ -54,11 +81,10 @@ function badge(text, kind) {
 
 // Snapshot marker row — each in its own bordered card with a value and a bar.
 function snapCard(b) {
-  const kind = statusKind(b.status);
-  const c = KIND_COLOR[kind];
+  const c = pctColor(b.percent);
   return `<div class="scard">
-    <div class="scard-top"><span class="scard-lbl">${esc(b.icon)} ${esc(b.label)}</span><span class="scard-pct" style="color:${c}">${b.percent}%</span></div>
-    <div class="ptrack"><div class="pfill" style="width:${Math.max(2, Math.min(100, b.percent))}%;background:${c}"></div></div>
+    <div class="scard-top"><span class="scard-lbl">${esc(b.icon)} ${esc(b.label)}</span><span class="scard-pct" style="color:${c}">${Number(b.percent) || 0}%</span></div>
+    <div class="ptrack"><div class="pfill" style="width:${Math.max(2, Math.min(100, Number(b.percent) || 0))}%;background:${c}"></div></div>
   </div>`;
 }
 
@@ -114,6 +140,14 @@ function splitDash(s) {
   if (dot > 0) return { title: String(s).slice(0, dot), body: String(s).slice(dot + 2) };
   return { title: s, body: '' };
 }
+
+// Small icon shown before each brain-type trait pill on the "Your Type" hero.
+const TRAIT_ICON = {
+  Vigilant: '👁️', Prepared: '🎯', 'Deeply Feeling': '💗', 'Risk-Aware': '🛡️', 'High Arousal': '⚡',
+  'Goal-Oriented': '🏁', 'High Drive': '🔥', Reliable: '✅', Balanced: '⚖️', 'Even-keeled': '😌', Adaptable: '🔄',
+  Creative: '🎨', Curious: '🔍', Spontaneous: '✨', Divergent: '🌱', Driven: '⚡', Focused: '🎯', 'Strong-willed': '💪',
+  Empathetic: '💗', Sensitive: '🌦️', Intuitive: '🔮', Expressive: '🎭',
+};
 
 function renderReportHtml(reportData, narrative = {}) {
   const d = reportData;
@@ -174,23 +208,21 @@ function renderReportHtml(reportData, narrative = {}) {
     burnout: 'Mental fuel · Stamina',
   };
   const perfCard = (b, sub, body) => {
-    const kind = statusKind(b.status);
-    const c = KIND_COLOR[kind];
+    const c = pctColor(b.percent);
     return `<div class="card perf2">
-      <div class="perf2-top"><div><div class="perf2-title">${esc(b.label)}</div><div class="perf2-sub">${esc(sub)}</div></div><div class="perf2-pct" style="color:${c}">${b.percent}%</div></div>
-      ${badge(b.status, kind)}
+      <div class="perf2-top"><div><div class="perf2-title">${esc(b.label)}</div><div class="perf2-sub">${esc(sub)}</div></div><div class="perf2-pct" style="color:${c}">${Number(b.percent) || 0}%</div></div>
+      ${pctBadge(b.status, b.percent)}
       <p class="perf2-body">${esc(body || '')}</p>
     </div>`;
   };
 
   // Inner-bandwidth cards (page 9).
   const innerCard = (label, b, body) => {
-    const kind = statusKind(b.status);
-    const c = KIND_COLOR[kind];
+    const c = pctColor(b.percent);
     return `<div class="card">
       <div class="perf2-title">${esc(label)}</div>
-      <div class="inner-pct" style="color:${c}">${b.percent}%</div>
-      ${badge(b.status, kind)}
+      <div class="inner-pct" style="color:${c}">${Number(b.percent) || 0}%</div>
+      ${pctBadge(b.status, b.percent)}
       <p class="perf2-body" style="margin-top:6px;">${esc(body || '')}</p>
     </div>`;
   };
@@ -216,6 +248,8 @@ function renderReportHtml(reportData, narrative = {}) {
     regeneration: 'Brain recovery capacity — how fast you replenish what you spend. Protect sleep and add daily downtime to move this number.',
     frontalAsymmetry: 'Right-shifted values are linked to vigilance, worry and slower emotional recovery. Goal-activation routines rebuild the left side.',
     daytimeDelta: 'Elevated waking delta points to recovery debt and fatigue rather than a primary issue. Sleep optimisation addresses it.',
+    focusScore: 'A theta:beta focus marker — above target is consistent with attention pulled sideways by vigilance. Pomodoro intervals and reduced threat-input help anchor sustained focus.',
+    alphaTheta: 'A workable ratio for memory and learning. This is the foundation that makes spaced repetition and active recall effective for you.',
   };
   const metricCard = (key, m) => {
     const kind = statusKind(m.status);
@@ -243,7 +277,7 @@ function renderReportHtml(reportData, narrative = {}) {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><style>
   @page { size: A4 portrait; margin: 0; }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif; color:#1f2a44; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body { font-family:'Helvetica Neue',Helvetica,Arial,'Liberation Sans',sans-serif; color:#1f2a44; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .page { position:relative; width:210mm; height:297mm; padding:16mm 15mm; page-break-after:always; overflow:hidden; }
   .page:last-child { page-break-after:auto; }
   .dark { background:linear-gradient(135deg,#123a76 0%,#1e63b4 100%); color:#fff; }
@@ -352,7 +386,7 @@ function renderReportHtml(reportData, narrative = {}) {
     <div class="brand">${logoMark(40)}<div><div class="cover-brand-name">NeuroSense</div><div class="cover-brand-sub">SMART EEG INTELLIGENCE</div></div></div>
     <div style="margin-top:150px;">
       <div class="eyebrow" style="color:#9ec2f0;">Personalized Neuro-Profile</div>
-      <h1>Your Brain<br>Type &amp; Performance<br>Report</h1>
+      <h1 style="font-size:52px;line-height:1.06;">Your Brain<br>Type &amp; Performance<br>Report</h1>
       <p class="lead" style="color:#cfe0f7;">A complete map of your brainwave activity, cognitive performance, and dominant brain type — built from 19-channel qEEG analysis and the NeuroSense five-type framework.</p>
     </div>
     <div class="info-cards">
@@ -405,7 +439,7 @@ function renderReportHtml(reportData, narrative = {}) {
     <div class="signals">
       ${toneCard(`💪 ${topStrength.title}`, topStrength.points, 'good', false)}
       ${toneCard(`⚠️ ${watchZone.title}`, watchZone.points, 'warn', false)}
-      ${toneCard(`🧭 Brain Type`, [`Type ${bt.id} — ${bt.name}${secondary ? `, with secondary ${secondary.name} traits.` : '.'}`, bt.tagline], 'info', false)}
+      ${toneCard(`🎯 Brain Type`, [`Type ${bt.id} — ${bt.name}${secondary ? `, with secondary ${secondary.name} traits.` : '.'}`, bt.tagline], 'info', false)}
     </div>
     ${pageFooter('Page 3 • Snapshot')}
   </section>
@@ -450,7 +484,7 @@ function renderReportHtml(reportData, narrative = {}) {
       <div class="eyebrow">${esc(p.firstName)}'s Brain Type</div>
       <h1 style="font-size:30px;">Type ${bt.id} — The ${esc(bt.name)} Brain</h1>
       <p class="lead" style="color:#cfe0f7;">${esc(bt.tagline)}.</p>
-      <div class="mt14">${bt.traits.map((t) => `<span class="pill">${esc(t)}</span>`).join('')}</div>
+      <div class="mt14">${bt.traits.map((t) => `<span class="pill">${TRAIT_ICON[t] ? esc(TRAIT_ICON[t]) + ' ' : ''}${esc(t)}</span>`).join('')}</div>
     </div>
     <h3 class="h3">What's happening in your brain</h3>
     <div class="grid2">
@@ -530,6 +564,7 @@ function renderReportHtml(reportData, narrative = {}) {
       ${metricCard('alphaPeak', dd.alphaPeak)}${metricCard('arousal', dd.arousal)}
       ${metricCard('relaxation', dd.relaxation)}${metricCard('regeneration', dd.regeneration)}
       ${metricCard('frontalAsymmetry', dd.frontalAsymmetry)}${metricCard('daytimeDelta', dd.daytimeDelta)}
+      ${metricCard('focusScore', dd.focusScore)}${metricCard('alphaTheta', dd.alphaTheta)}
     </div>
     ${pageFooter('Page 10 • Deep-Dive Metrics')}
   </section>

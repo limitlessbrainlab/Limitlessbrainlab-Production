@@ -180,7 +180,7 @@ const TYPES = {
     color: '#2B6CB0',
     tagline: 'The vigilant, prepared brain',
     card: 'Prepared, motivated, thorough. Heightened activity in vigilance circuits (amygdala, basal ganglia). Worry-prone but reliable.',
-    traits: ['Prepared', 'Goal-Oriented', 'High Drive', 'Vigilant', 'Reliable'],
+    traits: ['Vigilant', 'Prepared', 'Deeply Feeling', 'Risk-Aware', 'High Arousal'],
     neuroscience:
       'Brain-imaging research shows the Sentinel brain has heightened activity in the basal ganglia, insular cortex, and amygdala — the threat-detection circuits — often linked to lower GABA. Your qEEG mirrors this: high arousal, right-frontal alpha asymmetry, and low regeneration. The nervous system stays "on," scanning for what could go wrong.',
     whyStrength:

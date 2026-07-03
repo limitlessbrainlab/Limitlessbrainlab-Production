@@ -825,9 +825,19 @@ const CoachManagement = ({ onUpdate }) => {
                     </label>
                     <input
                       type="tel"
-                      {...register('phone', { required: 'Phone is required' })}
+                      inputMode="numeric"
+                      maxLength={10}
+                      {...register('phone', {
+                        required: 'Phone is required',
+                        pattern: { value: /^\d{10}$/, message: 'Phone number must be exactly 10 digits' },
+                      })}
+                      onChange={(e) => {
+                        // Accept digits only, capped at 10.
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setValue('phone', digits, { shouldValidate: true });
+                      }}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#323956]"
-                      placeholder="+971 50 123 4567"
+                      placeholder="9876543210"
                     />
                     {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone.message}</p>}
                   </div>
@@ -841,9 +851,19 @@ const CoachManagement = ({ onUpdate }) => {
                     </label>
                     <input
                       type="tel"
-                      {...register('whatsapp', { required: 'WhatsApp is required' })}
+                      inputMode="numeric"
+                      maxLength={10}
+                      {...register('whatsapp', {
+                        required: 'WhatsApp is required',
+                        pattern: { value: /^\d{10}$/, message: 'WhatsApp number must be exactly 10 digits' },
+                      })}
+                      onChange={(e) => {
+                        // Accept digits only, capped at 10.
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setValue('whatsapp', digits, { shouldValidate: true });
+                      }}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#323956]"
-                      placeholder="+971501234567"
+                      placeholder="9876543210"
                     />
                     {errors.whatsapp && <p className="text-red-500 text-xs mt-1">{errors.whatsapp.message}</p>}
                   </div>

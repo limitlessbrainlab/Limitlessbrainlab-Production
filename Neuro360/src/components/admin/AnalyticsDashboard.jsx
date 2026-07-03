@@ -160,20 +160,16 @@ const AnalyticsDashboard = ({ analytics }) => {
   ];
 
   // Export the dashboard as a printable PDF (browser "Save as PDF").
-  const exportData = () => {
-    // Escape any DB-sourced text before injecting into the print window's HTML.
-    const esc = (v) => String(v ?? '')
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const exportData = async () => {
     const money = (v) => `$${(Number(v) || 0).toLocaleString()}`;
     const rangeLabel = RANGE_LABELS[timeRange] || `Last ${timeRange} days`;
     const generatedAt = new Date().toLocaleString();
 
     const metricRows = [
       ['Total Revenue', money(metrics.totalRevenue), fmtPct(metrics.revenueChange)],
-      ['Active Clinics', metrics.activeClinics, fmtPct(metrics.clinicsChange)],
-      ['Reports Generated', metrics.reportsGenerated, fmtPct(metrics.reportsChange)],
-      ['Avg. Reports/Clinic', metrics.avgReports, fmtPct(metrics.avgChange)]
+      ['Active Clinics', String(metrics.activeClinics), fmtPct(metrics.clinicsChange)],
+      ['Reports Generated', String(metrics.reportsGenerated), fmtPct(metrics.reportsChange)],
+      ['Avg. Reports/Clinic', String(metrics.avgReports), fmtPct(metrics.avgChange)]
     ];
 
     const topClinics = [...clinics]
@@ -184,68 +180,86 @@ const AnalyticsDashboard = ({ analytics }) => {
     const trialUsers = clinics.filter(c => c.subscriptionStatus === 'trial').length;
     const expiredTrials = clinics.filter(c => c.subscriptionStatus === 'expired').length;
 
-    const row = (cells, tag = 'td') =>
-      `<tr>${cells.map(c => `<${tag}>${c}</${tag}>`).join('')}</tr>`;
+    const th = (t) => ({ text: t, bold: true, fillColor: '#f3f4f6' });
 
-    const html = `<!doctype html><html><head><meta charset="utf-8" />
-      <title>Neuro360 Analytics - ${generatedAt}</title>
-      <style>
-        * { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-        body { margin: 32px; color: #1f2937; }
-        h1 { font-size: 22px; margin: 0 0 4px; }
-        h2 { font-size: 15px; margin: 28px 0 8px; color: #4338ca; }
-        .sub { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px; }
-        th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e5e7eb; }
-        th { background: #f3f4f6; font-weight: 600; }
-        td.num, th.num { text-align: right; }
-        @media print { body { margin: 12mm; } button { display: none; } }
-      </style></head><body>
-      <h1>Neuro360 &mdash; Analytics &amp; Reports</h1>
-      <div class="sub">Range: ${rangeLabel} &nbsp;&bull;&nbsp; Generated: ${generatedAt}</div>
+    const docDefinition = {
+      pageMargins: [40, 40, 40, 50],
+      content: [
+        { text: 'Neuro360 — Analytics & Reports', style: 'h1' },
+        { text: `Range: ${rangeLabel}  •  Generated: ${generatedAt}`, style: 'sub' },
 
-      <h2>Key Metrics</h2>
-      <table>
-        <thead>${row(['Metric', 'Value', 'Change vs previous period'], 'th')}</thead>
-        <tbody>${metricRows.map(r => row([r[0], `<b>${r[1]}</b>`, r[2]])).join('')}</tbody>
-      </table>
+        { text: 'Key Metrics', style: 'h2' },
+        {
+          table: {
+            headerRows: 1,
+            widths: ['*', '*', '*'],
+            body: [
+              [th('Metric'), th('Value'), th('Change vs previous period')],
+              ...metricRows.map(r => [r[0], { text: r[1], bold: true }, r[2]])
+            ]
+          },
+          layout: 'lightHorizontalLines'
+        },
 
-      <h2>Top Performing Clinics</h2>
-      <table>
-        <thead>${row(['#', 'Clinic', 'Email', 'Reports', '% Used'], 'th')}</thead>
-        <tbody>${topClinics.map((c, i) => row([
-          i + 1,
-          esc(c.name) || '-',
-          esc(c.email) || '-',
-          c.reportsUsed || 0,
-          `${(((c.reportsUsed || 0) / (c.reportsAllowed || 10)) * 100).toFixed(0)}%`
-        ])).join('')}</tbody>
-      </table>
+        { text: 'Top Performing Clinics', style: 'h2' },
+        {
+          table: {
+            headerRows: 1,
+            widths: [20, '*', '*', 45, 45],
+            body: [
+              [th('#'), th('Clinic'), th('Email'), th('Reports'), th('% Used')],
+              ...topClinics.map((c, i) => [
+                String(i + 1),
+                c.name || '-',
+                c.email || '-',
+                String(c.reportsUsed || 0),
+                `${(((c.reportsUsed || 0) / (c.reportsAllowed || 10)) * 100).toFixed(0)}%`
+              ])
+            ]
+          },
+          layout: 'lightHorizontalLines'
+        },
 
-      <h2>Usage Statistics</h2>
-      <table>
-        <tbody>
-          ${row(['Active Subscriptions', activeSubs])}
-          ${row(['Trial Users', trialUsers])}
-          ${row(['Expired Trials', expiredTrials])}
-          ${row(['Total Reports', metrics.reportsGenerated])}
-          ${row(['Monthly Revenue', money(metrics.totalRevenue)])}
-          ${row(['Avg. Revenue/Clinic', money(metrics.activeClinics ? Math.round(metrics.totalRevenue / metrics.activeClinics) : 0)])}
-          ${row(['Revenue Growth', fmtPct(metrics.revenueChange)])}
-        </tbody>
-      </table>
-      <script>window.onload = function () { window.print(); };</script>
-      </body></html>`;
+        { text: 'Usage Statistics', style: 'h2' },
+        {
+          table: {
+            widths: ['*', '*'],
+            body: [
+              ['Active Subscriptions', String(activeSubs)],
+              ['Trial Users', String(trialUsers)],
+              ['Expired Trials', String(expiredTrials)],
+              ['Total Reports', String(metrics.reportsGenerated)],
+              ['Monthly Revenue', money(metrics.totalRevenue)],
+              ['Avg. Revenue/Clinic', money(metrics.activeClinics ? Math.round(metrics.totalRevenue / metrics.activeClinics) : 0)],
+              ['Revenue Growth', fmtPct(metrics.revenueChange)]
+            ]
+          },
+          layout: 'lightHorizontalLines'
+        }
+      ],
+      styles: {
+        h1: { fontSize: 18, bold: true, margin: [0, 0, 0, 2] },
+        h2: { fontSize: 13, bold: true, color: '#4338ca', margin: [0, 16, 0, 6] },
+        sub: { fontSize: 9, color: '#6b7280', margin: [0, 0, 0, 10] }
+      },
+      defaultStyle: { fontSize: 9 }
+    };
 
-    const w = window.open('', '_blank');
-    if (!w) {
-      console.error('Popup blocked — unable to open print window for PDF export');
-      alert('Please allow pop-ups for this site to export the analytics PDF.');
-      return;
+    try {
+      // Lazy-load pdfmake so it stays out of the main bundle; .download()
+      // triggers a direct file download (no browser print/save dialog).
+      const pdfMakeModule = await import('pdfmake/build/pdfmake');
+      const pdfFontsModule = await import('pdfmake/build/vfs_fonts');
+      const pdfMake = pdfMakeModule.default || pdfMakeModule;
+      const vfs = pdfFontsModule.default || pdfFontsModule.vfs || pdfFontsModule;
+      if (vfs && !pdfMake.vfs) pdfMake.vfs = vfs;
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      pdfMake.createPdf(docDefinition).download(`Neuro360-Analytics-${stamp}.pdf`);
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      alert('Failed to generate the analytics PDF. Please try again.');
     }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
   };
 
   return (

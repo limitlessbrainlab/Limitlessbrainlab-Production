@@ -259,7 +259,10 @@ const AlgorithmDataProcessor = () => {
   const loadProcessingHistory = async (patientId) => {
     try {
       // Load algorithm results for THIS patient server-side (was a whole-table scan).
-      const patientResults = (await DatabaseService.findBy('algorithmResults', 'patient_id', patientId)) || [];
+      // Show newest processing runs first (latest → oldest).
+      const recordTime = (r) => new Date(r.inputData?.processedAt || r.processedAt || r.createdAt).getTime() || 0;
+      const patientResults = ((await DatabaseService.findBy('algorithmResults', 'patient_id', patientId)) || [])
+        .sort((a, b) => recordTime(b) - recordTime(a));
 
 
       // Log all records for debugging
@@ -362,7 +365,9 @@ const AlgorithmDataProcessor = () => {
         if (updatedCount > 0) {
           // Reload the results after updating
           const updatedResults = await DatabaseService.get('algorithmResults');
-          const updatedPatientResults = updatedResults.filter(r => r.patientId === patientId);
+          const updatedPatientResults = updatedResults
+            .filter(r => r.patientId === patientId)
+            .sort((a, b) => recordTime(b) - recordTime(a));
           setProcessingHistory(updatedPatientResults);
 
           updatedPatientResults.forEach((record, idx) => {
@@ -3489,6 +3494,20 @@ const AlgorithmDataProcessor = () => {
                     {/* Download PDF Button - Always visible - Regenerates PDF with saved notes */}
                     <button
                       onClick={async () => {
+                        // Prefer the PDF already generated for this record — fast and
+                        // reliable. Regenerating via Gemini on every click is slow and
+                        // fails often; only fall back to it when no stored PDF exists.
+                        if (record.pdfUrl) {
+                          let url = record.pdfUrl;
+                          if (url.startsWith('/')) {
+                            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                            url = apiUrl.replace(/\/api\/?$/, '') + url;
+                          }
+                          const fname = `neurosense-report-${(record.inputData?.patientName || 'patient').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+                          await downloadViaBlob(url, fname, 'history-download');
+                          return;
+                        }
+
                         const savedResults = parseResultsData(record.outputData || record.results);
                         if (!savedResults || savedResults.length === 0) {
                           toast.error('No results available for this record');

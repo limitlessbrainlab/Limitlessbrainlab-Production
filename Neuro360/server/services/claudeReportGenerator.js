@@ -13,6 +13,7 @@
 
 const { generateReportNarrative, renderHtmlOnVps, postLesson } = require('./nexaprocService');
 const { renderReportHtml } = require('../templates/brainReport12Page');
+const { inlineEmojis } = require('../utils/inlineEmojis');
 
 /**
  * @param {object} reportData  Output of buildReportData() (numbers + brain type).
@@ -45,7 +46,9 @@ async function generateBrainReportPdf(reportData, narrative, onProgress) {
   }
 
   if (typeof onProgress === 'function') onProgress('render');
-  const html = renderReportHtml(reportData, prose);
+  // Inline emojis as SVG images so they render on the fontless headless-Chromium
+  // renderer (otherwise they appear as empty "tofu" boxes).
+  const html = inlineEmojis(renderReportHtml(reportData, prose));
   const pdf = await renderHtmlOnVps(html);
   return { pdf, narrative: prose };
 }

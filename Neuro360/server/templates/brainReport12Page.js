@@ -277,6 +277,7 @@ function renderReportHtml(reportData, narrative = {}) {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><style>
   @page { size: A4 portrait; margin: 0; }
   * { margin:0; padding:0; box-sizing:border-box; }
+  img.emoji { height:1em; width:1em; margin:0 .05em; vertical-align:-.12em; display:inline-block; }
   body { font-family:'Helvetica Neue',Helvetica,Arial,'Liberation Sans',sans-serif; color:#1f2a44; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .page { position:relative; width:210mm; height:297mm; padding:16mm 15mm; page-break-after:always; overflow:hidden; }
   .page:last-child { page-break-after:auto; }

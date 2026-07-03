@@ -483,7 +483,7 @@ const AlertDashboard = () => {
         )}
       </div>
 
-      {/* Alert Management Actions */}
+      {/* Alert Management Actions card — hidden per request.
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Alert Management</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -498,7 +498,7 @@ const AlertDashboard = () => {
             <TrendingUp className="h-5 w-5 text-gray-600" />
             <span>Run Alert Check</span>
           </button>
-          
+
           <button
             onClick={() => setShowNotifSettings((v) => !v)}
             className={`flex items-center justify-center space-x-2 p-3 border rounded-lg transition-colors ${
@@ -508,7 +508,7 @@ const AlertDashboard = () => {
             <Bell className="h-5 w-5 text-gray-600" />
             <span>Alert Settings</span>
           </button>
-          
+
           <button
             onClick={loadAlerts}
             className="flex items-center justify-center space-x-2 p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -518,6 +518,7 @@ const AlertDashboard = () => {
           </button>
         </div>
       </div>
+      */}
     </div>
   );
 };

@@ -54,9 +54,49 @@ class AlertService {
           this.checkTrialStatus(clinic);
         }
       });
+
+      // Payment problems (failed/declined transactions) need admin action too.
+      const payments = await DatabaseService.get('payments') || [];
+      if (Array.isArray(payments)) {
+        this.checkPayments(payments, clinics);
+      }
     } catch (error) {
       console.error('Error checking clinic alerts:', error);
     }
+  }
+
+  // Raise a critical alert for each recently failed/declined payment so the
+  // admin can follow up. One alert per payment (deduped by payment id).
+  checkPayments(payments, clinics = []) {
+    const FAILED = ['failed', 'declined', 'cancelled', 'canceled', 'error'];
+    const recentThreshold = Date.now() - 30 * 24 * 60 * 60 * 1000; // last 30 days
+
+    payments.forEach((payment) => {
+      const status = (payment.status || '').toLowerCase();
+      if (!FAILED.includes(status)) return;
+
+      const when = new Date(payment.createdAt || payment.created_at).getTime();
+      if (!isNaN(when) && when < recentThreshold) return; // skip stale failures
+
+      const clinic = clinics.find(c => c.id === (payment.clinicId || payment.clinic_id));
+      const clinicName = clinic?.name || 'a clinic';
+      const amount = payment.amount != null ? `₹${payment.amount}` : 'a payment';
+
+      this.createAlert(payment.clinicId || payment.clinic_id || 'unknown', {
+        dedupId: `payment_${payment.id}`,
+        type: 'critical',
+        category: 'payment',
+        title: 'Payment Failed',
+        message: `${amount} from ${clinicName} ${status === 'declined' ? 'was declined' : 'failed'}. Review and follow up.`,
+        action: 'review_payment',
+        clinicName,
+        data: {
+          paymentId: payment.id,
+          amount: payment.amount,
+          status,
+        },
+      });
+    });
   }
 
   // Check clinic usage and generate alerts
@@ -140,10 +180,15 @@ class AlertService {
 
   // Create an alert record
   async createAlert(clinicId, alertData) {
-    const alertId = `${clinicId}_${alertData.category}_${alertData.type}`;
+    // Per-record alerts (e.g. one per failed payment) pass an explicit dedupId;
+    // otherwise dedupe by clinic+category+type so repeated checks don't pile up.
+    const { dedupId, ...rest } = alertData;
+    const alertId = dedupId || `${clinicId}_${alertData.category}_${alertData.type}`;
 
-    // Check if similar alert already exists and is recent
-    const existingAlert = await this.getRecentAlert(clinicId, alertData.category, alertData.type);
+    // Check if this exact alert already exists and is still active
+    const existingAlert = this.inMemoryAlerts.find(
+      a => a.id === alertId && a.status === 'active'
+    );
     if (existingAlert) {
       // Update existing alert instead of creating duplicate
       existingAlert.updatedAt = new Date().toISOString();
@@ -156,7 +201,7 @@ class AlertService {
     const alert = {
       id: alertId,
       clinicId,
-      ...alertData,
+      ...rest,
       status: 'active',
       count: 1,
       acknowledged: false,
@@ -171,19 +216,6 @@ class AlertService {
     // Toast notifications were annoying on page refresh
 
     return alert;
-  }
-
-  // Get recent alert of same type to avoid duplicates
-  async getRecentAlert(clinicId, category, type) {
-    const recentThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
-
-    return this.inMemoryAlerts.find(alert =>
-      alert.clinicId === clinicId &&
-      alert.category === category &&
-      alert.type === type &&
-      alert.status === 'active' &&
-      new Date(alert.createdAt) > recentThreshold
-    );
   }
 
   // Get active alerts for a clinic

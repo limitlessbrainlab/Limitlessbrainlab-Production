@@ -76,6 +76,13 @@ const CoachManagement = ({ onUpdate }) => {
     loadBookings();
   }, []);
 
+  // The status filter options differ per tab (coaches: active/inactive; requests
+  // & bookings: pending/contacted/completed). Reset to "all" on every tab switch
+  // so a value carried over from another tab can't leave the list stuck/empty.
+  useEffect(() => {
+    setStatusFilter('all');
+  }, [activeTab]);
+
   const loadBookings = async () => {
     try {
       const { data, error } = await supabase

@@ -8,17 +8,32 @@ import {
   Calendar,
   Users,
   TrendingUp,
-  Filter
+  Filter,
+  Activity,
+  Clock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AlertService from '../../services/alertService';
 import DatabaseService from '../../services/databaseService';
+import { buildRecentActivities, getIconColor } from './recentActivitiesHelpers';
+
+// Notification-type filters for the activity feed shown alongside alerts.
+const NOTIF_TYPES = [
+  { key: 'clinic', label: 'Clinic creations' },
+  { key: 'report', label: 'Report generation' },
+  { key: 'payment', label: 'Payments & transactions' },
+];
 
 const AlertDashboard = () => {
   const [alerts, setAlerts] = useState([]);
   const [stats, setStats] = useState({});
   const [filter, setFilter] = useState('all'); // 'all', 'critical', 'warning'
   const [loading, setLoading] = useState(true);
+  // Activity notifications (clinic creations, payments, report generation) shown
+  // alongside the system alerts, mirroring the dashboard "Recent Activities" feed.
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifSettings, setShowNotifSettings] = useState(false);
+  const [notifFilter, setNotifFilter] = useState({ clinic: true, report: true, payment: true });
 
   const loadAlerts = useCallback(async () => {
     try {
@@ -32,6 +47,15 @@ const AlertDashboard = () => {
 
       setAlerts(alertServiceData);
       setStats(statsData);
+
+      // Build the activity-notification feed from real clinic/report/payment rows
+      // so every creation, payment transaction and report generation surfaces here.
+      const [clinics, reports, payments] = await Promise.all([
+        DatabaseService.get('clinics'),
+        DatabaseService.get('reports'),
+        DatabaseService.get('payments'),
+      ]);
+      setNotifications(buildRecentActivities(clinics || [], reports || [], payments || []));
     } catch (error) {
       toast.error('Error loading alerts');
       console.error(error);
@@ -39,6 +63,8 @@ const AlertDashboard = () => {
       setLoading(false);
     }
   }, []);
+
+  const filteredNotifications = notifications.filter((n) => notifFilter[n.type]);
 
   useEffect(() => {
     // Start the alert service if not already running
@@ -400,6 +426,63 @@ const AlertDashboard = () => {
         )}
       </div>
 
+      {/* Recent Notifications — every clinic creation, payment/transaction and report generation */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+              <Activity className="h-5 w-5 text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900">
+              Recent Notifications ({filteredNotifications.length})
+            </h3>
+          </div>
+        </div>
+
+        {showNotifSettings && (
+          <div className="mb-5 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <h4 className="text-sm font-medium text-gray-900 mb-3">Notification Settings — show:</h4>
+            <div className="flex flex-wrap gap-4">
+              {NOTIF_TYPES.map((t) => (
+                <label key={t.key} className="flex items-center space-x-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={notifFilter[t.key]}
+                    onChange={(e) => setNotifFilter((prev) => ({ ...prev, [t.key]: e.target.checked }))}
+                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span>{t.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {filteredNotifications.length === 0 ? (
+          <p className="text-sm text-gray-500">No notifications to show.</p>
+        ) : (
+          <div className="space-y-3 max-h-[32rem] overflow-y-auto">
+            {filteredNotifications.map((n) => {
+              const Icon = n.icon;
+              return (
+                <div key={n.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className={`p-2 rounded-lg ${getIconColor(n.color)}`}>
+                    <Icon className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 line-clamp-2">{n.message}</p>
+                    <div className="flex items-center space-x-1 mt-1">
+                      <Clock className="h-3 w-3 text-gray-400" />
+                      <p className="text-xs text-gray-500">{n.time}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Alert Management Actions */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Alert Management</h3>
@@ -416,7 +499,12 @@ const AlertDashboard = () => {
             <span>Run Alert Check</span>
           </button>
           
-          <button className="flex items-center justify-center space-x-2 p-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+          <button
+            onClick={() => setShowNotifSettings((v) => !v)}
+            className={`flex items-center justify-center space-x-2 p-3 border rounded-lg transition-colors ${
+              showNotifSettings ? 'border-primary-500 bg-primary-50' : 'border-gray-300 hover:bg-gray-50'
+            }`}
+          >
             <Bell className="h-5 w-5 text-gray-600" />
             <span>Alert Settings</span>
           </button>

@@ -175,3 +175,11 @@ Loaded from `~/.claude/skills/harvested/`. Reference any skill below by name or 
 _Catalog auto-regenerated on every Claude Code session start. Do not edit between the IRONBARK markers, manual edits outside the block are preserved._
 
 <!-- IRONBARK:END -->
+
+## gstack
+
+This project has [gstack](https://github.com/garrytan/gstack) installed (`~/.claude/skills/gstack`). It turns Claude Code into a virtual engineering team via slash commands.
+
+- Use the `/browse` skill from gstack for all web browsing. **Never** use `mcp__claude-in-chrome__*` tools.
+- Available skills: /office-hours, /plan-ceo-review, /plan-eng-review, /plan-design-review, /design-consultation, /design-shotgun, /design-html, /review, /ship, /land-and-deploy, /canary, /benchmark, /browse, /connect-chrome, /qa, /qa-only, /design-review, /setup-browser-cookies, /setup-deploy, /setup-gbrain, /retro, /investigate, /document-release, /document-generate, /codex, /cso, /autoplan, /plan-devex-review, /devex-review, /careful, /freeze, /guard, /unfreeze, /gstack-upgrade, /learn.
+- Run `/gstack-upgrade` anytime to stay current.

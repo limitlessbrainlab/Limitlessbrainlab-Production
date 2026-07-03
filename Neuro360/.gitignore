@@ -29,6 +29,11 @@ dist-ssr
 .env.development.local
 .env.test.local
 .env.production.local
+# Any .env in subdirectories (e.g. server/.env) — never commit real secrets
+**/.env
+**/.env.local
+.env.vercel
+.env.vercel-production
 
 # Build outputs
 build/

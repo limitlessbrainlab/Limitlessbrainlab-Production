@@ -1126,6 +1126,54 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
 
 // Report Details Component
 const ReportDetails = ({ report, patient, onBack, onDownload }) => {
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(true);
+  const [previewError, setPreviewError] = useState(false);
+
+  const previewFileName = report.fileName || report.file_name ||
+    report.reportData?.file_name || report.report_data?.file_name || '';
+  const isImagePreview = /\.(png|jpe?g|gif|webp)$/i.test(previewFileName);
+
+  // Resolve a viewable URL for the report file (direct URL, else Supabase signed
+  // URL) so the PDF/image can render inline instead of forcing a download.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      setPreviewLoading(true);
+      setPreviewError(false);
+      setPreviewUrl(null);
+      try {
+        const reportDataObj = report.reportData || report.report_data || {};
+        let url = reportDataObj.fileUrl || reportDataObj.file_url ||
+                  report.fileUrl || report.file_url;
+
+        if (!url) {
+          let filePath = report.filePath || report.file_path ||
+                         reportDataObj.filePath || reportDataObj.file_path;
+          if (filePath) {
+            if (filePath.startsWith('neurosense-reports/')) {
+              filePath = filePath.substring('neurosense-reports/'.length);
+            }
+            const StorageService = (await import('../../services/storageService')).default;
+            url = await StorageService.getSignedUrl(filePath, 300);
+          }
+        }
+
+        if (!active) return;
+        if (url) setPreviewUrl(url);
+        else setPreviewError(true);
+      } catch (err) {
+        console.error('ERROR: Report preview URL resolution failed:', err);
+        if (active) setPreviewError(true);
+      } finally {
+        if (active) setPreviewLoading(false);
+      }
+    })();
+    return () => { active = false; };
+    // Depend on the report id (not the object) so an unmemoized parent re-render
+    // with a fresh object reference doesn't re-request the signed URL every time.
+  }, [report?.id]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-4">
@@ -1280,22 +1328,44 @@ const ReportDetails = ({ report, patient, onBack, onDownload }) => {
             )}
           </div>
 
-          {/* Report Preview Placeholder */}
+          {/* Report Preview */}
           <div className="mt-8">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Report Preview</h3>
-            <div className="bg-gray-100 rounded-lg p-8 text-center">
-              <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h4 className="text-lg font-medium text-gray-600 mb-2">Report Preview</h4>
-              <p className="text-gray-500 mb-4">
-                Preview functionality will be available in a future update.
-              </p>
-              <button
-                onClick={() => onDownload(report)}
-                className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg font-medium"
-              >
-                Download Report to View
-              </button>
-            </div>
+            {previewLoading ? (
+              <div className="bg-gray-100 rounded-lg p-8 flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#323956]"></div>
+              </div>
+            ) : previewUrl && !previewError ? (
+              isImagePreview ? (
+                <img
+                  src={previewUrl}
+                  alt={previewFileName || 'Report preview'}
+                  className="w-full rounded-lg border border-gray-200"
+                  onError={() => setPreviewError(true)}
+                />
+              ) : (
+                <iframe
+                  src={previewUrl}
+                  title={previewFileName || 'Report preview'}
+                  className="w-full rounded-lg border border-gray-200 bg-white"
+                  style={{ height: '80vh' }}
+                />
+              )
+            ) : (
+              <div className="bg-gray-100 rounded-lg p-8 text-center">
+                <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h4 className="text-lg font-medium text-gray-600 mb-2">Preview unavailable</h4>
+                <p className="text-gray-500 mb-4">
+                  This report can't be previewed here. Download it to view.
+                </p>
+                <button
+                  onClick={() => onDownload(report)}
+                  className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg font-medium"
+                >
+                  Download Report to View
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -241,12 +241,12 @@ const OverviewTab = ({ clinic, patients = [], reports = [], usage = {}, onRefres
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Activities</h3>
-            <button
-              onClick={onRefresh}
+            <Link
+              to="/clinic/reports"
               className="text-sm text-primary-600 dark:text-blue-400 hover:text-primary-500 dark:hover:text-blue-300 font-medium"
             >
               View All
-            </button>
+            </Link>
           </div>
           <div className="space-y-4">
             {recentActivities.length > 0 ? (

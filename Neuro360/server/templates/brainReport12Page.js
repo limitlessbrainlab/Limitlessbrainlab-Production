@@ -583,6 +583,21 @@ function renderReportHtml(reportData, narrative = {}) {
     ${pageFooter('Page 11 • 30-Day Plan')}
   </section>
 
+  <!-- PAGE 12 — CLOSING / CONTACT -->
+  <section class="page dark" style="text-align:center;position:relative;">
+    <div style="margin-top:150px;">
+      <div style="font-size:40px;">◉</div>
+      <h1 style="margin-top:20px;">Your brain is unique.<br>Your plan should be too.</h1>
+      <p class="lead" style="color:#cfe0f7;margin:20px auto 0;">${esc(n.closing || 'This report is a starting point, not a finish line. Small, consistent shifts in lifestyle, sleep, and self-regulation produce measurable changes in your EEG within weeks. We\'re here to walk that path with you.')}</p>
+      <div class="card" style="background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);max-width:340px;margin:34px auto 0;color:#fff;">
+        <div style="letter-spacing:2px;font-size:11px;opacity:.75;">GET IN TOUCH</div>
+        <div style="font-weight:800;font-size:22px;margin:8px 0;">+971 58 560 2551</div>
+        <div style="color:#9ec2f0;font-size:13px;">www.limitlessbrainlab.com</div>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:24mm;left:16mm;right:16mm;font-size:9px;line-height:1.5;color:rgba(255,255,255,.65);text-align:left;">This AI-generated qEEG report is provided for informational, educational, and wellness purposes only. It is not intended to diagnose, treat, cure, mitigate, or prevent any medical condition and is not a substitute for the individualized care of a licensed healthcare professional. The five brain-type framework is the NeuroSense interpretation of common qEEG patterns and is used for educational context only.</div>
+  </section>
+
   </body></html>`;
 }
 

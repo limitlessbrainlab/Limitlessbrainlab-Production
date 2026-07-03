@@ -1,0 +1,52 @@
+◉ NeuroSense Brain Health                                                                                    06 / DEEP DIVE
+
+
+
+SECTION 6 — THE NUMBERS BEHIND THE STORY
+
+
+Deep-dive neuro metrics
+The actual EEG values behind every score above — the metrics your clinician will reference.
+
+
+
+    Alpha Peak Frequency                                                Arousal Score
+    Optimal: 9.5 – 11.5 Hz                                              Optimal: < 1.0
+
+
+    10.5 Hz                                                             1.58
+      HEALTHY                                                             ELEVATED
+
+
+
+
+    Relaxation Score                                                    Regeneration (Alpha Modulation)
+    Optimal: > 8                                                        Optimal: > 30%
+
+
+    4.53                                                                22.32%
+      LOW                                                                 LOW
+
+
+
+
+    Frontal Alpha Asymmetry                                             Daytime Delta
+    Optimal: Balanced (near 0)                                          Optimal: < 20%
+
+
+    -16.55                                                              26.67%
+      RIGHT-SHIFTED                                                       BORDERLINE
+
+
+
+
+    ① Reading these numbers
+    The pattern is Sentinel + Empath in distress. High arousal, low relaxation, low regeneration, and right-frontal asymmetry are
+    all Sentinel signatures — but the severity of burnout risk (10%) and the Empath overlay (emotional sensitivity + high
+    reactivity) push this beyond typical vigilance into nervous-system exhaustion.
+
+
+
+
+NeuroSense • Limitless Brain Lab                                                                            Page 10 • Deep-Dive Metrics
+

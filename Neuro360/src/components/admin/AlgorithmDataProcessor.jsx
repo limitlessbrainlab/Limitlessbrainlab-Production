@@ -201,8 +201,17 @@ const AlgorithmDataProcessor = () => {
     loadPatients();
   }, []);
 
+  const lastLoadedPatientIdRef = useRef(null);
   useEffect(() => {
     if (selectedPatient && showProcessingUI) {
+      // On an actual patient switch, clear synchronously so a transient load error can't leave the
+      // previous patient's records (and their Download/Send buttons) rendered under the new patient.
+      // On a same-patient refresh (e.g. after saving), keep the current list so loadProcessingHistory's
+      // preserve-on-error behaviour still protects a just-generated report.
+      if (lastLoadedPatientIdRef.current !== selectedPatient.id) {
+        setProcessingHistory([]);
+        lastLoadedPatientIdRef.current = selectedPatient.id;
+      }
       loadProcessingHistory(selectedPatient.id);
     }
   }, [selectedPatient, showProcessingUI, isSaved]); // Re-load when saved
@@ -384,8 +393,9 @@ const AlgorithmDataProcessor = () => {
       // Also fetch QEEG files from Supabase bucket for this patient
       await fetchPatientQeegFiles(patientId);
     } catch (error) {
+      // Don't wipe already-loaded history to [] on a transient error (e.g. a failed PDF-backfill
+      // fetch) — that made freshly generated reports vanish from the list. Leave prior state intact.
       console.error('Error loading processing history:', error);
-      setProcessingHistory([]);
     }
   };
 
@@ -1511,6 +1521,17 @@ const AlgorithmDataProcessor = () => {
       setClaudeStages((prev) => prev.map((s) => (s.status === 'active' ? { ...s, status: 'done', elapsedMs: performance.now() - (stageStartRef.current || performance.now()) } : s)));
       setClaudeReportUrl(pdfUrlResult);
       setClaudeReportId(reportIdResult);
+
+      // Patch the in-memory history row immediately so the new report's card shows the
+      // Download/Send buttons right away — the buttons only render when the record carries a
+      // claude_report_url, and the DB write below is best-effort and may lag or fail silently.
+      if (savedResultId) {
+        setProcessingHistory((prev) => prev.map((rec) => (
+          rec.id === savedResultId
+            ? { ...rec, claude_report_url: pdfUrlResult, claudeReportUrl: pdfUrlResult, claude_report_id: reportIdResult, claudeReportId: reportIdResult }
+            : rec
+        )));
+      }
 
       // The report is produced and saved server-side — the user-visible work is DONE. Reset the
       // button NOW so it can't stay stuck on "Generating…" if the follow-up DB writes stall on a

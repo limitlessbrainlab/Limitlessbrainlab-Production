@@ -1,0 +1,554 @@
+◉ NeuroSense
+SMART EEG INTELLIGENCE
+
+
+
+
+PERSONALIZED NEURO-PROFILE
+
+
+Neuro Performance Report
+A complete map of your brainwave activity, cognitive performance, and dominant brain type — built
+from 19-channel qEEG analysis and the NeuroSense five-type framework.
+
+
+
+  NAME                       ASSESSMENT                 BRAIN TYPE                       REPORT ID
+
+  TEST TEJAS                 01 Jul 2026                Sentinel                         NS-7211458
+  SHAH
+
+
+
+
+LIMITLESS BRAIN LAB                                                AI-generated wellness report — not a medical diagnosis
+◉ NeuroSense Brain Health                                                                                  01 / WELCOME
+
+
+
+WELCOME, TEST
+
+
+What's inside this report
+A complete walkthrough of how your brain works — from the dominant brainwave patterns across 19
+EEG channels, to your unique brain type, to a personalized 30-day plan.
+
+
+      1     Your Snapshot — at-a-glance score & key signals                                                           PAGE 3
+
+
+
+
+      2     Brainwave Profile — Delta, Theta, Alpha, Beta, hi-Beta                                                    PAGE 4
+
+
+
+
+      3     Your Brain Type — the NeuroSense five-type framework                                                   PAGE 5–7
+
+
+
+
+      4     Performance Markers — Cognition, Focus, Stress, Burnout                                                   PAGE 8
+
+
+
+
+      5     Emotional Regulation, Learning & Creativity                                                               PAGE 9
+
+
+
+
+      6     Deep-Dive Neuro-Metrics                                                                                 PAGE 10
+
+
+
+
+      7     Your 30-Day Brain Optimization Plan                                                                     PAGE 11
+
+
+
+
+    ★ How to read this report
+    Each metric is shown as a percentage or raw EEG value. Higher isn't always better — for stress regulation, higher means
+    calmer. Look for the colored status badges on every card. Your Brain Type on page 5 is the lens through which every score
+    should be interpreted.
+
+
+
+
+NeuroSense • Limitless Brain Lab                                                                                  Page 2 • Welcome
+◉ NeuroSense Brain Health                                                                              02 / SNAPSHOT
+
+
+
+SECTION 1 — QUICK READ
+
+
+Your brain at a glance
+A quick view of where you stand right now. Your cognitive engine is functioning at a moderate level, but
+your nervous system is stuck in high alert — the signature of a Sentinel brain that struggles to power
+down and recover. Stress regulation and burnout resistance both need immediate attention; this is your
+primary entry point for change.
+
+
+                                                        ⚡ Stress Regulation                                               10%
+              OVERALL BRAIN
+              PERFORMANCE                                  Cognition                                                      55%
+
+
+
+              32
+                                                        🎯 Focus & Attention                                               55%
+                                                        📚 Learning                                                        55%
+                              /100                      🔋 Burnout Resistance                                              10%
+      A composite of your seven performance             💗 Emotional Regulation                                            20%
+       markers. The growth zones are where
+      small daily practices yield outsized gains.
+                                                        🎨 Creativity                                                      20%
+
+
+
+
+Your three biggest signals
+
+    💪 Healthy alpha peak                            ⚠️Severe stress                      🧭 Brain Type
+    frequency                                       dysregulation and recovery
+                                                                                         • Type 5 — Sentinel, with
+                                                    collapse
+    ✓ Your alpha rhythm peaks at                                                           secondary Empath traits.
+        10.5 Hz, right in the healthy               ! Stress regulation at 10% and
+                                                                                         • The vigilant, prepared brain
+        range. This supports clear                    burnout resistance at 10% —
+        thinking, memory consolidation,               these are critical. Your nervous
+        and the ability to focus when                 system activates easily but
+        you need to.                                  cannot deactivate. Pressure
+                                                      does break you because you
+    ✓ Cognition and focus both score
+                                                      stay broken.
+        at 55% — moderate, not poor.
+        Your brain can think and                    ! Low regeneration (22.32%), high
+        concentrate; the bottleneck is                arousal (1.58), and low
+        recovery, not capacity.                       relaxation (4.53) form a
+                                                      dangerous trio: you're running
+                                                      hot and can't cool down.
+                                                      Recovery is not keeping pace
+                                                      with output.
+
+
+
+
+NeuroSense • Limitless Brain Lab                                                                               Page 3 • Snapshot
+◉ NeuroSense Brain Health                                                                               0 3 / B R A I N WAV E S
+
+
+
+SECTION 2 — THE FIVE BANDS
+
+
+Your brainwave profile
+Your brain produces five distinct rhythms simultaneously, each tied to a different mental state. The mix
+below, recorded eyes-closed, reveals a pattern of high baseline activation with poor downregulation —
+your dominant frequencies are elevated, and your recovery rhythm is weak.
+
+
+    Relative Power Distribution
+    Delta
+    0.5–4 Hz · Deep rest
+                                                                                                                           23.1%
+
+    Theta                                                                                                                   9.6%
+    4–7 Hz · Creativity
+
+    Alpha                                                                                                             Peak 10.5
+    8–12 Hz · Calm focus                                                                                                    Hz
+    Beta                                                                                                               Elevated
+    13–20 Hz · Active thinking
+
+    Hi-Beta
+    20–30 Hz · Vigilance
+                                                                                                                       Elevated
+
+
+
+
+What this means for you
+
+    Healthy alpha peak (10.5 Hz)                                   Elevated delta (23.1%) — recovery signal in
+    Your alpha rhythm sits in the optimal range. This is
+                                                                   crisis
+    genuine cognitive horsepower — it explains why your            Daytime delta of 26.67% suggests your brain is trying to
+    thinking and focus aren't worse than they are, despite         downshift and recover, but not succeeding. Delta should
+    everything else running hot.                                   rise at night; if it's this high during the day, sleep quality
+                                                                   needs examination.
+
+
+
+
+    Moderate theta (9.6%) — well-regulated                         Low alpha bandwidth for a Sentinel brain
+    Theta is sitting in a healthy zone. It's not starving          Your alpha dominance (23.8%) is present but not
+    creativity, but it's not abundant either — consistent with a   pronounced. Combined with low beta (4.7%), this
+    brain that's vigilant rather than open.                        suggests you're stuck in a monitoring/waiting mode
+                                                                   rather than active execution.
+
+
+
+
+NeuroSense • Limitless Brain Lab                                                                                   Page 4 • Brainwaves
+◉ NeuroSense Brain Health                                                                                            04 / BRAIN TYPE
+
+
+
+SECTION 3 — THE NEUROSENSE FRAMEWORK
+
+
+The five brain types
+Decades of brain imaging and qEEG research show that brains organize into recognizable patterns —
+distinct combinations of arousal, regulation, and reactivity. Knowing your type isn't a label — it's a lens.
+It tells you which strategies will actually work for your brain.
+                                                                                                                                 YOUR
+                                                                                                                                 TYPE
+
+
+            ✳️                                                         ⚡                          💗                               🛡️
+          TYPE 1                          TYPE 2                     TYPE 3                     TYPE 4                         TYPE 5
+        Steady                         Explorer                     Driver                    Empath                         Sentinel
+       Focused, flexible,           Creative, risk-taking,     Driven, strong-willed,       Empathetic, deeply            Prepared, motivated,
+       emotionally even.           novelty-seeking. Lower      reliable. High arousal      feeling, relationship-        thorough. Heightened
+      Shows up on time,            prefrontal regulation —    channelled into output.       driven. High limbic            activity in vigilance
+  follows through, plays by        easily bored, struggles     Sees things through.     reactivity. Prone to mood          circuits (amygdala,
+      the rules. The well-         with routine and follow-      Tends to lock onto       swings and emotional           basal ganglia). Worry-
+        regulated brain.                   through.           thoughts and grind on              intensity.                prone but reliable.
+                                                                     problems.
+
+
+
+
+How we determined your type
+
+    Your qEEG showed signatures that map onto the Sentinel (Type 5) profile, with secondary Empath features:
+    • Right-shifted frontal alpha asymmetry (-16.55) — a core Sentinel marker. Your brain is wired for threat-monitoring,
+      anticipatory worry, and vigilance. The emotional and creative centers run in the background.
+    • High arousal (1.58) with critically low relaxation (4.53) — the nervous system is locked in 'on' mode. This is the Sentinel
+      signature: prepared, driven, but unable to rest.
+
+    • Severe stress dysregulation (10%) despite a healthy cognitive engine — unlike most Sentinel-type brains, yours isn't
+      collapsing under pressure, it's collapsing in recovery. You can perform, but not sustain.
+    • Low regeneration (22.32%) combined with borderline daytime delta (26.67%) and an Empath secondary overlay — your
+      brain is running a double load: vigilance circuits monitoring threat, while emotional sensitivity amplifies reaction. Sleep is
+      not refreshing you.
+
+
+
+
+NeuroSense • Limitless Brain Lab                                                                                    Page 5 • Brain Types Overview
+◉ NeuroSense Brain Health                                                                                  04 / YOUR TYPE
+
+
+
+
+   TEST'S BRAIN TYPE
+
+
+   Type 5 — The Sentinel Brain
+   The vigilant, prepared brain.
+
+      Prepared         Goal-Oriented       High Drive       Vigilant   Reliable
+
+
+
+
+What's happening in your brain
+
+    🧬 The neuroscience                                                 ⭐ Why it's a strength
+    Brain-imaging research shows the Sentinel brain has                Sentinel brains are the people you want planning your
+    heightened activity in the basal ganglia, insular cortex,          wedding or running operations. You see risk before it
+    and amygdala — the threat-detection circuits — often               arrives, you prepare, and you finish what you start. The
+    linked to lower GABA. Your qEEG mirrors this: high                 same vigilance that costs recovery is what makes you
+    arousal, right-frontal alpha asymmetry, and low                    exceptionally reliable.
+    regeneration. The nervous system stays "on," scanning
+    for what could go wrong.
+
+
+
+
+Your strengths & watch-zones
+
+    ✨ Sentinel-Brain Strengths                                         🔍 Sentinel-Brain Watch-Zones
+    ✓ Reliable and prepared — you don’t drop balls; people             ! Mental "always-on" mode — the mind doesn’t switch
+        trust your follow-through.                                       off; falling asleep can feel hard.
+    ✓ Risk-aware and goal-driven — you see what others                 ! Anticipatory worry — what-ifs run in the background,
+        miss and don’t quit once committed.                              reducing emotional bandwidth.
+
+    ✓ Strong stress tolerance — a real advantage over                  ! Recovery debt — low regeneration means you spend
+        most Sentinel-type brains.                                       energy faster than you replenish.
+
+
+
+
+NeuroSense • Limitless Brain Lab                                                                         Page 6 • Your Type Deep Dive
+◉ NeuroSense Brain Health                                                                0 4 / T Y P E - S P E C I F I C S T R AT E G Y
+
+
+
+W H AT W O R K S F O R Y O U R T Y P E
+
+
+Sentinel-brain strategy guide
+Generic advice often fails this type. Here's what actually moves the needle for a Sentinel brain.
+
+Lifestyle & nutrition
+
+    🥗 Eat for your type                          🏃 Move                                           😴 Sleep
+    Sentinel brains do best with a               Skip extreme HIIT for now — it                   Your low regeneration score makes
+    balanced diet rich in complex                spikes the same arousal you’re                   sleep non-negotiable. No screens
+    carbohydrates (which raise                   trying to lower. Choose walking,                 60 min before bed. Cool, dark room.
+    serotonin) plus moderate protein.            swimming, yoga, tai chi, or light                Same wake-time daily. Consider
+    Foods rich in magnesium (leafy               cycling. Aim for daily movement that             magnesium glycinate at night (after
+    greens, almonds, dark chocolate)             finishes with you feeling calmer than            a chat with your doctor).
+    support GABA. Limit caffeine — it            you started.
+    amplifies your already-active
+    arousal.
+
+
+
+
+Mind & emotional practices
+
+    ✓ Do more of                                                         ⚠ Less of
+    ✓ 4-7-8 breathing — twice daily for 4 cycles. Activates              ! Caffeine after noon — extends your already-elevated
+        parasympathetic tone.                                              arousal into the night.
+    ✓ Worry journaling — 10 min before bed. Sentinel                     ! Doom-scrolling news — primes the threat-monitoring
+        brains sleep better when worries are "contained."                  circuits already running hot.
+    ✓ Box breathing before any high-stakes task.                         ! Saying yes when you mean no — Sentinel brains over-
+                                                                           commit; boundaries protect your nervous system.
+    ✓ Cognitive reframing — for every "what could go
+        wrong," add "what could go right."                               ! Late-night problem-solving — your brain gnaws on it.
+                                                                           Park it; tackle after sleep.
+
+
+
+
+NeuroSense • Limitless Brain Lab                                                                             Page 7 • Type-Specific Strategy
+◉ NeuroSense Brain Health                                                                               05 / PERFORMANCE
+
+
+
+SECTION 4 — PERFORMANCE MARKERS
+
+
+Cognition & stress
+How clearly you think and how well you handle pressure — the two engines of daily performance.
+
+
+
+       Cognition                                                        ⚡ Stress Regulation
+
+    55%                                                                 10%
+      MODERATE                                                            NEEDS ATTENTION
+
+
+    Moderate cognitive function. Memory, reasoning, and                 Critical weakness. At 10%, this is the metric to address
+    processing all work, but at 55% they're constrained —               first. Your brain activates the stress response but cannot
+    not by capacity, but by the nervous system's inability to           turn it off. This is not normal Sentinel-type dysregulation;
+    enter focused, low-stress learning states.                          this is severe.
+
+
+
+
+    🎯 Focus & Attention                                                 🔋 Burnout Resistance
+
+
+    55%                                                                 10%
+      MODERATE                                                            NEEDS ATTENTION
+
+
+    Moderate baseline focus at 55%. You can concentrate                 Severe burnout risk at 10%. You are running on fumes.
+    on a task, but sustained attention is taxing because the            Recovery debt is accumulating faster than you can pay it
+    nervous system is simultaneously running threat-                    down. Without intervention, this trajectory leads to
+    detection. Vigilance pulls resources away from task-                breakdown.
+    focus.
+
+
+
+
+    Worth understanding
+    This pattern is worth understanding deeply. Most Sentinel-type brains show poor stress regulation *and* poor cognition — the
+    threat-monitoring system hijacks resources. Your data is different: cognition and focus are moderate despite catastrophic
+    stress dysregulation and burnout risk. The interpretation: you have strong cognitive wiring, but it's clamped down by a
+    nervous system that won't unlock. Your high arousal (1.58), low relaxation (4.53), and right-frontal asymmetry (-16.55) aren't
+    your weakness — they're your ceiling. The work isn't to become less vigilant; it's to add enough recovery that your cognition
+    can actually breathe. An Empath secondary overlay amplifies this: you're monitoring not just external threats, but emotional
+    ones too. The nervous system is doing double duty, and regeneration (22.32%) can't keep up.
+
+
+
+
+NeuroSense • Limitless Brain Lab                                                                              Page 8 • Cognition & Stress
+◉ NeuroSense Brain Health                                                                                05 / PERFORMANCE
+
+
+
+SECTION 5 — INNER BANDWIDTH
+
+
+Emotion, learning & creativity
+When the nervous system is busy scanning, it has less bandwidth for emotional flexibility, divergent
+thinking, and the open-mode states that drive creativity.
+
+
+
+    💗 Emotional Regulation                       📚 Learning Capacity                             🎨 Creativity
+
+    20%                                          55%                                             20%
+      NEEDS ATTENTION                               MODERATE                                       NEEDS ATTENTION
+
+
+    Emotional regulation at 20% is low,          Moderate learning capacity (55%),               At 20%, creativity is very low.
+    and the right-frontal alpha                  supported by your healthy alpha                 Creativity needs open, exploratory,
+    asymmetry (-16.55) combined with             peak. The constraint isn't the                  low-arousal mode. Your high-alert
+    your Empath secondary type                   learning wiring — it's that high                baseline keeps the brain in execute-
+    explains why. Feelings register              arousal (1.58) and low relaxation               lock, not explore-mode.
+    strongly, recover slowly, and your           (4.53) make it hard to enter the
+    default state is worry-tinged.               calm, focused state where memory
+                                                 consolidation happens.
+
+
+
+
+    ✦ The hidden link between these three
+    Emotional depth, learning clarity, and creative flow all depend on the same underlying state: low arousal + parasympathetic
+    tone. When your nervous system is in threat-mode, all three collapse. When you add real recovery, all three typically rise
+    together. This is why the action plan focuses on nervous-system reset, not skill-building.
+
+
+
+
+NeuroSense • Limitless Brain Lab                                                                                  Page 9 • Inner Bandwidth
+◉ NeuroSense Brain Health                                                                                    06 / DEEP DIVE
+
+
+
+SECTION 6 — THE NUMBERS BEHIND THE STORY
+
+
+Deep-dive neuro metrics
+The actual EEG values behind every score above — the metrics your clinician will reference.
+
+
+
+    Alpha Peak Frequency                                                Arousal Score
+    Optimal: 9.5 – 11.5 Hz                                              Optimal: < 1.0
+
+
+    10.5 Hz                                                             1.58
+      HEALTHY                                                             ELEVATED
+
+
+
+
+    Relaxation Score                                                    Regeneration (Alpha Modulation)
+    Optimal: > 8                                                        Optimal: > 30%
+
+
+    4.53                                                                22.32%
+      LOW                                                                 LOW
+
+
+
+
+    Frontal Alpha Asymmetry                                             Daytime Delta
+    Optimal: Balanced (near 0)                                          Optimal: < 20%
+
+
+    -16.55                                                              26.67%
+      RIGHT-SHIFTED                                                       BORDERLINE
+
+
+
+
+    ① Reading these numbers
+    The pattern is Sentinel + Empath in distress. High arousal, low relaxation, low regeneration, and right-frontal asymmetry are
+    all Sentinel signatures — but the severity of burnout risk (10%) and the Empath overlay (emotional sensitivity + high
+    reactivity) push this beyond typical vigilance into nervous-system exhaustion.
+
+
+
+
+NeuroSense • Limitless Brain Lab                                                                            Page 10 • Deep-Dive Metrics
+◉ NeuroSense Brain Health                                                                                      07 / ACTION PLAN
+
+
+
+SECTION 7 — YOUR PERSONALIZED PLAN
+
+
+Your 30-day brain plan
+Your 30-day plan targets your core problem: a nervous system locked in high alert that cannot access
+recovery. Small daily inputs to lower arousal and build relaxation will compound fast — your healthy
+alpha peak means you have the cognitive wiring to respond.
+
+Daily non-negotiables (start tomorrow)
+
+          4-7-8 breathing — twice daily for 4 cycles.                               Worry journaling — 10 min before bed. Sentinel
+     1                                                                         2
+          Activates parasympathetic tone.                                           brains sleep better when worries are "contained."
+
+
+
+
+      3     Box breathing before any high-stakes task.                         4    Cognitive reframing — for every "what could go
+                                                                                    wrong," add "what could go right."
+
+
+
+
+Week-by-week build
+     WEEK 1 — CALM FIRST
+     Lock in the daily anchors
+     Just the anchors above. Prove to your nervous system that calm is safe and consistent.
+
+     W E E K 2 — C O N TA I N
+     Add structure & containment
+     A short evening wind-down and a 3-item morning priority list. Contain the open loops.
+
+     WEEK 3 — RECOVER
+     Add one weekly true-rest session
+     90 minutes of no productivity, no input, no goal. It will feel uncomfortable — that is the point.
+
+     W E E K 4 — A C T I VAT E
+     Layer in performance work
+     Add a daily goal-activation routine — one intention plus one thing you are looking forward to.
+
+
+
+    ◷ After 30 days
+    Relaxation and regeneration scores typically shift first — expect easier wind-downs within 2-3 weeks and clearer mornings as
+    recovery starts to catch up with output. Stress regulation and emotional bandwidth follow as your baseline arousal lowers.
+
+
+
+
+NeuroSense • Limitless Brain Lab                                                                                       Page 11 • 30-Day Plan
+                                                                        ◉
+                       Your brain is unique.
+                      Your plan should be too.
+   You are starting from a challenging position, but not hopeless. Your healthy alpha peak and moderate
+      cognition show real capacity — what's missing is the recovery to use it sustainably. The Sentinel
+ strengths (reliability, preparation, follow-through) are still there; they're just exhausted. Your 30-day plan
+                                                 is the reset button. Pull it consistently.
+
+
+
+                                                                GET IN TOUCH
+
+                                                       +971 58 560 2551
+                                                          www.limitlessbrainlab.com
+
+
+
+
+  This AI-generated qEEG report is provided for informational, educational, and wellness purposes only. It is not intended to diagnose, treat, cure,
+mitigate, or prevent any medical condition and is not a substitute for the individualized care of a licensed healthcare professional. The five brain-type
+                  framework is the NeuroSense interpretation of common qEEG patterns and is used for educational context only.
+

@@ -2341,6 +2341,32 @@ async function applyReportCredits(sessionId) {
     return { ok: false, status: 400, message: 'Session missing clinic_id / reports metadata' };
   }
 
+  // Record the payment for Payment History. Written here (not only in the Stripe
+  // webhook) so it lands on the frontend confirm path too — the webhook may not
+  // reach staging/preview deployments. Kept INDEPENDENT of the credits claim
+  // below and idempotent via upsert on the unique stripe_session_id, so every
+  // caller (frontend confirm + webhook) can safely (re)attempt it — a failure
+  // here never gets locked out by an already-spent credits claim.
+  const { error: paymentError } = await supabase
+    .from('payments')
+    .upsert({
+      clinic_id: clinicId,
+      amount: session.amount_total / 100,
+      currency: session.currency?.toUpperCase() || 'INR',
+      status: 'completed',
+      type: 'subscription',
+      package_name: `${reports} EEG Reports`,
+      reports_allowed: reports,
+      payment_method: 'stripe',
+      payment_id: session.payment_intent || session.id,
+      stripe_payment_id: session.payment_intent || session.id,
+      stripe_session_id: session.id,
+      created_at: new Date().toISOString()
+    }, { onConflict: 'stripe_session_id', ignoreDuplicates: true });
+  if (paymentError) {
+    console.error('applyReportCredits payment record error:', paymentError.message);
+  }
+
   // Idempotent: only the first caller for this session actually adds credits.
   const firstTime = await claimNotificationOnce(`clinic_report:${sessionId}:credits`);
   if (!firstTime) {
@@ -3557,29 +3583,9 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
               console.error('Webhook applyReportCredits threw:', creditErr.message);
             }
 
-            // 2. Save to payments table for SuperAdmin Payment History
-            const { error: paymentError } = await supabase
-              .from('payments')
-              .insert({
-                clinic_id: clinicId,
-                amount: session.amount_total / 100,
-                currency: session.currency?.toUpperCase() || 'INR',
-                status: 'completed',
-                type: 'subscription',
-                package_name: `${reports} EEG Reports`,
-                reports_allowed: reports,
-                payment_method: 'stripe',
-                payment_id: session.payment_intent || session.id,
-                stripe_payment_id: session.payment_intent || session.id,
-                stripe_session_id: session.id,
-                created_at: new Date().toISOString()
-              });
-
-            if (paymentError) {
-              console.error('Error saving clinic payment record:', paymentError);
-            } else {
-              console.log('SUCCESS: Clinic payment record saved for SuperAdmin dashboard');
-            }
+            // 2. The payments-table record is written inside applyReportCredits
+            // (idempotently, shared with the frontend confirm path) so it lands
+            // even when this webhook does not reach the deployment.
           }
 
           // Send confirmation email to clinic — reorder vs first purchase

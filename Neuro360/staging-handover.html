@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neuro360 Staging Handover Document</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f0f4f8;
+      color: #1a2340;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 20px auto;
+      background: #fff;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+      padding: 0;
+      page-break-after: always;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #0f2a5e 0%, #1e63b4 100%);
+      padding: 36px 48px 28px;
+      color: white;
+    }
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 18px;
+    }
+    .brand {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #9ec2f0;
+      margin-bottom: 6px;
+    }
+    .doc-title {
+      font-size: 26px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.2;
+    }
+    .doc-subtitle {
+      font-size: 13px;
+      color: #9ec2f0;
+      margin-top: 6px;
+    }
+    .badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 11px;
+      color: #e0ecff;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .meta-row {
+      display: flex;
+      gap: 32px;
+      border-top: 1px solid rgba(255,255,255,0.15);
+      padding-top: 16px;
+    }
+    .meta-item label {
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #7aaee8;
+      display: block;
+      margin-bottom: 2px;
+    }
+    .meta-item span {
+      font-size: 13px;
+      color: #fff;
+      font-weight: 500;
+    }
+
+    /* Body */
+    .body { padding: 36px 48px; }
+
+    /* Section */
+    .section { margin-bottom: 32px; }
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #1e63b4;
+      border-bottom: 2px solid #e8f0fc;
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+    }
+
+    /* URL cards */
+    .url-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .url-card {
+      background: #f8faff;
+      border: 1px solid #d0e4fc;
+      border-left: 4px solid #1e63b4;
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .url-card .label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #6b8cba;
+      margin-bottom: 4px;
+    }
+    .url-card .value {
+      font-size: 12px;
+      font-weight: 600;
+      color: #0f2a5e;
+      word-break: break-all;
+    }
+    .url-card .desc {
+      font-size: 11px;
+      color: #7a8ea8;
+      margin-top: 3px;
+    }
+
+    /* Credentials */
+    .role-block {
+      margin-bottom: 16px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+    }
+    .role-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+    }
+    .role-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .role-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .role-desc {
+      font-size: 11px;
+      color: rgba(255,255,255,0.75);
+    }
+    .role-body {
+      background: #fff;
+      padding: 14px 16px;
+    }
+    .cred-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+    .cred-row:last-child { margin-bottom: 0; }
+    .cred-field {
+      flex: 1;
+    }
+    .cred-field label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #8899b0;
+      display: block;
+      margin-bottom: 3px;
+    }
+    .cred-field .val {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #1a2340;
+      background: #f4f7fc;
+      border: 1px solid #dde5f0;
+      border-radius: 5px;
+      padding: 6px 10px;
+      font-family: 'Courier New', monospace;
+    }
+
+    /* Superadmin */
+    .role-super .role-header { background: linear-gradient(135deg, #0f2a5e, #1e63b4); }
+    .role-super .role-icon { background: rgba(255,255,255,0.2); }
+    /* Clinic */
+    .role-clinic .role-header { background: linear-gradient(135deg, #0d6b4a, #1a9b6f); }
+    .role-clinic .role-icon { background: rgba(255,255,255,0.2); }
+    /* Doctor */
+    .role-doctor .role-header { background: linear-gradient(135deg, #5b21b6, #7c3aed); }
+    .role-doctor .role-icon { background: rgba(255,255,255,0.2); }
+    /* Patient */
+    .role-patient .role-header { background: linear-gradient(135deg, #b45309, #d97706); }
+    .role-patient .role-icon { background: rgba(255,255,255,0.2); }
+
+    /* Access levels */
+    .access-pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      background: #e8f0fc;
+      color: #1e63b4;
+      margin-top: 6px;
+    }
+
+    /* Timeline / Deployment steps */
+    .timeline { list-style: none; }
+    .timeline li {
+      position: relative;
+      padding: 10px 0 10px 36px;
+      border-left: 2px solid #d0e4fc;
+      margin-left: 8px;
+    }
+    .timeline li:last-child { border-left: 2px solid transparent; }
+    .timeline li::before {
+      content: '';
+      position: absolute;
+      left: -7px;
+      top: 14px;
+      width: 12px;
+      height: 12px;
+      background: #1e63b4;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      box-shadow: 0 0 0 2px #1e63b4;
+    }
+    .timeline li .step-title {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #0f2a5e;
+      margin-bottom: 2px;
+    }
+    .timeline li .step-detail {
+      font-size: 11.5px;
+      color: #5a6e8a;
+      line-height: 1.5;
+    }
+    .timeline li .tag {
+      display: inline-block;
+      background: #e8f0fc;
+      color: #1e63b4;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 8px;
+      border-radius: 10px;
+      margin-right: 4px;
+      margin-top: 3px;
+    }
+    .tag.fixed { background: #dcfce7; color: #16a34a; }
+    .tag.config { background: #fef3c7; color: #b45309; }
+    .tag.deploy { background: #ede9fe; color: #6d28d9; }
+
+    /* Notes / callout */
+    .callout {
+      background: #fff8e6;
+      border-left: 4px solid #f59e0b;
+      border-radius: 0 8px 8px 0;
+      padding: 12px 16px;
+      margin-top: 16px;
+      font-size: 12px;
+      color: #7c4f00;
+    }
+    .callout strong { color: #b45309; }
+
+    /* Footer */
+    .footer {
+      background: #f8faff;
+      border-top: 1px solid #e2e8f0;
+      padding: 16px 48px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .footer-brand {
+      font-size: 11px;
+      font-weight: 700;
+      color: #1e63b4;
+      letter-spacing: 1px;
+    }
+    .footer-note {
+      font-size: 10px;
+      color: #8899b0;
+    }
+
+    /* Stack / tech */
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .tech-card {
+      background: #f4f7fc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 14px;
+      text-align: center;
+    }
+    .tech-card .tech-icon { font-size: 20px; margin-bottom: 4px; }
+    .tech-card .tech-name { font-size: 11px; font-weight: 700; color: #0f2a5e; }
+    .tech-card .tech-desc { font-size: 10px; color: #7a8ea8; margin-top: 2px; }
+
+    /* Print */
+    @media print {
+      body { background: white; }
+      .page {
+        margin: 0;
+        box-shadow: none;
+        page-break-after: always;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- PAGE 1: Cover + URLs + Credentials -->
+<div class="page">
+  <div class="header">
+    <div class="header-top">
+      <div>
+        <div class="brand">Limitless Brain Lab</div>
+        <div class="doc-title">Neuro360 Platform<br>Staging Handover</div>
+        <div class="doc-subtitle">Staging environment credentials, URLs, and deployment summary</div>
+      </div>
+      <div class="badge">Confidential</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-item">
+        <label>Prepared For</label>
+        <span>Client / Internal Team</span>
+      </div>
+      <div class="meta-item">
+        <label>Date</label>
+        <span>30 May 2026</span>
+      </div>
+      <div class="meta-item">
+        <label>Environment</label>
+        <span>Staging</span>
+      </div>
+      <div class="meta-item">
+        <label>Version</label>
+        <span>Neuro360 v2.0</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- Staging URLs -->
+    <div class="section">
+      <div class="section-title">Staging Environment URLs</div>
+      <div class="url-grid">
+        <div class="url-card">
+          <div class="label">Frontend (Web App)</div>
+          <div class="value">https://limitlessbrainlab-eight.vercel.app</div>
+          <div class="desc">Hosted on Vercel &mdash; main access point</div>
+        </div>
+        <div class="url-card">
+          <div class="label">Backend API</div>
+          <div class="value">https://neuro360-backend.onrender.com</div>
+          <div class="desc">Node.js server hosted on Render (Singapore)</div>
+        </div>
+        <div class="url-card">
+          <div class="label">Admin Panel</div>
+          <div class="value">https://limitlessbrainlab-eight.vercel.app/admin</div>
+          <div class="desc">Super Admin dashboard &amp; Algorithm Processor</div>
+        </div>
+        <div class="url-card">
+          <div class="label">Database</div>
+          <div class="value">Supabase (PostgreSQL)</div>
+          <div class="desc">wqykofpjpaytjuqsessf.supabase.co</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Login Credentials -->
+    <div class="section">
+      <div class="section-title">Login Credentials</div>
+
+      <!-- Super Admin -->
+      <div class="role-block role-super">
+        <div class="role-header">
+          <div class="role-icon">&#127737;</div>
+          <div>
+            <div class="role-name">Super Admin</div>
+            <div class="role-desc">Full platform access &mdash; algorithm processing, clinic management, reports</div>
+          </div>
+        </div>
+        <div class="role-body">
+          <div class="cred-row">
+            <div class="cred-field">
+              <label>Email</label>
+              <div class="val">superadmin@neuro360.com</div>
+            </div>
+            <div class="cred-field">
+              <label>Password</label>
+              <div class="val">admin123</div>
+            </div>
+          </div>
+          <div class="access-pill">&#9679; Full Access &mdash; Algorithm Processor, Clinic Mgmt, Patient Records, Reports, Settings</div>
+        </div>
+      </div>
+
+      <!-- Clinic Admin -->
+      <div class="role-block role-clinic">
+        <div class="role-header">
+          <div class="role-icon">&#127968;</div>
+          <div>
+            <div class="role-name">Clinic Admin</div>
+            <div class="role-desc">Clinic-level access &mdash; manage patients, view reports, subscriptions</div>
+          </div>
+        </div>
+        <div class="role-body">
+          <div class="cred-row">
+            <div class="cred-field">
+              <label>Email</label>
+              <div class="val">clinic@test.com</div>
+            </div>
+            <div class="cred-field">
+              <label>Password</label>
+              <div class="val">clinic123</div>
+            </div>
+          </div>
+          <div class="access-pill">&#9679; Clinic Dashboard, Patient List, Reports, Subscription Management</div>
+        </div>
+      </div>
+
+      <!-- Doctor -->
+      <div class="role-block role-doctor">
+        <div class="role-header">
+          <div class="role-icon">&#128084;</div>
+          <div>
+            <div class="role-name">Doctor / Clinician</div>
+            <div class="role-desc">Clinical access &mdash; patient records, QEEG reports, assessments</div>
+          </div>
+        </div>
+        <div class="role-body">
+          <div class="cred-row">
+            <div class="cred-field">
+              <label>Email</label>
+              <div class="val">doctor@clinic.com</div>
+            </div>
+            <div class="cred-field">
+              <label>Password</label>
+              <div class="val">doctor123</div>
+            </div>
+          </div>
+          <div class="access-pill">&#9679; Patient Dashboard, Clinical Reports, QEEG Viewer</div>
+        </div>
+      </div>
+
+      <!-- Patient -->
+      <div class="role-block role-patient">
+        <div class="role-header">
+          <div class="role-icon">&#128153;</div>
+          <div>
+            <div class="role-name">Patient</div>
+            <div class="role-desc">Patient portal &mdash; brain wellness reports, coaching, programs</div>
+          </div>
+        </div>
+        <div class="role-body">
+          <div class="cred-row">
+            <div class="cred-field">
+              <label>Email</label>
+              <div class="val">patient@neurosense.com</div>
+            </div>
+            <div class="cred-field">
+              <label>Password</label>
+              <div class="val">patient123</div>
+            </div>
+          </div>
+          <div class="access-pill">&#9679; Brain Wellness Dashboard, Reports, Brain Coach, Programs, Wallet</div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>Note:</strong> These are staging credentials only. Please change all passwords before going live in production. Do not share these credentials publicly.
+      </div>
+    </div>
+
+  </div>
+  <div class="footer">
+    <div class="footer-brand">LIMITLESS BRAIN LAB &mdash; NEURO360</div>
+    <div class="footer-note">Staging Handover Document &bull; Page 1 of 2</div>
+  </div>
+</div>
+
+
+<!-- PAGE 2: Deployment Summary + Tech Stack -->
+<div class="page">
+  <div class="header">
+    <div class="header-top">
+      <div>
+        <div class="brand">Limitless Brain Lab</div>
+        <div class="doc-title">Deployment Summary</div>
+        <div class="doc-subtitle">Issues resolved and changes deployed to staging on 30 May 2026</div>
+      </div>
+      <div class="badge">Staging Build</div>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- What was done -->
+    <div class="section">
+      <div class="section-title">Changes Deployed This Session</div>
+      <ul class="timeline">
+
+        <li>
+          <div class="step-title">Runtime Crash Fix &mdash; Algorithm Data Processor</div>
+          <div class="step-detail">
+            Resolved a hard crash on the Algorithm Data Processor page where
+            <code>outputData.slice().map()</code> was called on a JSON string instead of a parsed array.
+            Added a <code>parseResultsData()</code> guard that safely parses doubly-encoded JSONB data
+            from the <code>algorithm_results</code> table. Applied across all 6 call-sites.
+          </div>
+          <span class="tag fixed">Bug Fix</span>
+          <span class="tag">Frontend</span>
+          <span class="tag">AlgorithmDataProcessor.jsx</span>
+        </li>
+
+        <li>
+          <div class="step-title">API Proxy Fix &mdash; Vercel to Render Backend</div>
+          <div class="step-detail">
+            All <code>/api/*</code> requests from the Vercel frontend were hitting Vercel's own CDN
+            instead of the Render backend, returning <code>index.html</code> and causing 404 errors
+            on all email and report endpoints. Fixed by adding an API proxy rewrite in
+            <code>vercel.json</code> that forwards <code>/api/:path*</code> to
+            <code>https://neuro360-backend.onrender.com/api/:path*</code>.
+          </div>
+          <span class="tag fixed">Bug Fix</span>
+          <span class="tag deploy">Deployment Config</span>
+          <span class="tag">vercel.json</span>
+        </li>
+
+        <li>
+          <div class="step-title">NEXAPROC_MASTER_KEY &mdash; Render Environment Variable</div>
+          <div class="step-detail">
+            The <code>NEXAPROC_MASTER_KEY</code> server environment variable was missing from the
+            Render dashboard, causing the "Upload to Claude" (Claude Report generation) feature to
+            fail with an authentication error. Variable added to Render with <code>sync: false</code>
+            as required. Render auto-redeployed the backend after save.
+          </div>
+          <span class="tag config">Config</span>
+          <span class="tag">Render Backend</span>
+          <span class="tag">nexaprocService.js</span>
+        </li>
+
+        <li>
+          <div class="step-title">GitHub Repository Access &mdash; Push Permissions</div>
+          <div class="step-detail">
+            Resolved push permission issue on <code>limitlessbrainlab/Limitlessbrainlab</code>
+            GitHub repository. Added collaborator write access for the deployment account and
+            accepted the pending repository invitation via the GitHub API.
+          </div>
+          <span class="tag config">Config</span>
+          <span class="tag">GitHub</span>
+        </li>
+
+        <li>
+          <div class="step-title">Vercel Production Deployments</div>
+          <div class="step-detail">
+            Two production deployments pushed to <code>https://limitlessbrainlab-eight.vercel.app</code>:
+            first for the Algorithm Processor crash fix, second for the API proxy / email fix.
+            Both builds completed successfully (build time ~17s each).
+          </div>
+          <span class="tag deploy">Deploy</span>
+          <span class="tag">Vercel</span>
+        </li>
+
+      </ul>
+    </div>
+
+    <!-- Tech Stack -->
+    <div class="section">
+      <div class="section-title">Technology Stack</div>
+      <div class="tech-grid">
+        <div class="tech-card">
+          <div class="tech-icon">&#9889;</div>
+          <div class="tech-name">React + Vite</div>
+          <div class="tech-desc">Frontend SPA</div>
+        </div>
+        <div class="tech-card">
+          <div class="tech-icon">&#127381;</div>
+          <div class="tech-name">Node.js + Express</div>
+          <div class="tech-desc">Backend API Server</div>
+        </div>
+        <div class="tech-card">
+          <div class="tech-icon">&#128451;</div>
+          <div class="tech-name">Supabase (PostgreSQL)</div>
+          <div class="tech-desc">Database + Auth + Storage</div>
+        </div>
+        <div class="tech-card">
+          <div class="tech-icon">&#9651;</div>
+          <div class="tech-name">Vercel</div>
+          <div class="tech-desc">Frontend Hosting + CDN</div>
+        </div>
+        <div class="tech-card">
+          <div class="tech-icon">&#128295;</div>
+          <div class="tech-name">Render</div>
+          <div class="tech-desc">Backend Hosting (Singapore)</div>
+        </div>
+        <div class="tech-card">
+          <div class="tech-icon">&#129302;</div>
+          <div class="tech-name">Gemini + Claude AI</div>
+          <div class="tech-desc">QEEG Report Generation</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Current Status -->
+    <div class="section">
+      <div class="section-title">Current Status</div>
+      <div class="url-grid">
+        <div class="url-card">
+          <div class="label">Frontend</div>
+          <div class="value" style="color:#16a34a;">&#10003; Live</div>
+          <div class="desc">limitlessbrainlab-eight.vercel.app</div>
+        </div>
+        <div class="url-card">
+          <div class="label">Backend API</div>
+          <div class="value" style="color:#16a34a;">&#10003; Live</div>
+          <div class="desc">neuro360-backend.onrender.com</div>
+        </div>
+        <div class="url-card">
+          <div class="label">Algorithm Processor</div>
+          <div class="value" style="color:#16a34a;">&#10003; Fixed &amp; Deployed</div>
+          <div class="desc">Crash on results page resolved</div>
+        </div>
+        <div class="url-card">
+          <div class="label">Email Reports</div>
+          <div class="value" style="color:#16a34a;">&#10003; Fixed &amp; Deployed</div>
+          <div class="desc">Send to clinic &amp; patient now works</div>
+        </div>
+        <div class="url-card">
+          <div class="label">Claude Report (AI)</div>
+          <div class="value" style="color:#f59e0b;">&#9654; Pending Test</div>
+          <div class="desc">NEXAPROC key set, awaiting Render redeploy</div>
+        </div>
+        <div class="url-card">
+          <div class="label">Database</div>
+          <div class="value" style="color:#16a34a;">&#10003; Connected</div>
+          <div class="desc">Supabase PostgreSQL with RLS policies</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <div class="footer-brand">LIMITLESS BRAIN LAB &mdash; NEURO360</div>
+    <div class="footer-note">Staging Handover Document &bull; Page 2 of 2 &bull; Confidential</div>
+  </div>
+</div>
+
+</body>
+</html>

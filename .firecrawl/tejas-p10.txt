@@ -1,0 +1,59 @@
+          NeuroSense Brain Health                                                                                                       06 / DEEP DIVE
+          SMART EEG INTELLIGENCE
+
+
+
+
+SE CTI ON             6   —     THE   N UM B E RS          BE HI ND         T H E   S TO RY
+
+
+
+Deep-dive neuro metrics
+For those who want to see the actual EEG values behind every score above. These are the metrics your clinician will
+reference.
+
+
+    Reading these numbers: no single metric tells the story — look at the pattern. High arousal + low relaxation + low regeneration + excessive delta
+    + right-frontal asymmetry = an overloaded Sentinel signature: a vigilant brain that has run past its recovery capacity.
+
+
+
+
+    Alpha Peak Frequency                                                             Arousal Score
+    Optimal range: 8 – 12 Hz                            10.50 Hz                     Sweet spot: < 1.0                                              1.58
+    A healthy alpha peak, right in the optimal band. Supports clear                  Your nervous system sits on a high-alert baseline. This is what drives the
+    information processing and relaxed focus — genuine cognitive                     over-thinking and blocks recovery. Lowering it is the central goal of the
+    horsepower to build on.                                                          plan.
+
+
+
+
+    Relaxation Score                                                                 Regeneration (Alpha Modulation)
+    Higher is better (target: 8+)                                     4.53           Brain recovery capacity (30+ healthy)                  22.32%
+    Difficulty entering and holding a relaxed state — the mirror image of the        The single most important number here. Your brain isn't recovering as
+    high arousal score. Breathwork and HRV training are direct                       fast as it's working. Protect sleep, add daily downtime — non-negotiable.
+    interventions.
+
+
+
+
+    Frontal Alpha Asymmetry                                                          Excessive / Daytime Delta
+    Right-shifted = vigilance                                −16.55                  Below 20% is ideal                                     26.67%
+    Strong right-frontal dominance suggests heightened threat-monitoring,            Elevated waking delta. Combined with low regeneration, points to
+    worry and slower emotional recovery — a Sentinel-type signature. Goal-           recovery debt and fatigue rather than a primary issue. Sleep optimization
+    activation routines rebuild the left side.                                       addresses both.
+
+
+
+
+    Focus Score                                                                      Alpha:Theta Balance
+    Target: < 1.5                                                     2.63           fz 0.76 · cz 1.22 · pz 2.43                      HEALTHY
+    Above target, consistent with vigilance pulling attention sideways.              A workable ratio for memory and learning. This is the foundation that
+    Pomodoro intervals and reduced threat-input help anchor sustained                makes spaced repetition and active recall effective for you.
+    attention.
+
+
+
+
+NeuroSense • Limitless Brain Lab                                                                                                         Page 10 • Deep-Dive Metrics
+

@@ -61,7 +61,7 @@ const WebsitePayments = () => {
 
   const formatAmount = (amount, currency) => {
     if (!amount) return 'N/A';
-    return `${currency || 'USD'} ${parseFloat(amount).toFixed(2)}`;
+    return `${currency || 'INR'} ${parseFloat(amount).toFixed(2)}`;
   };
 
   const getTypeBadge = (type) => {
@@ -152,7 +152,7 @@ const WebsitePayments = () => {
             </div>
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400">Total Revenue</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">${totalRevenue.toFixed(2)}</p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white">₹{totalRevenue.toFixed(2)}</p>
             </div>
           </div>
         </div>

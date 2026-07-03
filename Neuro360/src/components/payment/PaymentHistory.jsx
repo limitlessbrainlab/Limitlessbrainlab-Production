@@ -199,7 +199,7 @@ const PaymentHistory = ({ clinicId }) => {
     }
   };
 
-  const formatCurrency = (amount, currency = 'USD') => {
+  const formatCurrency = (amount, currency = 'INR') => {
     if (currency === 'INR') {
       return `₹${amount?.toLocaleString() || 0}`;
     }
@@ -295,7 +295,7 @@ const PaymentHistory = ({ clinicId }) => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Spent</p>
               <p className="text-2xl font-semibold text-gray-900">
-                ${payments.reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString()}
+                ₹{payments.reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString()}
               </p>
             </div>
           </div>

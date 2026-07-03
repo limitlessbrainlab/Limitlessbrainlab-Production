@@ -67,10 +67,20 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
   }, [usageStats, loading, lowCreditsDismissed]);
 
   const detectCurrency = async () => {
-    // Clinic report credits are priced and charged in INR. (Previously this used
-    // IP geolocation and fell back to USD on non-IN / lookup failure, so clinics
-    // saw dollar prices and were charged in USD.)
-    setUserCurrency({ currency: 'INR', symbol: '\u20b9' });
+    // Use the clinic's location to pick its billing currency: Indian clinics pay
+    // in INR, others in USD. On lookup failure, default to INR (India-first) \u2014
+    // don't silently fall back to USD.
+    try {
+      const response = await fetch('https://ipapi.co/json/');
+      const data = await response.json();
+      if (data.country_code === 'IN') {
+        setUserCurrency({ currency: 'INR', symbol: '\u20b9' });
+      } else {
+        setUserCurrency({ currency: 'USD', symbol: '$' });
+      }
+    } catch {
+      setUserCurrency({ currency: 'INR', symbol: '\u20b9' });
+    }
   };
 
   const checkPaymentSuccess = async () => {

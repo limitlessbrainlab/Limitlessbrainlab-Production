@@ -207,7 +207,11 @@ const AssessmentManagement = () => {
     setValue('display_order', assessment.display_order || 0);
     setValue('is_active', assessment.is_active);
     setValue('category', assessment.category || 'individual');
-    setValue('bundle_includes', assessment.bundle_includes?.join(', ') || '');
+    // bundle_includes is JSONB — normally an array, but seeded/legacy rows may
+    // store it as a JSON string. Guard so a non-array value can't throw here and
+    // silently swallow the click (leaving the edit modal unopened).
+    const bundle = assessment.bundle_includes;
+    setValue('bundle_includes', Array.isArray(bundle) ? bundle.join(', ') : (bundle || ''));
     setShowModal(true);
   };
 
@@ -317,6 +321,13 @@ const AssessmentManagement = () => {
         >
           <RefreshCw className="h-4 w-4" />
           <span>Refresh</span>
+        </button>
+        <button
+          onClick={() => { setSearchTerm(''); setStatusFilter('all'); setCategoryFilter('all'); }}
+          className="flex items-center space-x-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+        >
+          <X className="h-4 w-4" />
+          <span>Clear</span>
         </button>
       </div>
 

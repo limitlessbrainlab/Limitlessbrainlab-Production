@@ -24,6 +24,10 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [rejectRemark, setRejectRemark] = useState('');
   const [rejectLoading, setRejectLoading] = useState(false);
+  // Lifted out of the (former) inline DetailModal so the modal can be rendered as a plain helper
+  // instead of a nested component — a nested component was re-created on every parent render,
+  // remounting the modal on each keystroke and scrolling the reject-reason field back to the top.
+  const [contractAgreed, setContractAgreed] = useState(false);
 
   useEffect(() => {
     loadPendingItems();
@@ -196,6 +200,7 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
     setDetailClinic(clinic);
     setShowRejectForm(startRejecting);
     setRejectRemark('');
+    setContractAgreed(clinic?.contract_agreed || clinic?.contractAgreed || false);
   };
 
   const closeDetail = () => {
@@ -207,11 +212,11 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
   const pendingCount = pendingClinics.length + pendingSuperAdmins.length;
 
   // ── Detail Modal ────────────────────────────────────────────────────────────
-  const DetailModal = ({ clinic }) => {
+  // Rendered via a plain function call (not <DetailModal/>) so it is inlined into this component's
+  // tree and never remounts on re-render — that remount was what reset the reject-reason scroll.
+  // contractAgreed is lifted to parent state (see above) and initialised in openDetail.
+  const renderDetailModal = (clinic) => {
     const isLoading = loading && selectedItem?.id === clinic.id;
-    const [contractAgreed, setContractAgreed] = useState(
-      clinic?.contract_agreed || clinic?.contractAgreed || false
-    );
 
     return (
       <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[60] flex items-start justify-center pt-4 sm:pt-8 px-2">
@@ -522,7 +527,7 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
       )}
 
       {/* Detail Modal — rendered on top of list modal */}
-      {detailClinic && <DetailModal clinic={detailClinic} />}
+      {detailClinic && renderDetailModal(detailClinic)}
     </>
   );
 };

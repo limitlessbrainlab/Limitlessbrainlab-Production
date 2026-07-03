@@ -2135,19 +2135,22 @@ const ClinicModal = ({ clinic, clinics, user, onSubmit, onClose, register, handl
               {/* Phone Number Input */}
               <input
                 type="tel"
+                inputMode="numeric"
+                maxLength={10}
                 {...register('phone', {
                   pattern: {
-                    value: /^[0-9]{5,15}$/,
-                    message: 'Please enter a valid phone number'
+                    value: /^[0-9]{10}$/,
+                    message: 'Phone number must be exactly 10 digits'
                   }
                 })}
-                placeholder="Enter phone number"
+                onInput={(e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10); }}
+                placeholder="Enter 10-digit phone number"
                 className="flex-1 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
             {errors.phone && <p className="text-red-500 text-xs mt-0.5">{errors.phone.message}</p>}
             <p className="text-xs text-gray-500 mt-0.5">
-              Select your country code from the dropdown and enter your phone number
+              Select your country code from the dropdown and enter a 10-digit phone number
             </p>
           </div>
 

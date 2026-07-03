@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Play, Download, FileText, CheckCircle, Activity, User, Building2, Calendar, History, X, ArrowLeft, Search, Filter, Send, Loader2 } from 'lucide-react';
+import { Upload, Play, Download, FileText, CheckCircle, Activity, User, Building2, Calendar, History, X, ArrowLeft, Search, Filter, Send, Loader2, RefreshCw } from 'lucide-react';
 import DatabaseService from '../../services/databaseService';
 import SupabaseService from '../../services/supabaseService';
 import toast from 'react-hot-toast';
@@ -3380,7 +3380,7 @@ const AlgorithmDataProcessor = () => {
               className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center space-x-1"
               title="Fetch PDFs from Supabase bucket and update database"
             >
-              <Download className="h-3 w-3" />
+              <RefreshCw className="h-3 w-3" />
               <span>Sync PDFs</span>
             </button>
           </div>

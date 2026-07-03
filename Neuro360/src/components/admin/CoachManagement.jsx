@@ -36,8 +36,24 @@ const CoachManagement = ({ onUpdate }) => {
   const [selectedCoach, setSelectedCoach] = useState(null);
   const [activeTab, setActiveTab] = useState('coaches');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // Reload all three data sets with visible feedback (spinner + toast) so the
+  // Refresh button clearly does something even when the data is unchanged.
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await Promise.all([loadCoaches(), loadConnectionRequests(), loadBookings()]);
+      toast.success('Refreshed');
+    } catch (e) {
+      toast.error('Failed to refresh');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm();
 
@@ -420,10 +436,11 @@ const CoachManagement = ({ onUpdate }) => {
           )}
         </select>
         <button
-          onClick={() => { loadCoaches(); loadConnectionRequests(); loadBookings(); }}
-          className="flex items-center space-x-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center space-x-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-60"
         >
-          <RefreshCw className="h-4 w-4" />
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           <span>Refresh</span>
         </button>
       </div>

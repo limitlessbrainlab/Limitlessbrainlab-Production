@@ -413,7 +413,7 @@ const CoachManagement = ({ onUpdate }) => {
           )}
         </select>
         <button
-          onClick={() => { loadCoaches(); loadConnectionRequests(); }}
+          onClick={() => { loadCoaches(); loadConnectionRequests(); loadBookings(); }}
           className="flex items-center space-x-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
         >
           <RefreshCw className="h-4 w-4" />
@@ -656,6 +656,7 @@ const CoachManagement = ({ onUpdate }) => {
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {bookings
                     .filter(b => {
+                      if (statusFilter !== 'all' && (b.status || 'completed') !== statusFilter) return false;
                       const term = searchTerm.toLowerCase();
                       if (!term) return true;
                       return (

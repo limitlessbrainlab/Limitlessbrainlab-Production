@@ -22,7 +22,7 @@ npm run dev  # Runs with nodemon for auto-restart
 [INFO] Server running on port 5000
 [INFO] CORS enabled for: http://localhost:3000, http://localhost:5173, ...
 [INFO] All security and utility middleware initialized
-Email transporter ready - connected to noreplylimitlessbrainlab@gmail.com
+Email transporter ready - connected to info@limitlessbrainlab.com
 ```
 
 ### Terminal 2: Start Frontend

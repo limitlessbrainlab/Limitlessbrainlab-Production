@@ -2,11 +2,11 @@
 
 ## Root cause (found 2026-06-10)
 
-Outbound mail is sent through **Brevo SMTP** but the From address is
-`noreplylimitlessbrainlab@gmail.com`. A `@gmail.com` From address sent via
-non-Google servers fails SPF and DKIM alignment, so Gmail/Outlook treat it as
-spoofed mail and send it to spam. Additionally, `limitlessbrainlab.com` has
-**no SPF, DKIM, or DMARC records** in DNS.
+Outbound mail was being sent through **Brevo SMTP** with a `@gmail.com` From
+address. A Gmail From address sent via non-Google servers fails SPF and DKIM
+alignment, so Gmail/Outlook treat it as spoofed mail and send it to spam.
+Additionally, `limitlessbrainlab.com` must have SPF, DKIM, and DMARC records in
+DNS before using a domain From address.
 
 Code-level mitigations (plain-text alternative part, Reply-To support) are
 already applied in `server/index.js`. The steps below are the actual fix and
@@ -35,11 +35,11 @@ After 2–4 weeks of clean DMARC reports, tighten `p=none` → `p=quarantine`.
 
 Only after Step 1 shows "Authenticated" in Brevo:
 
-- `EMAIL_FROM=noreply@limitlessbrainlab.com`
+- `EMAIL_FROM=info@limitlessbrainlab.com`
 - `EMAIL_REPLY_TO=<monitored inbox>` (optional — replies to noreply mail get
   routed here; the code applies it automatically when set)
 
-Add `noreply@limitlessbrainlab.com` as a verified sender in Brevo if prompted.
+Add `info@limitlessbrainlab.com` as a verified sender in Brevo if prompted.
 
 ## Step 4 — Verify
 

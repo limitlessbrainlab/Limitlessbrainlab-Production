@@ -1280,7 +1280,7 @@ router.get('/patients/:id', authMiddleware, getPatient);
     <p><strong>Purpose:</strong> Send transactional emails (reports, credentials, notifications)</p>
     <ul>
         <li><strong>SMTP Provider:</strong> Gmail with app-specific password</li>
-        <li><strong>Outbound Email:</strong> noreplylimitlessbrainlab@gmail.com</li>
+        <li><strong>Outbound Email:</strong> info@limitlessbrainlab.com</li>
         <li><strong>Inbound Email:</strong> limitlessbrainlab@gmail.com (receives admin notifications)</li>
         <li><strong>Config Variables:</strong> <code>EMAIL_USER</code>, <code>EMAIL_PASS</code>, <code>EMAIL_TO</code>, <code>EMAIL_TO_PASS</code></li>
         <li><strong>Rate Limit:</strong> ~100 emails/min from Gmail</li>
@@ -1332,10 +1332,10 @@ GEMINI_REQUEST_DELAY_MS=2000
 GEMINI_DAILY_LIMIT=50
 
 # Email
-EMAIL_USER=noreplylimitlessbrainlab@gmail.com
-EMAIL_PASS=rvky yrzh ztew btty
+EMAIL_USER=info@limitlessbrainlab.com
+EMAIL_PASS=&lt;google-app-password&gt;
 EMAIL_TO=limitlessbrainlab@gmail.com
-EMAIL_TO_PASS=czyx mgep zxry ikpy
+EMAIL_TO_PASS=&lt;admin-google-app-password&gt;
 
 # Payments
 RAZORPAY_KEY_ID=rzp_test_...

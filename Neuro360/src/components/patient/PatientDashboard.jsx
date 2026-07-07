@@ -6558,12 +6558,12 @@ const PatientDashboard = () => {
     if (!data) return <ProfileSection />;
 
     const Icon = data.icon;
-    const [showVisualGuide, setShowVisualGuide] = useState(false);
+    const [showVisualGuide, setShowVisualGuide] = useState(true);
     const [visualGuideThumbnail, setVisualGuideThumbnail] = useState('');
 
     useEffect(() => {
       let alive = true;
-      setShowVisualGuide(false);
+      setShowVisualGuide(true);
 
       const directThumbnail = data.thumbnailUrl || getGuideThumbnailUrl(data.videoUrl);
       if (directThumbnail) {

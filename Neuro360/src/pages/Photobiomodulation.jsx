@@ -91,13 +91,13 @@ const Photobiomodulation = () => {
       // Fetch patient details including UUID
       const { data: patientData } = await supabase
         .from('patients')
-        .select('id, name, patient_name, email')
+        .select('id, name, full_name, email')
         .eq('email', patientEmail)
-        .single();
+        .maybeSingle();
 
       let patientId = null;
       if (patientData) {
-        setPatientName(patientData.name || patientData.patient_name || user?.name || '');
+        setPatientName(patientData.name || patientData.full_name || user?.name || '');
         patientId = patientData.id;
       } else {
         setPatientName(user?.name || '');
@@ -113,7 +113,7 @@ const Photobiomodulation = () => {
           .eq('patient_id', patientId)
           .order('processed_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (data) algorithmData = data;
       }

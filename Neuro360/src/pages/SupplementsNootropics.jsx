@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import {
@@ -26,10 +26,12 @@ const SupplementCard = ({ supplement, paramColor = 'blue' }) => (
 
 const SupplementsNootropics = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [sortBy, setSortBy] = useState('best_selling');
   const [filterOpen, setFilterOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('all');
+  const [highlightedProducts, setHighlightedProducts] = useState([]);
   const [showEligibilityForm, setShowEligibilityForm] = useState(false);
   const [isEligible, setIsEligible] = useState(false);
   const [eligibilityChecks, setEligibilityChecks] = useState({
@@ -98,6 +100,27 @@ const SupplementsNootropics = () => {
     if (sortBy === 'name') return a.name.localeCompare(b.name);
     return 0; // best_selling — default order
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const productIds = [
+      ...(params.get('products') || '').split(','),
+      params.get('product')
+    ].filter(Boolean);
+    const validProductIds = productIds.filter((id) => products.some((product) => product.id === id));
+    if (validProductIds.length === 0) return;
+
+    setActiveCategory('all');
+    setHighlightedProducts([...new Set(validProductIds)]);
+
+    setTimeout(() => {
+      const el = document.getElementById(`nootropic-product-${validProductIds[0]}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 300);
+
+    const clearTimer = setTimeout(() => setHighlightedProducts([]), 3500);
+    return () => clearTimeout(clearTimer);
+  }, [location.search]);
 
   const handleAddToCart = () => {
     window.open('https://www.limitlessbrainshop.com/collections/ksb-nsb-products', '_blank');
@@ -205,7 +228,12 @@ const SupplementsNootropics = () => {
           {sortedProducts.map((product) => (
             <div
               key={product.id}
-              className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-all group"
+              id={`nootropic-product-${product.id}`}
+              className={`bg-white dark:bg-gray-800 rounded-xl overflow-hidden border hover:shadow-lg transition-all group ${
+                highlightedProducts.includes(product.id)
+                  ? 'border-blue-500 ring-2 ring-blue-400 ring-offset-2'
+                  : 'border-gray-200 dark:border-gray-700'
+              }`}
             >
               {/* Product Image */}
               <div className={`relative aspect-square bg-gradient-to-br ${product.color} flex items-center justify-center overflow-hidden`}>

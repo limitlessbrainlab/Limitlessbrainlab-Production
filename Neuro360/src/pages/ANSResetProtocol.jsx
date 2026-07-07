@@ -32,6 +32,11 @@ import {
   X
 } from 'lucide-react';
 
+const SUPABASE_STORAGE_URL = (import.meta.env.VITE_SUPABASE_URL || 'https://puzdgwtprcpaaxxwkwtk.supabase.co').replace(/\/$/, '');
+const getSupabasePublicStorageUrl = (bucket, objectPath) =>
+  `${SUPABASE_STORAGE_URL}/storage/v1/object/public/${bucket}/${objectPath.split('/').map(encodeURIComponent).join('/')}`;
+const getFrequencyMediaUrl = (objectPath) => getSupabasePublicStorageUrl('frequncies', objectPath);
+
 const ANSResetProtocol = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -39,7 +44,7 @@ const ANSResetProtocol = () => {
   // Mode and timer state
   const [selectedMode, setSelectedMode] = useState('box'); // 478, sigh, bhramari, box, custom
   const [selectedGoal, setSelectedGoal] = useState(null);
-  const [highlightedVideo, setHighlightedVideo] = useState(null);
+  const [highlightedVideos, setHighlightedVideos] = useState([]);
 
   // Yogic Breathing gamified session state
   const [yogicPhase, setYogicPhase] = useState('tips'); // 'tips' | 'countdown' | 'breathing' | 'complete'
@@ -343,7 +348,7 @@ const ANSResetProtocol = () => {
         .from('ans_user_settings')
         .select('*')
         .eq('patient_email', user.email.toLowerCase())
-        .single();
+        .maybeSingle();
 
       if (settings && !error) {
         if (settings.routine) {
@@ -376,7 +381,7 @@ const ANSResetProtocol = () => {
         .from('ans_user_settings')
         .select('id')
         .eq('patient_email', user.email.toLowerCase())
-        .single();
+        .maybeSingle();
 
       if (existing) {
         await supabase
@@ -437,7 +442,7 @@ const ANSResetProtocol = () => {
         .from('ans_user_settings')
         .select('id')
         .eq('patient_email', user.email.toLowerCase())
-        .single();
+        .maybeSingle();
 
       if (existing) {
         await supabase
@@ -496,7 +501,7 @@ const ANSResetProtocol = () => {
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
       const { data: weekSessions, error: weekError } = await supabase
         .from('ans_sessions')
-        .select('session_date, delta_stress')
+        .select('session_date, notes')
         .eq('patient_email', userEmail)
         .gte('session_date', sevenDaysAgo.toISOString().split('T')[0])
         .order('session_date', { ascending: true });
@@ -541,8 +546,12 @@ const ANSResetProtocol = () => {
           if (dayIndex >= 0 && dayIndex < 7) {
             weeklyTrend[dayIndex]++;
           }
-          if (session.delta_stress !== null) {
-            totalStressReduction += session.delta_stress;
+          const parsedNotes = typeof session.notes === 'string'
+            ? (() => { try { return JSON.parse(session.notes); } catch { return null; } })()
+            : session.notes;
+          const deltaStress = parsedNotes?.delta_stress;
+          if (typeof deltaStress === 'number') {
+            totalStressReduction += deltaStress;
             stressCount++;
           }
         });
@@ -588,20 +597,40 @@ const ANSResetProtocol = () => {
     }
   }, [selectedGoal]);
 
-  // Handle deep-link to specific video in carousel
+  // Handle deep-link to specific video(s) or carousel section
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const videoSlug = params.get('video');
-    if (!videoSlug) return;
+    const requestedVideos = [
+      ...(params.get('videos') || '').split(','),
+      params.get('video')
+    ].filter(Boolean);
+    const sectionId = params.get('section');
+    if (requestedVideos.length === 0 && !sectionId) return;
 
     setTimeout(() => {
       const allCards = document.querySelectorAll('[id^="video-"]');
-      const target = [...allCards].find(el => el.id.includes(videoSlug));
-      if (!target) return;
-      setHighlightedVideo(target.id.replace('video-', ''));
-      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      const container = target.parentElement;
-      if (container) container.scrollTo({ left: target.offsetLeft - 20, behavior: 'smooth' });
+      const matchedCards = requestedVideos
+        .map((slug) => {
+          const exact = document.getElementById(`video-${slug}`);
+          if (exact) return exact;
+          return [...allCards].find((el) => el.id.includes(slug));
+        })
+        .filter(Boolean);
+
+      if (matchedCards.length > 0) {
+        const matchedSlugs = matchedCards.map((card) => card.id.replace('video-', ''));
+        setHighlightedVideos([...new Set(matchedSlugs)]);
+        const target = matchedCards[0];
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const container = target.parentElement;
+        if (container) container.scrollTo({ left: target.offsetLeft - 20, behavior: 'smooth' });
+        return;
+      }
+
+      if (sectionId) {
+        const section = document.getElementById(sectionId);
+        if (section) section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }, 600);
   }, []);
 
@@ -1199,20 +1228,22 @@ const ANSResetProtocol = () => {
     try {
       const sessionData = {
         patient_email: user?.email?.toLowerCase(),
-        mode: selectedMode,
-        mode_name: currentMode.instruction,
-        duration_seconds: currentMode.duration,
-        completed: true,
-        pre_stress: preSession.stress,
-        pre_calm: preSession.calm,
-        pre_focus: preSession.focus,
-        post_stress: postSession.stress,
-        post_calm: postSession.calm,
-        post_focus: postSession.focus,
-        delta_stress: preSession.stress - postSession.stress,
-        delta_calm: postSession.calm - preSession.calm,
-        delta_focus: postSession.focus - preSession.focus,
-        notes: notes || null,
+        notes: JSON.stringify({
+          mode: selectedMode,
+          mode_name: currentMode.instruction,
+          duration_seconds: currentMode.duration,
+          completed: true,
+          pre_stress: preSession.stress,
+          pre_calm: preSession.calm,
+          pre_focus: preSession.focus,
+          post_stress: postSession.stress,
+          post_calm: postSession.calm,
+          post_focus: postSession.focus,
+          delta_stress: preSession.stress - postSession.stress,
+          delta_calm: postSession.calm - preSession.calm,
+          delta_focus: postSession.focus - preSession.focus,
+          user_notes: notes || null
+        }),
         session_date: new Date().toISOString().split('T')[0]
       };
 
@@ -2132,18 +2163,18 @@ const ANSResetProtocol = () => {
             icon: '🙏',
             subtitle: 'Short audio chants for brain activation',
             videos: [
-              { name: 'Aim Beej Mantra', url: 'https://wqykofpjpaytjuqsessf.supabase.co/storage/v1/object/sign/frequncies/Aim%20Beejmantra.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDdhYzBlMC01NjM3LTQzNmMtODBmYy0yYWQ5MjI1MzFmMGEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmcmVxdW5jaWVzL0FpbSBCZWVqbWFudHJhLm1wNCIsImlhdCI6MTc3Njg2MDEyOCwiZXhwIjoxODA4Mzk2MTI4fQ.2RjciMSvUd67PZmYVk8K-WneXlM-_f_oQ3c6G_H5QyA', color: 'from-orange-400 to-red-500', isAudio: true },
-              { name: 'Ar Ra Pa Ca Na Dhi', url: 'https://wqykofpjpaytjuqsessf.supabase.co/storage/v1/object/sign/frequncies/ArRaPaCaNaDhi..mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDdhYzBlMC01NjM3LTQzNmMtODBmYy0yYWQ5MjI1MzFmMGEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmcmVxdW5jaWVzL0FyUmFQYUNhTmFEaGkuLm1wNCIsImlhdCI6MTc3Njg2MDE1NywiZXhwIjoxODA4Mzk2MTU3fQ.vE6esRibuKa4gkKyU4mORY7plQnfll7C6bT42yencsE', color: 'from-yellow-400 to-orange-500', isAudio: true },
-              { name: 'Aum Beej Mantra', url: 'https://wqykofpjpaytjuqsessf.supabase.co/storage/v1/object/sign/frequncies/Aum%20BeejMantra.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDdhYzBlMC01NjM3LTQzNmMtODBmYy0yYWQ5MjI1MzFmMGEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmcmVxdW5jaWVzL0F1bSBCZWVqTWFudHJhLm1wNCIsImlhdCI6MTc3Njg2MDE2OCwiZXhwIjoxODA4Mzk2MTY4fQ.FXNbn7oPdc0r-zLnLI0wBZZKWHV673Cwqz1Qv8DfJQY', color: 'from-purple-500 to-indigo-600', isAudio: true },
-              { name: 'Aum Gang Ganpataye Namah', url: 'https://wqykofpjpaytjuqsessf.supabase.co/storage/v1/object/sign/frequncies/AumGangGanpataye%20Namah.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDdhYzBlMC01NjM3LTQzNmMtODBmYy0yYWQ5MjI1MzFmMGEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmcmVxdW5jaWVzL0F1bUdhbmdHYW5wYXRheWUgTmFtYWgubXA0IiwiaWF0IjoxNzc2ODYwMTgzLCJleHAiOjE4MDgzOTYxODN9.SuftskkShPN6bE1u7xODFzmnMMz6AeLTVt-7qzKMCDI', color: 'from-red-500 to-orange-600', isAudio: true },
-              { name: 'Bhramari Breath', url: 'https://wqykofpjpaytjuqsessf.supabase.co/storage/v1/object/sign/frequncies/Bharamar.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDdhYzBlMC01NjM3LTQzNmMtODBmYy0yYWQ5MjI1MzFmMGEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmcmVxdW5jaWVzL0JoYXJhbWFyLm1wNCIsImlhdCI6MTc3Njg2MDIwMywiZXhwIjoxODA4Mzk2MjAzfQ.BdFiKrpC-cKFjeb3NM-hKGseSJtMMbsqvZE_a8WiTXQ', color: 'from-blue-400 to-blue-600', isAudio: true },
-              { name: 'Gang Beej Mantra', url: 'https://wqykofpjpaytjuqsessf.supabase.co/storage/v1/object/sign/frequncies/Gang%20BeejMantra.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDdhYzBlMC01NjM3LTQzNmMtODBmYy0yYWQ5MjI1MzFmMGEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmcmVxdW5jaWVzL0dhbmcgQmVlak1hbnRyYS5tcDQiLCJpYXQiOjE3NzY4NjAyMjAsImV4cCI6MTgwODM5NjIyMH0.P5A6koag9MnOeGrmR7pXGMPVMG0drhjeNmErF_Xbgr4', color: 'from-orange-500 to-yellow-600', isAudio: true },
-              { name: 'Mahamrityunjaya Mantra', url: 'https://wqykofpjpaytjuqsessf.supabase.co/storage/v1/object/sign/frequncies/MahaMrutyunjay%20Mantra.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDdhYzBlMC01NjM3LTQzNmMtODBmYy0yYWQ5MjI1MzFmMGEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmcmVxdW5jaWVzL01haGFNcnV0eXVuamF5IE1hbnRyYS5tcDQiLCJpYXQiOjE3NzY4NjAyNjcsImV4cCI6MTgwODM5NjI2N30.Aou8k6MbGeDlyYPwzgbEVE20uIt77Pslyd_be8x_iXg', color: 'from-blue-600 to-indigo-800', isAudio: true },
-              { name: 'Maheshwar Sutrani', url: 'https://wqykofpjpaytjuqsessf.supabase.co/storage/v1/object/sign/frequncies/Maheshwar%20Sutrani.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDdhYzBlMC01NjM3LTQzNmMtODBmYy0yYWQ5MjI1MzFmMGEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmcmVxdW5jaWVzL01haGVzaHdhciBTdXRyYW5pLm1wNCIsImlhdCI6MTc3Njg2MDI4MiwiZXhwIjoxODA4Mzk2MjgyfQ.PaGP0jcskWNj0Hq37aauShzNabMCR3ZMb4YlhyYRCtI', color: 'from-gray-600 to-gray-800', isAudio: true },
-              { name: 'Saraswati Mantra', url: 'https://wqykofpjpaytjuqsessf.supabase.co/storage/v1/object/sign/frequncies/Saraswati%20Mantra.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDdhYzBlMC01NjM3LTQzNmMtODBmYy0yYWQ5MjI1MzFmMGEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmcmVxdW5jaWVzL1NhcmFzd2F0aSBNYW50cmEubXA0IiwiaWF0IjoxNzc2ODYwMzE4LCJleHAiOjE4MDgzOTYzMTh9.yu6d9OnAm3f4wHfmoq3RWHm70S-3CHKoGuZ2HZ0GBtc', color: 'from-teal-400 to-emerald-600', isAudio: true },
-              { name: 'Shree Dhanvantari Mantra', url: 'https://wqykofpjpaytjuqsessf.supabase.co/storage/v1/object/sign/frequncies/Shree%20DHanvantari%20Mnatra.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDdhYzBlMC01NjM3LTQzNmMtODBmYy0yYWQ5MjI1MzFmMGEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmcmVxdW5jaWVzL1NocmVlIERIYW52YW50YXJpIE1uYXRyYS5tcDQiLCJpYXQiOjE3NzY4NjAzMzEsImV4cCI6MTgwODM5NjMzMX0.drQFh7TeRNaQdz97LsAjrX4MH4gGgCSF-J7kDGIf_Cg', color: 'from-green-500 to-green-700', isAudio: true },
-              { name: 'Sohum Meditation', url: 'https://wqykofpjpaytjuqsessf.supabase.co/storage/v1/object/sign/frequncies/Sohum.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDdhYzBlMC01NjM3LTQzNmMtODBmYy0yYWQ5MjI1MzFmMGEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmcmVxdW5jaWVzL1NvaHVtLm1wNCIsImlhdCI6MTc3Njg2MDM0MywiZXhwIjoxODA4Mzk2MzQzfQ.BxqKpbu-mrQOx75N3RjiQpSgobj0QrXbMCY1ofqJ7YY', color: 'from-blue-300 to-blue-500', isAudio: true },
-              { name: 'Vam Beej Mantra', url: 'https://wqykofpjpaytjuqsessf.supabase.co/storage/v1/object/sign/frequncies/Vam%20Beejmantra.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDdhYzBlMC01NjM3LTQzNmMtODBmYy0yYWQ5MjI1MzFmMGEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmcmVxdW5jaWVzL1ZhbSBCZWVqbWFudHJhLm1wNCIsImlhdCI6MTc3Njg2MDM1NSwiZXhwIjoxODA4Mzk2MzU1fQ.kSjQrTwGNvF6o01JRuR7BVlzSJie7Et7Hgg0snHxcYI', color: 'from-cyan-400 to-blue-600', isAudio: true }
+              { name: 'Aim Beej Mantra', url: getFrequencyMediaUrl('Aim Beejmantra.mp4'), color: 'from-orange-400 to-red-500', isAudio: true },
+              { name: 'Ar Ra Pa Ca Na Dhi', url: getFrequencyMediaUrl('ArRaPaCaNaDhi..mp4'), color: 'from-yellow-400 to-orange-500', isAudio: true },
+              { name: 'Aum Beej Mantra', url: getFrequencyMediaUrl('Aum BeejMantra.mp4'), color: 'from-purple-500 to-indigo-600', isAudio: true },
+              { name: 'Aum Gang Ganpataye Namah', url: getFrequencyMediaUrl('AumGangGanpataye Namah.mp4'), color: 'from-red-500 to-orange-600', isAudio: true },
+              { name: 'Bhramari Breath', url: getFrequencyMediaUrl('Bharamar.mp4'), color: 'from-blue-400 to-blue-600', isAudio: true },
+              { name: 'Gang Beej Mantra', url: getFrequencyMediaUrl('Gang BeejMantra.mp4'), color: 'from-orange-500 to-yellow-600', isAudio: true },
+              { name: 'Mahamrityunjaya Mantra', url: getFrequencyMediaUrl('MahaMrutyunjay Mantra.mp4'), color: 'from-blue-600 to-indigo-800', isAudio: true },
+              { name: 'Maheshwar Sutrani', url: getFrequencyMediaUrl('Maheshwar Sutrani.mp4'), color: 'from-gray-600 to-gray-800', isAudio: true },
+              { name: 'Saraswati Mantra', url: getFrequencyMediaUrl('Saraswati Mantra.mp4'), color: 'from-teal-400 to-emerald-600', isAudio: true },
+              { name: 'Shree Dhanvantari Mantra', url: getFrequencyMediaUrl('Shree DHanvantari Mnatra.mp4'), color: 'from-green-500 to-green-700', isAudio: true },
+              { name: 'Sohum Meditation', url: getFrequencyMediaUrl('Sohum.mp4'), color: 'from-blue-300 to-blue-500', isAudio: true },
+              { name: 'Vam Beej Mantra', url: getFrequencyMediaUrl('Vam Beejmantra.mp4'), color: 'from-cyan-400 to-blue-600', isAudio: true }
             ]
           }
         ].map((section) => (
@@ -2178,15 +2209,13 @@ const ANSResetProtocol = () => {
             <div id={section.id} className="flex overflow-x-auto gap-4 sm:gap-5 pb-2 scroll-smooth" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
               {section.videos.length > 0 ? section.videos.map((video, idx) => {
                 const isAudio = video.isAudio;
-                const videoId = isAudio ? null : video.url.split('/embed/')[1];
-                const thumbnail = isAudio ? null : `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
                 const videoSlug = video.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
                 return (
                   <div
                     key={idx}
                     id={`video-${videoSlug}`}
                     className={`flex-shrink-0 w-[calc(33.333%-14px)] min-w-[250px] rounded-xl overflow-hidden border bg-white dark:bg-gray-900 shadow-md hover:shadow-xl transition-shadow ${
-                      highlightedVideo === videoSlug
+                      highlightedVideos.includes(videoSlug)
                         ? 'border-blue-500 ring-2 ring-blue-400 ring-offset-2'
                         : 'border-gray-200 dark:border-gray-700'
                     }`}
@@ -2202,12 +2231,11 @@ const ANSResetProtocol = () => {
                           playsInline
                         />
                       ) : (
-                        <img
-                          src={thumbnail}
-                          alt={video.name}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
+                        <div className="w-full h-full bg-gradient-to-br from-gray-900 to-green-900 flex items-center justify-center">
+                          <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center">
+                            <Play className="h-7 w-7 text-white ml-1" />
+                          </div>
+                        </div>
                       )}
                     </div>
                     {/* Card body */}

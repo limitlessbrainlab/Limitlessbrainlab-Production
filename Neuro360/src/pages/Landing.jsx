@@ -2233,7 +2233,7 @@ const Landing = () => {
                       Dr. Adatia empowers the next generation to map their brains to help them embrace their limitless potential through her startup Mylimitlessbrain. Her book on this subject FUTURE READY NOW has achieved global bestseller status on Amazon.
                     </p>
                     <p className="text-base leading-relaxed mb-4 text-gray-700">
-                      A sought-after keynote speaker, she has delivered a TEDx talk on the impact of storytelling on the brain and conducted more than 500 seminars on neuroscience-based topics, bridging science and spirituality, Neuro parenting, Neuro manifestation, total transformation of the brain, A journey from Illness to Wellness and neuroscience for daily life. Her YouTube channel @drsweta.adatia is fast growing with over 55 million impressions and over 10 million views. Some of her talks are vividly viral and appreciated by a global audience. Dr Adatia lives in Dubai currently and has a collaborative lab in Cambridge and USA.
+                      A sought-after keynote speaker, she has delivered a TEDx talk on the impact of storytelling on the brain and conducted more than 500 seminars on neuroscience-based topics, bridging science and spirituality, Neuro parenting, Neuro manifestation, total transformation of the brain, A journey from Illness to Wellness and neuroscience for daily life. Her YouTube channels <a href="https://www.youtube.com/@drsweta.adatia" target="_blank" rel="noopener noreferrer" className="text-[#323956] hover:underline font-semibold">@drsweta.adatia</a> (English) and <a href="https://www.youtube.com/@drsweta.adatiahindi" target="_blank" rel="noopener noreferrer" className="text-[#323956] hover:underline font-semibold">@drsweta.adatiahindi</a> (Hindi) are fast growing with over 55 million impressions and over 10 million views. Some of her talks are vividly viral and appreciated by a global audience. Dr Adatia lives in Dubai currently and has a collaborative lab in Cambridge and USA.
                     </p>
                   </>
                 )}
@@ -2246,7 +2246,7 @@ const Landing = () => {
                 </button>
 
                 <p className="text-base leading-relaxed text-gray-700 mt-4">
-                  More about her – <a href="https://www.drswetaadatia.com" target="_blank" rel="noopener noreferrer" className="text-[#323956] hover:underline font-semibold">www.drswetaadatia.com</a>
+                  More about her – <a href="https://www.drswetaadatia.com" target="_blank" rel="noopener noreferrer" className="text-[#323956] hover:underline font-semibold">www.drswetaadatia.com</a> | <a href="https://www.youtube.com/@drsweta.adatiahindi" target="_blank" rel="noopener noreferrer" className="text-[#323956] hover:underline font-semibold">YouTube Hindi</a>
                 </p>
 
                 {/* Statistics Section Inside Card */}

@@ -97,9 +97,9 @@ const HomeNeurofeedback = () => {
       // Method 1: Query by email
       const { data: data1 } = await supabase
         .from('patients')
-        .select('id, name, patient_name, email, full_name')
+        .select('id, name, email, full_name')
         .eq('email', patientEmail)
-        .single();
+        .maybeSingle();
 
       if (data1) {
         patientData = data1;
@@ -110,10 +110,10 @@ const HomeNeurofeedback = () => {
       if (!patientData && user?.name) {
         const { data: data2 } = await supabase
           .from('patients')
-          .select('id, name, patient_name, email, full_name')
-          .or(`name.ilike.%${user.name}%,patient_name.ilike.%${user.name}%,full_name.ilike.%${user.name}%`)
+          .select('id, name, email, full_name')
+          .or(`name.ilike.%${user.name}%,full_name.ilike.%${user.name}%`)
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (data2) {
           patientData = data2;
@@ -121,7 +121,7 @@ const HomeNeurofeedback = () => {
         }
       }
 
-      const displayName = patientData?.name || patientData?.patient_name || patientData?.full_name || user?.name || '';
+      const displayName = patientData?.name || patientData?.full_name || user?.name || '';
       setPatientName(displayName);
 
       // Fetch algorithm results - try multiple approaches
@@ -135,7 +135,7 @@ const HomeNeurofeedback = () => {
           .eq('patient_id', patientId)
           .order('processed_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (algData1 && !err1) {
           algorithmData = algData1;
@@ -151,7 +151,7 @@ const HomeNeurofeedback = () => {
           .ilike('patient_name', `%${displayName}%`)
           .order('processed_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (algData2 && !err2) {
           algorithmData = algData2;

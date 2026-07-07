@@ -41,6 +41,26 @@ import {
   Mic2
 } from 'lucide-react';
 
+const parseMoverNotes = (notes) => {
+  if (!notes || typeof notes !== 'string') return {};
+  try {
+    const parsed = JSON.parse(notes);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const normalizeMoverActivity = (activity) => {
+  const notes = parseMoverNotes(activity?.notes);
+  return {
+    ...activity,
+    activity_id: activity?.activity_id || notes.activity_id || activity?.activity_type || '',
+    category: activity?.category || notes.category || activity?.intensity || '',
+    points: Number(activity?.points ?? notes.points ?? activity?.calories_burned ?? 0)
+  };
+};
+
 const MoversSection = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('daily');
@@ -330,12 +350,12 @@ const MoversSection = () => {
       // Get today's completed activities
       const { data: todayData, error: todayError } = await supabase
         .from('movers_activities')
-        .select('activity_id')
+        .select('activity_type, notes')
         .eq('patient_email', userEmail)
         .eq('activity_date', today);
 
       if (!todayError && todayData) {
-        setCompletedActivities(todayData.map(d => d.activity_id));
+        setCompletedActivities(todayData.map(d => normalizeMoverActivity(d).activity_id).filter(Boolean));
       }
 
       // Get week's activities
@@ -350,20 +370,21 @@ const MoversSection = () => {
       // Get ALL activities for streak and journey calculations
       const { data: allData } = await supabase
         .from('movers_activities')
-        .select('activity_date, activity_id, category')
+        .select('activity_date, activity_type, intensity, calories_burned, notes')
         .eq('patient_email', userEmail)
         .order('activity_date', { ascending: true });
 
+      const normalizedAllData = (allData || []).map(normalizeMoverActivity);
       let streakDays = 0;
       let startDate = null;
 
-      if (allData && allData.length > 0) {
+      if (normalizedAllData.length > 0) {
         // First activity date is journey start
-        startDate = new Date(allData[0].activity_date);
+        startDate = new Date(normalizedAllData[0].activity_date);
         setJourneyStartDate(startDate);
 
         // Calculate streak (consecutive days)
-        const uniqueDates = [...new Set(allData.map(d => d.activity_date))].sort().reverse();
+        const uniqueDates = [...new Set(normalizedAllData.map(d => d.activity_date))].sort().reverse();
         const todayStr = new Date().toISOString().split('T')[0];
         const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
 
@@ -385,7 +406,7 @@ const MoversSection = () => {
         const weeklyData = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0 };
         const weeklyCategories = { 1: new Set(), 2: new Set(), 3: new Set(), 4: new Set(), 5: new Set(), 6: new Set(), 7: new Set(), 8: new Set(), 9: new Set(), 10: new Set(), 11: new Set(), 12: new Set() };
 
-        allData.forEach(activity => {
+        normalizedAllData.forEach(activity => {
           const activityDate = new Date(activity.activity_date);
           const daysSinceStart = Math.floor((activityDate - startDate) / (1000 * 60 * 60 * 24));
           const weekNumber = Math.floor(daysSinceStart / 7) + 1;
@@ -422,7 +443,7 @@ const MoversSection = () => {
         todayCount: todayData?.length || 0,
         weekCount: weekData?.length || 0,
         streakDays,
-        totalActivities: allData?.length || 0
+        totalActivities: normalizedAllData.length
       });
     } catch (error) {
       console.error('Error fetching MOVERS progress:', error);
@@ -456,26 +477,29 @@ const MoversSection = () => {
 
       if (isCompleted) {
         // Remove activity
-        await supabase
+        const { error } = await supabase
           .from('movers_activities')
           .delete()
           .eq('patient_email', userEmail)
-          .eq('activity_id', fullActivityId)
+          .eq('activity_type', fullActivityId)
           .eq('activity_date', today);
+        if (error) throw error;
 
         setCompletedActivities(prev => prev.filter(id => id !== fullActivityId));
         toast.success('Activity unmarked');
       } else {
         // Add activity
-        await supabase
+        const { error } = await supabase
           .from('movers_activities')
           .insert({
             patient_email: userEmail,
-            activity_id: fullActivityId,
-            category: categoryId,
-            points: points,
+            activity_type: fullActivityId,
+            intensity: categoryId,
+            calories_burned: points,
+            notes: JSON.stringify({ activity_id: fullActivityId, category: categoryId, points }),
             activity_date: today
           });
+        if (error) throw error;
 
         setCompletedActivities(prev => [...prev, fullActivityId]);
         toast.success(`+${points} points! Great job!`);

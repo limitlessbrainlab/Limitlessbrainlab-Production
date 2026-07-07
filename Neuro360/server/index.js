@@ -54,37 +54,59 @@ if (process.env.STRIPE_SECRET_KEY) {
   stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 }
 
-// Email transporter — Gmail is primary when configured; Brevo stays as fallback.
+// Email transporter — Gmail is primary when configured; Brevo remains as fallback.
 const gmailConfigured = !!(process.env.EMAIL_USER && process.env.EMAIL_PASS);
 const brevoConfigured = !!(process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_KEY);
-const emailTransporter = nodemailer.createTransport(
-  gmailConfigured
-    ? {
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS
-        },
-        connectionTimeout: 30000,
-        greetingTimeout: 30000,
-        socketTimeout: 30000
-      }
-    : {
-        host: 'smtp-relay.brevo.com',
-        port: Number(process.env.BREVO_SMTP_PORT) || 2525,
-        secure: false,
-        auth: {
-          user: process.env.BREVO_SMTP_USER,
-          pass: process.env.BREVO_SMTP_KEY
-        },
-        connectionTimeout: 30000,
-        greetingTimeout: 30000,
-        socketTimeout: 30000
-      }
-);
+const activeTransporter = (() => {
+  if (gmailConfigured) {
+    return nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      },
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000
+    });
+  }
 
+  if (brevoConfigured) {
+    return nodemailer.createTransport({
+      host: 'smtp-relay.brevo.com',
+      port: Number(process.env.BREVO_SMTP_PORT) || 2525,
+      secure: false,
+      auth: {
+        user: process.env.BREVO_SMTP_USER,
+        pass: process.env.BREVO_SMTP_KEY
+      },
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000
+    });
+  }
+
+  return null;
+})();
+
+const fallbackTransporter = gmailConfigured && brevoConfigured
+  ? nodemailer.createTransport({
+      host: 'smtp-relay.brevo.com',
+      port: Number(process.env.BREVO_SMTP_PORT) || 2525,
+      secure: false,
+      auth: {
+        user: process.env.BREVO_SMTP_USER,
+        pass: process.env.BREVO_SMTP_KEY
+      },
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000
+    })
+  : null;
+
+const emailTransporter = activeTransporter;
 const mailerConfigured = gmailConfigured || brevoConfigured;
 
 // Deliverability: HTML-only mail scores worse with spam filters, so derive a
@@ -131,8 +153,10 @@ function getEmailFooterHtml() {
                 <td style="padding-right:14px;"><a href="https://www.instagram.com/drsweta.adatia/?hl=en" target="_blank"><img src="https://img.icons8.com/fluency/48/instagram-new.png" alt="Instagram" width="30" height="30" style="display:block; border:0;"/></a></td>
                 <td style="padding-right:14px;"><a href="https://www.facebook.com/sweta.adatia" target="_blank"><img src="https://img.icons8.com/fluency/48/facebook-new.png" alt="Facebook" width="30" height="30" style="display:block; border:0;"/></a></td>
                 <td style="padding-right:14px;"><a href="https://www.linkedin.com/in/drswetaadatia/" target="_blank"><img src="https://img.icons8.com/fluency/48/linkedin.png" alt="LinkedIn" width="30" height="30" style="display:block; border:0;"/></a></td>
-                <td><a href="https://www.youtube.com/@drsweta.adatia" target="_blank"><img src="https://img.icons8.com/fluency/48/youtube-play.png" alt="YouTube" width="30" height="30" style="display:block; border:0;"/></a></td>
+                <td><a href="https://www.youtube.com/@drsweta.adatia" target="_blank"><img src="https://img.icons8.com/fluency/48/youtube-play.png" alt="YouTube English" width="30" height="30" style="display:block; border:0;"/></a></td>
+                <td style="padding-left:14px;"><a href="https://www.youtube.com/@drsweta.adatiahindi" target="_blank"><img src="https://img.icons8.com/fluency/48/youtube-play.png" alt="YouTube Hindi" width="30" height="30" style="display:block; border:0;"/></a></td>
               </tr></table>
+              <p style="margin:8px 0 0; color:#888; font-size:12px;">&#9654; English &nbsp;&#9654; Hindi</p>
             </td>
           </tr>
         </table>
@@ -168,24 +192,44 @@ function enhanceMailOptions(mailOptions) {
 }
 
 // Patch any nodemailer transporter so every email it sends gets the shared footer/enhancements.
-function patchSendMail(t) {
+function patchSendMail(t, fallback) {
   const raw = t.sendMail.bind(t);
-  t.sendMail = (opts, ...rest) => raw(enhanceMailOptions(opts), ...rest);
+  t.sendMail = async (opts, ...rest) => {
+    const enhanced = enhanceMailOptions(opts);
+    try {
+      return await raw(enhanced, ...rest);
+    } catch (error) {
+      if (fallback) {
+        console.error('Primary email transport failed, retrying with fallback:', error.message);
+        return await fallback.sendMail(enhanced, ...rest);
+      }
+      throw error;
+    }
+  };
   return t;
 }
-patchSendMail(emailTransporter);
+if (emailTransporter) {
+  patchSendMail(emailTransporter, fallbackTransporter);
+}
 
-// Verify email transporter on startup
-emailTransporter.verify((error, success) => {
-  if (error) {
-    console.error('EMAIL TRANSPORTER ERROR:', error.message);
-    console.error('EMAIL_USER:', process.env.EMAIL_USER);
-    console.error('EMAIL_PASS length:', (process.env.EMAIL_PASS || '').length);
-    console.error('EMAIL_PASS has spaces:', (process.env.EMAIL_PASS || '').includes(' '));
-  } else {
-    console.log('Email transporter ready - connected via', gmailConfigured ? 'gmail' : 'brevo');
-  }
-});
+if (fallbackTransporter && fallbackTransporter !== emailTransporter) {
+  patchSendMail(fallbackTransporter);
+}
+
+if (emailTransporter) {
+  emailTransporter.verify((error, success) => {
+    if (error) {
+      console.error('EMAIL TRANSPORTER ERROR:', error.message);
+      console.error('EMAIL_USER:', process.env.EMAIL_USER);
+      console.error('EMAIL_PASS length:', (process.env.EMAIL_PASS || '').length);
+      console.error('EMAIL_PASS has spaces:', (process.env.EMAIL_PASS || '').includes(' '));
+    } else {
+      console.log('Email transporter ready - connected via', gmailConfigured ? 'gmail' : 'brevo');
+    }
+  });
+} else {
+  console.warn('Email transporter not configured. Set EMAIL_USER/EMAIL_PASS or BREVO_SMTP_USER/BREVO_SMTP_KEY.');
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -202,7 +246,7 @@ app.set('trust proxy', 1);
 const SERVER_VERSION = `${process.env.RENDER_GIT_COMMIT || 'local'}-${Date.now()}`;
 
 // Outbound email "From" address (all emails to users/patients/clinics)
-const EMAIL_FROM = `"Limitless Brain Lab" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`;
+const EMAIL_FROM = `"Limitless Brain Lab" <${process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@limitlessbrainlab.com'}>`;
 
 // Consistent "date + time" formatter for email templates → e.g. "22 June 2026, 02:51 PM" (IST).
 const fmtDateTime = (d = new Date()) => {
@@ -6364,6 +6408,15 @@ app.post('/api/send-report-email', async (req, res) => {
   try {
     const { patientName, patientEmail, clinicName, clinicEmail, reportUrl, generatedAt } = req.body;
 
+    console.log('📧 send-report-email called:', {
+      patientName,
+      patientEmail,
+      clinicName,
+      clinicEmail,
+      reportUrl: reportUrl ? reportUrl.slice(0, 100) : undefined,
+      generatedAt
+    });
+
     // clinicEmail is OPTIONAL — the patient must always get the report; the clinic
     // copy is only sent when a real clinic email is supplied (never a fake fallback).
     if (!patientEmail || !reportUrl) {
@@ -6373,63 +6426,84 @@ app.post('/api/send-report-email', async (req, res) => {
       });
     }
 
-    if (!emailTransporter) {
+    const transporter = emailTransporter || fallbackTransporter;
+    if (!transporter) {
+      console.error('❌ send-report-email failed: no email transporter configured');
       return res.status(500).json({
         success: false,
         message: 'Email service not configured'
       });
     }
 
+    const sendWithFallback = async (mailOptions) => {
+      try {
+        return await transporter.sendMail(mailOptions);
+      } catch (sendError) {
+        console.warn('⚠️ Primary email transport failed:', sendError.message);
+        if (fallbackTransporter && fallbackTransporter !== transporter) {
+          console.log('🔁 Retrying email send with fallback transporter');
+          return await fallbackTransporter.sendMail(mailOptions);
+        }
+        throw sendError;
+      }
+    };
+
     const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
     const patientLoginUrl = `${FRONTEND_URL}/patient/login`;
     const clinicLoginUrl = `${FRONTEND_URL}/clinic/login`;
 
-    // Report is delivered as a download LINK (no PDF attachment). Both patient
-    // and clinic get the same Neuro Performance Report template.
     const reportHtmlPatient = getReportEmailHtml({ isClinic: false, patientName, clinicName, reportUrl, loginUrl: patientLoginUrl, generatedAt });
     const reportHtmlClinic = getReportEmailHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl: clinicLoginUrl, generatedAt });
 
-    // Email to Patient
     const patientMailOptions = {
       from: EMAIL_FROM,
       to: patientEmail,
-      replyTo: process.env.EMAIL_USER,
+      replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || EMAIL_FROM,
       headers: {
-        'List-Unsubscribe': `<mailto:${process.env.EMAIL_USER}?subject=unsubscribe>`,
+        'List-Unsubscribe': `<mailto:${process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || 'noreply@limitlessbrainlab.com'}?subject=unsubscribe>`,
         'X-Mailer': 'Limitless Brain Lab Mailer'
       },
       subject: `Your Neuro Performance Report is Ready`,
-      text: `Hi ${patientName},\n\nYour Neuro Performance Report is ready.\n\nDownload your report (PDF): ${reportUrl}\nLog in to your portal: ${patientLoginUrl}\n\nThe Limitless Brain Lab Team`,
+      text: `Hi ${patientName || 'there'},\n\nYour Neuro Performance Report is ready.\n\nDownload your report (PDF): ${reportUrl}\nLog in to your portal: ${patientLoginUrl}\n\nThe Limitless Brain Lab Team`,
       attachments: getLogoAttachment(),
       html: reportHtmlPatient
     };
 
-    // Send the patient email always; send the clinic email only if a real address was provided.
-    const sends = [emailTransporter.sendMail(patientMailOptions)];
+    let clinicEmailSent = false;
+
+    // Always send to the patient first. The clinic copy is non-fatal.
+    await sendWithFallback(patientMailOptions);
+    console.log('✉️ Patient report email sent:', patientEmail);
+
     if (clinicEmail) {
       const clinicMailOptions = {
         from: EMAIL_FROM,
         to: clinicEmail,
-        subject: `Neuro Performance Report — ${patientName}`,
-        text: `Hello ${clinicName},\n\nThe Neuro Performance Report for ${patientName} is ready for clinical review.\n\nDownload the report (PDF): ${reportUrl}\nLog in to your portal: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
+        subject: `Neuro Performance Report — ${patientName || 'Patient'}`,
+        text: `Hello ${clinicName || 'Clinic'},\n\nThe Neuro Performance Report for ${patientName || 'your patient'} is ready for clinical review.\n\nDownload the report (PDF): ${reportUrl}\nLog in to your portal: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
         attachments: getLogoAttachment(),
         html: reportHtmlClinic
       };
-      sends.push(emailTransporter.sendMail(clinicMailOptions));
+      try {
+        await sendWithFallback(clinicMailOptions);
+        clinicEmailSent = true;
+        console.log('✉️ Clinic report email sent:', clinicEmail);
+      } catch (clinicError) {
+        console.error('⚠️ Clinic report email failed:', clinicError);
+      }
     }
 
-    await Promise.all(sends);
+    const message = clinicEmail
+      ? clinicEmailSent
+        ? 'Report emails sent to clinic and patient successfully'
+        : 'Patient email sent; clinic email failed'
+      : 'Report email sent to patient successfully';
 
-    console.log('✅ Report emails sent successfully:', { patientEmail, clinicEmail: clinicEmail || '(none)' });
-
-    res.json({
-      success: true,
-      message: clinicEmail ? 'Report emails sent to clinic and patient successfully' : 'Report email sent to patient successfully'
-    });
+    return res.json({ success: true, message });
 
   } catch (error) {
     console.error('❌ Error sending report emails:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: `Email send failed: ${error.message || 'Unknown error'}`
     });

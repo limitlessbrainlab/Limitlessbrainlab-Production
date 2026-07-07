@@ -115,6 +115,169 @@ import Events from '../../pages/Events';
 import ProfileGate from './ProfileGate';
 import { getCareProtocol } from '../../utils/careProtocolLookup';
 
+const CARE_PROGRAM_YOGA_NIDRA_URL = 'https://sweta8238.graphy.com/products/Yoga-Nidra---The-Ultimate-Whole-Brain-Synchronization-6788054d6cd6065534a49399';
+
+const normalizeCareProgramText = (value) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[’']/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[–—]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const slugifyCareProgramTarget = (value) =>
+  normalizeCareProgramText(value)
+    .replace(/\+/g, ' ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+const collectCareProgramTargetSlugs = (value, targets) => {
+  const text = normalizeCareProgramText(value);
+  const matches = targets
+    .map((target) => {
+      const termIndex = target.terms
+        .map((term) => text.indexOf(normalizeCareProgramText(term)))
+        .filter((index) => index >= 0)
+        .sort((a, b) => a - b)[0];
+      return Number.isInteger(termIndex) ? { slug: target.slug, index: termIndex } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.index - b.index);
+
+  return [...new Set(matches.map((match) => match.slug))];
+};
+
+const buildAnsResetLink = (value, targets, sectionId) => {
+  const slugs = collectCareProgramTargetSlugs(value, targets);
+  if (slugs.length > 0) return `/dashboard/ans-reset?videos=${slugs.join(',')}`;
+
+  const topic = slugifyCareProgramTarget(String(value || '').split('\n')[0]);
+  return topic
+    ? `/dashboard/ans-reset?section=${sectionId}&topic=${topic}`
+    : `/dashboard/ans-reset?section=${sectionId}`;
+};
+
+const CARE_PROGRAM_PRANAYAMA_TARGETS = [
+  { slug: 'yogic-breathing', terms: ['yogic breathing'] },
+  { slug: 'bahya-kumbhaka-pranayama', terms: ['bahya kumbhak', 'bahaye kumbhak', 'bahya kumbhaka'] },
+  { slug: 'ujjayi-breath-pranayama', terms: ['ujjayi'] },
+  { slug: 'antara-kumbhaka-pranayama', terms: ['antara kumbhaka', 'antar kumbhak'] },
+  { slug: 'chandra-bhedi-pranayama', terms: ['chandra bhedi'] },
+  { slug: 'box-breathing', terms: ['box breathing'] },
+  { slug: '4-7-8-breathing', terms: ['4-7-8', '478 breathing'] },
+  { slug: 'cyclic-sigh-breathing', terms: ['cyclic sigh'] },
+  { slug: 'kapalbhati-pranayama', terms: ['kapalbhati'] },
+  { slug: 'anulom-vilom-pranayama', terms: ['anulom vilom', 'nadi shodhan', 'nadi shoddhan'] },
+  { slug: 'bhramari-pranayama', terms: ['bhramari', 'bhrahmari'] },
+  { slug: 'bhastrika-pranayama', terms: ['bhastrika'] },
+];
+
+const CARE_PROGRAM_YOGASANA_TARGETS = [
+  { slug: 'marjaryasana', terms: ['marjaryasana', 'bitilasana', 'cat cow'] },
+  { slug: 'padahastasana', terms: ['padahastasana'] },
+  { slug: 'ushtrasana', terms: ['ushtrasana', 'camel pose'] },
+  { slug: 'vakrasana', terms: ['vakrasana'] },
+  { slug: 'janushirshasana', terms: ['janushirshasana'] },
+  { slug: 'surya-namaskar', terms: ['surya namaskar'] },
+  { slug: 'saral-matsyasana', terms: ['saral matsyasana', 'saral matsyana', 'simple fish'] },
+  { slug: 'tadasana', terms: ['tadasana', 'mountain pose'] },
+  { slug: 'setubandhasana', terms: ['setu bandhasana', 'setubandhasana', 'bridge'] },
+  { slug: 'balasana', terms: ['balasana', 'childs pose', "child's pose"] },
+  { slug: 'viparita-karani', terms: ['viparita karani', 'legs up wall'] },
+  { slug: 'vrikshasana', terms: ['vrikshasana', 'tree pose'] },
+];
+
+const CARE_PROGRAM_CHANT_TARGETS = [
+  { slug: 'aim-beej-mantra', terms: ['aim beej'] },
+  { slug: 'ar-ra-pa-ca-na-dhi', terms: ['ar ra pa ca na dhi'] },
+  { slug: 'aum-beej-mantra', terms: ['aum beej', 'om beej'] },
+  { slug: 'aum-gang-ganpataye-namah', terms: ['aum gang ganpataye namah'] },
+  { slug: 'bhramari-breath', terms: ['bhramari breath'] },
+  { slug: 'gang-beej-mantra', terms: ['gang beej'] },
+  { slug: 'mahamrityunjaya-mantra', terms: ['mahamrityunjaya', 'maha mrityunjaya'] },
+  { slug: 'maheshwar-sutrani', terms: ['maheshwar sutrani'] },
+  { slug: 'saraswati-mantra', terms: ['saraswati'] },
+  { slug: 'shree-dhanvantari-mantra', terms: ['dhanvantari'] },
+  { slug: 'sohum-meditation', terms: ['sohum', 'so hum'] },
+  { slug: 'vam-beej-mantra', terms: ['vam beej'] },
+];
+
+const CARE_PROGRAM_MEDITATION_LINKS = [
+  { terms: ['yoga nidra'], link: CARE_PROGRAM_YOGA_NIDRA_URL },
+  { terms: ['gamma meditation'], link: '/dashboard/meditations?meditation=gamma' },
+  { terms: ['alpha meditation'], link: '/dashboard/frequencies?freq=alpha' },
+  { terms: ['anxiety meditation'], link: '/dashboard/meditations?freeMeditation=no-anxiety-feel-safe-meditation' },
+  { terms: ['stress relief meditation'], link: '/dashboard/meditations?freeMeditation=neuro-adopt-relax-reset-meditation' },
+  { terms: ['deep sleep meditation'], link: '/dashboard/meditations?freeMeditation=neuro-deep-sleep-meditation' },
+  { terms: ['deep rest'], link: '/dashboard/meditations?freeMeditation=neuro-deep-rest-and-meditation' },
+  { terms: ['focus meditation', 'memory meditation', 'neuro memory'], link: '/dashboard/meditations?freeMeditation=neuro-focus-meditation' },
+];
+
+const getCareProgramMeditationLink = (value) => {
+  const text = normalizeCareProgramText(value);
+  const match = CARE_PROGRAM_MEDITATION_LINKS.find((target) =>
+    target.terms.some((term) => text.includes(normalizeCareProgramText(term)))
+  );
+  if (match) return match.link;
+
+  const topic = slugifyCareProgramTarget(String(value || '').split('\n')[0]);
+  return topic ? `/dashboard/meditations?topic=${topic}` : '/dashboard/meditations';
+};
+
+const getCareProgramBinauralLink = (value) => {
+  const val = normalizeCareProgramText(value);
+  if (val.includes('gamma')) return '/dashboard/meditations?meditation=gamma';
+  if (val.includes('alpha')) return '/dashboard/frequencies?freq=alpha';
+  if (val.includes('beta')) return '/dashboard/frequencies?freq=beta';
+  if (val.includes('theta')) return '/dashboard/frequencies?freq=theta';
+  if (val.includes('delta')) return '/dashboard/frequencies?freq=delta';
+  const hzMatch = val.match(/(\d{3})\s*hz/);
+  if (hzMatch) {
+    const hz = hzMatch[1];
+    if (['285', '396', '417', '528', '639', '741'].includes(hz)) return `/dashboard/frequencies?freq=solfeggio_${hz}`;
+    if (['852', '963'].includes(hz)) return `/dashboard/meditations?meditation=solfeggio_${hz}`;
+    return `/dashboard/frequencies?topic=solfeggio-${hz}`;
+  }
+  return '/dashboard/frequencies';
+};
+
+const CARE_PROGRAM_SUPPLEMENT_TARGETS = [
+  { slug: 'happy-brain', terms: ['happy brain'] },
+  { slug: 'aswa-ext', terms: ['aswa extract', 'aswa ext', 'ashwagandha'] },
+  { slug: 'vin-o-neuro', terms: ['vin-o-neuro', 'vin o neuro'] },
+  { slug: 'tryptoplus', terms: ['tryptoplus', '5 htp', '5-htp'] },
+  { slug: 'magneshine-b', terms: ['magneshine'] },
+];
+
+const getCareProgramSupplementLink = (value) => {
+  const productIds = collectCareProgramTargetSlugs(value, CARE_PROGRAM_SUPPLEMENT_TARGETS);
+  if (productIds.length > 0) return `/dashboard/nootropics?products=${productIds.join(',')}`;
+
+  const topic = slugifyCareProgramTarget(String(value || '').split('\n')[0]);
+  return topic ? `/dashboard/nootropics?topic=${topic}` : '/dashboard/nootropics';
+};
+
+const getCareProgramModalityLink = (key, value) => {
+  if (!value) return null;
+  switch (key) {
+    case 'pranayama':
+      return buildAnsResetLink(value, CARE_PROGRAM_PRANAYAMA_TARGETS, 'breathing-scroll');
+    case 'yogasana':
+      return buildAnsResetLink(value, CARE_PROGRAM_YOGASANA_TARGETS, 'exercise-scroll');
+    case 'chant':
+      return buildAnsResetLink(value, CARE_PROGRAM_CHANT_TARGETS, 'chants-scroll');
+    case 'meditation':
+      return getCareProgramMeditationLink(value);
+    case 'binaural':
+      return getCareProgramBinauralLink(value);
+    case 'supplement':
+      return getCareProgramSupplementLink(value);
+    default:
+      return null;
+  }
+};
+
 const PatientDashboard = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -794,28 +957,43 @@ const PatientDashboard = () => {
     }
   };
 
+  const normalizeName = (value) => String(value || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ');
+  const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+  const dedupeRecords = (items = []) => {
+    const seen = new Set();
+    return (items || []).filter((item) => {
+      const key = item?.id || item?.filePath || item?.file_path || item?.fileUrl || item?.file_url || item?.path || '';
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   // Fetch all reports for the patient (including response reports from super admin)
-  const fetchPatientReports = async (patientId, patientName, clinicId) => {
+  const fetchPatientReports = async (patientId, patientName, clinicId, patientEmail) => {
     try {
 
       let reports = await DatabaseService.getReportsByPatient(patientId);
 
-      // Fallback: if nothing matched by patient_id (e.g. the report was stored under
-      // a different/duplicate patient row for the same person), match by patient name
-      // scoped to the clinic so same-name patients at other clinics don't leak.
-      if ((!reports || reports.length === 0) && patientName) {
+      // Fallback: if nothing matched by patient_id, match by a stronger clinic +
+      // email/name signature so same-name patients at other clinics don't leak.
+      if ((!reports || reports.length === 0) && (patientName || patientEmail)) {
         const all = await DatabaseService.get('reports');
-        const nameLc = patientName.toLowerCase().trim();
-        reports = all.filter(r => {
+        const nameKey = normalizeName(patientName);
+        const emailKey = normalizeEmail(patientEmail);
+        reports = (all || []).filter((r) => {
           const rd = r.reportData || r.report_data || {};
-          const rn = (rd.patientName || rd.patient_name || '').toLowerCase().trim();
-          const rcid = r.clinicId || r.clinic_id;
+          const rn = normalizeName(rd.patientName || rd.patient_name || rd.patient || '');
+          const remail = normalizeEmail(rd.patientEmail || rd.patient_email || '');
+          const rcid = r.clinicId || r.clinic_id || rd.clinicId || rd.clinic_id || r.orgId || r.org_id;
           const clinicOk = !clinicId || !rcid || rcid === clinicId;
-          return rn && rn === nameLc && clinicOk;
+          const nameOk = !!nameKey && !!rn && rn === nameKey;
+          const emailOk = !!emailKey && !!remail && remail === emailKey;
+          return (nameOk || emailOk) && clinicOk;
         });
       }
 
-      setPatientReports(reports || []);
+      setPatientReports(dedupeRecords(reports || []));
     } catch (error) {
       console.error('ERROR: Failed to fetch patient reports:', error);
       setPatientReports([]);
@@ -823,7 +1001,7 @@ const PatientDashboard = () => {
   };
 
   // Fetch algorithm results for the patient (7 brain parameters from Algorithm Processor)
-  const fetchAlgorithmResults = async (patientDbId, patientEmail, patientName) => {
+  const fetchAlgorithmResults = async (patientDbId, patientEmail, patientName, clinicId) => {
     try {
 
       // Fast path: query algorithm_results by patient_id server-side (indexed, ~1 row set)
@@ -831,18 +1009,22 @@ const PatientDashboard = () => {
       // email/name match only for legacy rows that lack patient_id.
       const notClaude = (r) => (r.report_mode || r.reportMode || 'neurosense') !== 'claude';
       const matchesPatient = (r) => {
-        // Match by patient ID - check all possible field name variations
+        // Match by patient ID - check all possible field name variations.
         const rid = r.patient_id || r.patientId || r.patientid;
         const matchById = rid && rid === patientDbId;
-        // Match by email - check all possible field name variations
+
+        // Match by email/name only when we have a strong clinic signal or no clinic
+        // mismatch is present, which avoids cross-clinic leakage for same-name patients.
+        const rowClinicId = r.clinicId || r.clinic_id || r.inputData?.clinicId || r.inputData?.clinic_id;
+        const clinicOk = !clinicId || !rowClinicId || rowClinicId === clinicId;
+        const normalizedPatientEmail = normalizeEmail(patientEmail);
         const remail = r.patient_email || r.patientEmail || r.patientemail;
-        const matchByEmail = patientEmail && remail &&
-          remail.toLowerCase().trim() === patientEmail.toLowerCase().trim();
-        // Match by patient name (fallback) - check inputData.patientName too
+        const matchByEmail = normalizedPatientEmail && remail && normalizeEmail(remail) === normalizedPatientEmail;
+        const normalizedPatientName = normalizeName(patientName);
         const rname = r.patient_name || r.patientName || r.patientname || r.inputData?.patientName;
-        const matchByName = patientName && rname &&
-          rname.toLowerCase().trim() === patientName.toLowerCase().trim();
-        return matchById || matchByEmail || matchByName;
+        const matchByName = normalizedPatientName && rname && normalizeName(rname) === normalizedPatientName;
+
+        return matchById || ((matchByEmail || matchByName) && clinicOk);
       };
 
       // allMatched includes Claude/Performance-mode rows; patientResults excludes them (report list
@@ -1010,8 +1192,8 @@ const PatientDashboard = () => {
 
           const [, , , clinicData] = await Promise.all([
             fetchClinicalReport(user.id),
-            fetchPatientReports(patientRecord.id, patientFullName, clinicId),
-            fetchAlgorithmResults(patientRecord.id, patientRecord.email || user.email, patientFullName),
+            fetchPatientReports(patientRecord.id, patientFullName, clinicId, patientRecord.email || user.email),
+            fetchAlgorithmResults(patientRecord.id, patientRecord.email || user.email, patientFullName, clinicId),
             clinicId ? DatabaseService.findById('clinics', clinicId).catch(() => null) : Promise.resolve(null),
           ]);
 
@@ -1085,11 +1267,11 @@ const PatientDashboard = () => {
                 setPatientDbId(patientByEmail.id);
                 const patientByEmailName = patientByEmail.fullName || patientByEmail.full_name || patientByEmail.name || user.name;
                 const clinicId = patientByEmail.clinicId || patientByEmail.clinic_id || patientByEmail.orgId || patientByEmail.org_id || patientByEmail.ownerId || patientByEmail.owner_id;
-                await fetchPatientReports(patientByEmail.id, patientByEmailName, clinicId);
+                await fetchPatientReports(patientByEmail.id, patientByEmailName, clinicId, patientByEmail.email || user.email);
 
                 // Fetch algorithm results for this patient (7 brain parameters)
                 // Use patient's database ID and email for matching
-                await fetchAlgorithmResults(patientByEmail.id, patientByEmail.email || user.email, patientByEmailName);
+                await fetchAlgorithmResults(patientByEmail.id, patientByEmail.email || user.email, patientByEmailName, clinicId);
 
                 // Retry with the found patient
                 setPatientClinicId(clinicId || null);
@@ -1224,7 +1406,7 @@ const PatientDashboard = () => {
   // Fetch immediately on tab open while on the Neurosense Reports tab.
   useEffect(() => {
     if (activeTab !== 'neurosense-reports' || !patientDbId) return;
-    fetchPatientReports(patientDbId, patientData?.profile?.name, patientClinicId);
+    fetchPatientReports(patientDbId, patientData?.profile?.name, patientClinicId, user?.email);
   }, [activeTab, patientDbId]);
 
   // Live updates: refetch this patient's reports the instant one changes
@@ -1233,7 +1415,7 @@ const PatientDashboard = () => {
     (activeTab === 'neurosense-reports' && patientDbId)
       ? [{ table: 'reports', filter: `patient_id=eq.${patientDbId}` }]
       : [],
-    () => fetchPatientReports(patientDbId, patientData?.profile?.name, patientClinicId),
+    () => fetchPatientReports(patientDbId, patientData?.profile?.name, patientClinicId, user?.email),
     [activeTab, patientDbId]
   );
 
@@ -6279,6 +6461,7 @@ const PatientDashboard = () => {
     if (!data) return <ProfileSection />;
 
     const Icon = data.icon;
+    const [showVisualGuide, setShowVisualGuide] = useState(false);
 
     // Get patient's actual scores from multiple sources (priority order)
     const getPatientScoreData = (paramKey) => {
@@ -7079,14 +7262,27 @@ const PatientDashboard = () => {
             {data.videoUrl && !data.videoUrl.includes('placeholder') ? (
               <div className="max-w-2xl mx-auto">
                 <div className="aspect-video rounded-xl overflow-hidden shadow-md">
-                  <iframe
-                    src={data.videoUrl}
-                    title={`${data.title} Visual Guide`}
-                    className="w-full h-full"
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
+                  {showVisualGuide ? (
+                    <iframe
+                      src={data.videoUrl}
+                      title={`${data.title} Visual Guide`}
+                      className="w-full h-full"
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowVisualGuide(true)}
+                      className="w-full h-full bg-gradient-to-br from-[#323956] to-[#4a5578] flex flex-col items-center justify-center text-white hover:from-[#283047] hover:to-[#3d4666] transition-colors"
+                    >
+                      <span className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center mb-3">
+                        <Play className="h-7 w-7 ml-1" />
+                      </span>
+                      <span className="text-sm sm:text-base font-semibold">Play visual guide</span>
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -7286,6 +7482,7 @@ const PatientDashboard = () => {
     const [purchasedMedPackId, setPurchasedMedPackId] = useState(null);
     const [selectedVideo, setSelectedVideo] = useState(null);
     const [featuredPlaying, setFeaturedPlaying] = useState(false);
+    const [highlightedFreeMeditation, setHighlightedFreeMeditation] = useState(null);
 
     // Audio player state for meditation tracks
     const [isAudioPlaying, setIsAudioPlaying] = useState(false);
@@ -7803,17 +8000,23 @@ const PatientDashboard = () => {
       fetchPurchasedPacks();
     }, [user?.email, fetchPurchasedPacks]);
 
-    // Deep-link: scroll to specific meditation pack from care program card click
+    // Deep-link: scroll to specific meditation pack/video from care program card click
     useEffect(() => {
       const params = new URLSearchParams(window.location.search);
       const medId = params.get('meditation');
-      if (!medId) return;
+      const freeMeditationId = params.get('freeMeditation');
+      if (!medId && !freeMeditationId) return;
       setTimeout(() => {
-        const el = document.getElementById(`med-pack-${medId}`);
+        const targetId = freeMeditationId ? `free-meditation-${freeMeditationId}` : `med-pack-${medId}`;
+        const el = document.getElementById(targetId);
         if (el) {
+          if (freeMeditationId) setHighlightedFreeMeditation(freeMeditationId);
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           el.classList.add('ring-2', 'ring-blue-400', 'ring-offset-2');
-          setTimeout(() => el.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-2'), 3000);
+          setTimeout(() => {
+            el.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-2');
+            if (freeMeditationId) setHighlightedFreeMeditation(null);
+          }, 3000);
         }
       }, 500);
     }, []);
@@ -7988,8 +8191,18 @@ const PatientDashboard = () => {
 
               {/* 11 Meditation Video Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-                {rest.map((v) => (
-                  <div key={v.num} className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow flex flex-col">
+                {rest.map((v) => {
+                  const videoSlug = slugifyCareProgramTarget(v.title);
+                  return (
+                  <div
+                    key={v.num}
+                    id={`free-meditation-${videoSlug}`}
+                    className={`bg-white dark:bg-gray-800 rounded-xl overflow-hidden border hover:shadow-md transition-shadow flex flex-col ${
+                      highlightedFreeMeditation === videoSlug
+                        ? 'border-blue-500 ring-2 ring-blue-400 ring-offset-2'
+                        : 'border-gray-100 dark:border-gray-700'
+                    }`}
+                  >
                     <div className="relative aspect-video overflow-hidden bg-gray-100 dark:bg-gray-700">
                       <img
                         src={v.thumb}
@@ -8018,7 +8231,8 @@ const PatientDashboard = () => {
                       </a>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );
@@ -8111,8 +8325,8 @@ const PatientDashboard = () => {
         </div>
         */}
 
-        {/* Other Meditation Packs Grid */}
-        {meditationPacks.length > 3 && (
+        {/* Meditation Packs Grid */}
+        {meditationPacks.length > 0 && (
         <div>
           <div className="flex items-center space-x-2 mb-3">
             <div className="bg-[#323956] rounded-lg p-1.5">
@@ -8121,8 +8335,8 @@ const PatientDashboard = () => {
             <h2 className="text-base sm:text-lg font-bold text-gray-800 dark:text-white">Guided Meditations</h2>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-5 auto-rows-fr">
-            {meditationPacks.slice(3).map((pack, index) => {
-              const actualIndex = index + 3;
+            {meditationPacks.map((pack, index) => {
+              const actualIndex = index;
               const isFirstCard = actualIndex === 0;
             const isPurchased = purchasedPacks.includes(pack.id);
             const isUnlocked = isFirstCard || isPurchased || pack.isFree;
@@ -8130,6 +8344,7 @@ const PatientDashboard = () => {
             return (
               <div
                 key={pack.id}
+                id={`med-pack-${pack.id}`}
                 className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-all flex flex-col h-full"
               >
                 {/* Card Image */}
@@ -8502,6 +8717,7 @@ const PatientDashboard = () => {
 
   // MOVERS Section - Simple layout with video and care plan info
   const MoversSection = () => {
+    const [showMoversVideo, setShowMoversVideo] = useState(false);
     // State for dynamic 12-week progress tracking (6 Foundation + 6 Mastery)
     const [moversProgress, setMoversProgress] = useState({
       journeyStartDate: null,
@@ -8529,7 +8745,7 @@ const PatientDashboard = () => {
       try {
         const { data } = await supabase
           .from('movers_activities')
-          .select('activity_date, activity_id, category')
+          .select('activity_date')
           .eq('patient_email', user.email.toLowerCase())
           .order('activity_date', { ascending: true });
 
@@ -8626,16 +8842,29 @@ const PatientDashboard = () => {
           </div>
           <div className="p-3 sm:p-6">
             <div className="relative rounded-xl overflow-hidden" style={{ minHeight: '300px' }}>
-              <iframe
-                width="100%"
-                height="350"
-                src="https://www.youtube.com/embed/Uo5bx0ZPoTU"
-                title="Movers Video"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="rounded-xl"
-              ></iframe>
+              {showMoversVideo ? (
+                <iframe
+                  width="100%"
+                  height="350"
+                  src="https://www.youtube.com/embed/Uo5bx0ZPoTU"
+                  title="Movers Video"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="rounded-xl"
+                ></iframe>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowMoversVideo(true)}
+                  className="w-full h-[350px] rounded-xl bg-gradient-to-br from-[#323956] to-[#4a5578] flex flex-col items-center justify-center text-white hover:from-[#283047] hover:to-[#3d4666] transition-colors"
+                >
+                  <span className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center mb-3">
+                    <Play className="h-7 w-7 ml-1" />
+                  </span>
+                  <span className="text-sm sm:text-base font-semibold">Play MOVERS video</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -8904,7 +9133,7 @@ const PatientDashboard = () => {
             .from('care_program_progress')
             .select('*')
             .eq('patient_email', user.email.toLowerCase())
-            .single();
+            .maybeSingle();
 
           if (data) {
             setCheckedItems(data.checked_items || {});
@@ -9125,64 +9354,10 @@ const PatientDashboard = () => {
             supplement: '💊'
           };
 
-          const slugify = (text) => text.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-          const extractExerciseName = (text) => {
-            return text
-              .split('\n')[0]
-              .split(/\s*[|,]\s*/)[0]
-              .replace(/\s*\(.*?\)\s*/g, '')
-              .replace(/-[A-Z][a-z].*$/, '')
-              .trim();
-          };
-
           // NOTE: keep in sync with parseCareProgramRef in utils/careProgramEntitlements.js,
           // which mirrors this mapping to grant free access to the same packs at report time.
-          const getBinauralLink = (value) => {
-            const val = value.toLowerCase();
-            if (val.includes('gamma')) return '/dashboard/meditations?meditation=gamma';
-            if (val.includes('alpha')) return '/dashboard/frequencies?freq=alpha';
-            if (val.includes('beta'))  return '/dashboard/frequencies?freq=beta';
-            if (val.includes('theta')) return '/dashboard/frequencies?freq=theta';
-            if (val.includes('delta')) return '/dashboard/frequencies?freq=delta';
-            const hzMatch = val.match(/(\d{3})\s*hz/);
-            if (hzMatch) {
-              const hz = hzMatch[1];
-              if (['285','396','417','528','639','741'].includes(hz)) return `/dashboard/frequencies?freq=solfeggio_${hz}`;
-              if (['852','963'].includes(hz)) return `/dashboard/meditations?meditation=solfeggio_${hz}`;
-            }
-            return '/dashboard/frequencies';
-          };
-
-          const YOGA_NIDRA_URL = 'https://sweta8238.graphy.com/products/Yoga-Nidra---The-Ultimate-Whole-Brain-Synchronization-6788054d6cd6065534a49399';
           const getModalityLink = (key, value) => {
-            if (!value) return null;
-            switch(key) {
-              case 'pranayama': {
-                const slug = slugify(extractExerciseName(value));
-                return slug ? `/dashboard/ans-reset?video=${slug}` : '/dashboard/ans-reset';
-              }
-              case 'yogasana': {
-                const slug = slugify(extractExerciseName(value));
-                return slug ? `/dashboard/ans-reset?video=${slug}` : '/dashboard/ans-reset';
-              }
-              case 'meditation': {
-                // Yoga Nidra opens its dedicated free video directly; other meditations open the meditations page.
-                if (value.toLowerCase().includes('yoga nidra')) return YOGA_NIDRA_URL;
-                return '/dashboard/meditations';
-              }
-              case 'binaural': {
-                return getBinauralLink(value);
-              }
-              case 'chant': {
-                const slug = slugify(extractExerciseName(value));
-                return slug ? `/dashboard/ans-reset?video=${slug}` : '/dashboard/ans-reset';
-              }
-              case 'supplement': {
-                return '/dashboard/nootropics';
-              }
-              default:
-                return null;
-            }
+            return getCareProgramModalityLink(key, value);
           };
 
           if (paramData && Object.keys(paramData).length > 0) {
@@ -9215,7 +9390,7 @@ const PatientDashboard = () => {
               icon: '🌙',
               label: 'Yoga Nidra',
               value: 'Yoga Nidra\n30–40 min · PM',
-              link: YOGA_NIDRA_URL
+              link: CARE_PROGRAM_YOGA_NIDRA_URL
             });
           }
           return (
@@ -9993,7 +10168,10 @@ const PatientDashboard = () => {
                   <a href="https://www.facebook.com/sweta.adatia" target="_blank" rel="noopener noreferrer" className="w-5 h-5 sm:w-6 sm:h-6 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors">
                     <Facebook className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-white" />
                   </a>
-                  <a href="https://www.youtube.com/@drsweta.adatia" target="_blank" rel="noopener noreferrer" className="w-5 h-5 sm:w-6 sm:h-6 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors">
+                  <a href="https://www.youtube.com/@drsweta.adatia" target="_blank" rel="noopener noreferrer" className="w-5 h-5 sm:w-6 sm:h-6 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors" title="YouTube English">
+                    <svg className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                  </a>
+                  <a href="https://www.youtube.com/@drsweta.adatiahindi" target="_blank" rel="noopener noreferrer" className="w-5 h-5 sm:w-6 sm:h-6 bg-red-400/30 rounded-full flex items-center justify-center hover:bg-red-400/50 transition-colors" title="YouTube Hindi">
                     <svg className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
                   </a>
                   <a href="https://www.linkedin.com/in/drswetaadatia/" target="_blank" rel="noopener noreferrer" className="w-5 h-5 sm:w-6 sm:h-6 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors">

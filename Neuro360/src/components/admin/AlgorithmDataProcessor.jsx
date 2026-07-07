@@ -1405,9 +1405,12 @@ const AlgorithmDataProcessor = () => {
       formData.append('pdf', new File([blob], 'neurosense-report.pdf', { type: 'application/pdf' }));
       // Send continuous per-parameter % from the real algorithm metrics so the
       // performance report shows distinct values instead of the pinned 67% buckets.
+      // Also forward the raw algorithm results so the backend can keep the
+      // underlying scores aligned with the report values.
       try {
         const dp = computeParameterPercents(results);
         if (dp && Object.keys(dp).length) formData.append('displayPercents', JSON.stringify(dp));
+        if (results && results.length) formData.append('algorithmResults', JSON.stringify(results));
       } catch (dpErr) {
         console.warn('Could not compute display percents:', dpErr?.message);
       }
@@ -1733,7 +1736,7 @@ const AlgorithmDataProcessor = () => {
           emailHeaders['Authorization'] = `Bearer ${token}`;
         }
 
-        await fetch(`${baseUrl}/api/send-report-email`, {
+        const emailResponse = await fetch(`${baseUrl}/api/send-report-email`, {
           method: 'POST',
           headers: emailHeaders,
           body: JSON.stringify({
@@ -1746,18 +1749,24 @@ const AlgorithmDataProcessor = () => {
             reportType: 'neurosense',
             generatedAt: new Date().toISOString()
           })
-        }).catch(emailError => {
-          console.error('Failed to send report emails:', emailError);
         });
+
+        if (!emailResponse.ok) {
+          const emailErrorData = await emailResponse.json().catch(() => null);
+          const emailErrorMessage = emailErrorData?.message || `Server error (${emailResponse.status})`;
+          console.error('Failed to send report emails:', emailErrorMessage);
+          toast.error(`Report saved, but email delivery failed: ${emailErrorMessage}`);
+        } else {
+          toast.success(
+            `Report sent successfully!\n\n✓ Emails sent to clinic and patient\n✓ Accessible in clinic Reports section`,
+            { duration: 5000 }
+          );
+          setReportSent(true);
+        }
       } catch (emailError) {
         console.error('Error preparing report emails:', emailError);
+        toast.error('Report saved, but email delivery failed. Please check the server logs.');
       }
-
-      toast.success(
-        `Report sent successfully!\n\n✓ Emails sent to clinic and patient\n✓ Accessible in clinic Reports section`,
-        { duration: 5000 }
-      );
-      setReportSent(true);
 
     } catch (error) {
       console.error('❌ Error sending report:', error);
@@ -1885,7 +1894,7 @@ const AlgorithmDataProcessor = () => {
           emailHeaders['Authorization'] = `Bearer ${token}`;
         }
 
-        await fetch(`${baseUrl}/api/send-report-email`, {
+        const emailResponse = await fetch(`${baseUrl}/api/send-report-email`, {
           method: 'POST',
           headers: emailHeaders,
           body: JSON.stringify({
@@ -1898,15 +1907,21 @@ const AlgorithmDataProcessor = () => {
             reportType: 'claude',
             generatedAt: new Date().toISOString()
           })
-        }).catch(emailError => {
-          console.error('Failed to send Claude report emails:', emailError);
         });
+
+        if (!emailResponse.ok) {
+          const emailErrorData = await emailResponse.json().catch(() => null);
+          const emailErrorMessage = emailErrorData?.message || `Server error (${emailResponse.status})`;
+          console.error('Failed to send Claude report emails:', emailErrorMessage);
+          toast.error(`Report saved, but email delivery failed: ${emailErrorMessage}`);
+        } else {
+          toast.success('Neurosense Performance Report sent to patient & clinic + email.', { duration: 5000 });
+          setClaudeReportSent(true);
+        }
       } catch (emailError) {
         console.error('Error preparing Claude report emails:', emailError);
+        toast.error('Report saved, but email delivery failed. Please check the server logs.');
       }
-
-      toast.success('Neurosense Performance Report sent to patient & clinic + email.', { duration: 5000 });
-      setClaudeReportSent(true);
 
     } catch (error) {
       console.error('❌ Error sending Claude report:', error);

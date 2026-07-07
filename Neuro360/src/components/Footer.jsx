@@ -127,7 +127,10 @@ const Footer = () => {
                 <a href="https://www.facebook.com/sweta.adatia" target="_blank" rel="noopener noreferrer" className="w-9 h-9 sm:w-8 sm:h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors">
                   <Facebook className="h-4 w-4" />
                 </a>
-                <a href="https://www.youtube.com/@drsweta.adatia" target="_blank" rel="noopener noreferrer" className="w-9 h-9 sm:w-8 sm:h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors">
+                <a href="https://www.youtube.com/@drsweta.adatia" target="_blank" rel="noopener noreferrer" className="w-9 h-9 sm:w-8 sm:h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors" title="YouTube English">
+                  <Youtube className="h-4 w-4" />
+                </a>
+                <a href="https://www.youtube.com/@drsweta.adatiahindi" target="_blank" rel="noopener noreferrer" className="w-9 h-9 sm:w-8 sm:h-8 bg-red-800 hover:bg-red-700 rounded-full flex items-center justify-center transition-colors" title="YouTube Hindi">
                   <Youtube className="h-4 w-4" />
                 </a>
                 <a href="https://www.instagram.com/drsweta.adatia/?hl=en" target="_blank" rel="noopener noreferrer" className="w-9 h-9 sm:w-8 sm:h-8 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center transition-colors">

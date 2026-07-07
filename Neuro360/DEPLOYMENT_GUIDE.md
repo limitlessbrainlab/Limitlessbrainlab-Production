@@ -217,21 +217,21 @@ fbq('track', 'PageView');
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://neuro360.com/">
-  <meta property="og:title" content="Neuro360 - Neurofeedback Brain Training">
-  <meta property="og:description" content="Transform your mental wellness with personalized neurofeedback training. Trusted by 25,000+ members worldwide.">
-  <meta property="og:image" content="https://neuro360.com/og-image.jpg">
+  <meta property="og:title" content="Dr. Sweta Adatia - Limitless Brain Lab">
+  <meta property="og:description" content="Brain health & peak performance coaching by Dr. Sweta Adatia. qEEG brain mapping, AI-powered reports, neurofeedback training.">
+  <meta property="og:image" content="https://www.drswetaadatia.com/og-image.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://neuro360.com/">
-  <meta property="twitter:title" content="Neuro360 - Neurofeedback Brain Training">
-  <meta property="twitter:description" content="Transform your mental wellness with personalized neurofeedback training. Trusted by 25,000+ members worldwide.">
-  <meta property="twitter:image" content="https://neuro360.com/twitter-image.jpg">
+  <meta property="twitter:url" content="https://www.drswetaadatia.com/">
+  <meta property="twitter:title" content="Dr. Sweta Adatia - Limitless Brain Lab">
+  <meta property="twitter:description" content="Brain health & peak performance coaching by Dr. Sweta Adatia. qEEG brain mapping, AI-powered reports, neurofeedback training.">
+  <meta property="twitter:image" content="https://www.drswetaadatia.com/twitter-image.jpg">
 
   <!-- Canonical URL -->
-  <link rel="canonical" href="https://neuro360.com/" />
+  <link rel="canonical" href="https://www.drswetaadatia.com/" />
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32">
@@ -274,10 +274,11 @@ Add to `index.html` before `</body>`:
     "availableLanguage": ["English", "Hindi"]
   },
   "sameAs": [
-    "https://facebook.com/neuro360",
-    "https://twitter.com/neuro360",
-    "https://linkedin.com/company/neuro360",
-    "https://instagram.com/neuro360"
+    "https://www.facebook.com/sweta.adatia",
+    "https://www.youtube.com/@drsweta.adatia",
+    "https://www.youtube.com/@drsweta.adatiahindi",
+    "https://www.linkedin.com/in/drswetaadatia/",
+    "https://www.instagram.com/drsweta.adatia/?hl=en"
   ]
 }
 </script>

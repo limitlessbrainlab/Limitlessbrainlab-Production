@@ -47,6 +47,51 @@ import {
   Shield
 } from 'lucide-react';
 
+const formatDateOnly = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+};
+
+const titleCaseStatus = (status, fallback = 'Paid') => {
+  if (!status) return fallback;
+  const normalized = String(status).toLowerCase();
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+};
+
+const normalizePurchaseStatus = (status) => {
+  const normalized = String(status || '').toLowerCase();
+  if (['paid', 'completed', 'complete', 'succeeded', 'success', 'active'].includes(normalized)) return 'Paid';
+  if (['failed', 'refunded', 'pending'].includes(normalized)) return titleCaseStatus(normalized);
+  return titleCaseStatus(status);
+};
+
+const normalizeSubscriptionStatus = (status) => {
+  const normalized = String(status || '').toLowerCase();
+  if (['active', 'completed', 'complete', 'paid', 'succeeded', 'success'].includes(normalized)) return 'Active';
+  if (['paused', 'cancelled', 'canceled', 'pending'].includes(normalized)) return titleCaseStatus(normalized);
+  return titleCaseStatus(status, 'Active');
+};
+
+const categoryFromType = (type) => ({
+  coaching: 'Session',
+  coach: 'Session',
+  subscription: 'Subscription',
+  frequency: 'Frequencies',
+  meditation: 'Meditation',
+  assessment: 'Assessment',
+  credit: 'Credits',
+  refund: 'Refund'
+}[String(type || '').toLowerCase()] || 'Session');
+
+const parseExpiry = (expiry) => {
+  const [month, year] = String(expiry || '').split('/');
+  return {
+    exp_month: Number(month) || null,
+    exp_year: Number(year?.length === 2 ? `20${year}` : year) || null
+  };
+};
+
 const Wallet = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -100,12 +145,27 @@ const Wallet = () => {
   // Map a card row from the DB into the shape the UI expects
   const mapCardRow = (m) => ({
     id: m.id,
-    type: m.card_type,
-    last4: m.last_four,
-    exp: m.expiry,
-    name: m.cardholder_name,
+    type: m.card_type || m.brand || m.type,
+    last4: m.last_four || m.last4,
+    exp: m.expiry || (m.exp_month && m.exp_year ? `${String(m.exp_month).padStart(2, '0')}/${String(m.exp_year).slice(-2)}` : '-'),
+    name: m.cardholder_name || 'Saved card',
     isDefault: m.is_default
   });
+
+  const mapWalletTransaction = (t) => {
+    const invoiceSource = t.invoice_id || t.reference_id || t.stripe_payment_intent || t.id;
+    const type = t.type || t.category;
+    return {
+      id: t.id,
+      date: t.transaction_date || t.created_at,
+      item: t.item_name || t.description || (type ? `${titleCaseStatus(type, 'Wallet')} transaction` : 'Wallet transaction'),
+      category: t.category || categoryFromType(type),
+      partner: t.partner || 'Limitless Brain Lab',
+      status: normalizePurchaseStatus(t.status),
+      amount: Math.abs(Number(t.amount) || 0),
+      invoiceId: invoiceSource ? String(invoiceSource).slice(-8).toUpperCase() : null
+    };
+  };
 
   // Fetch wallet data
   const fetchWalletData = useCallback(async (email) => {
@@ -134,13 +194,9 @@ const Wallet = () => {
         .from('wallet_transactions')
         .select('*')
         .eq('patient_email', email)
-        .order('transaction_date', { ascending: false });
+        .order('created_at', { ascending: false });
       if (trans && trans.length > 0) {
-        allPurchases.push(...trans.map(t => ({
-          id: t.id, date: t.transaction_date, item: t.item_name,
-          category: t.category, partner: t.partner, status: t.status,
-          amount: t.amount, invoiceId: t.invoice_id
-        })));
+        allPurchases.push(...trans.map(mapWalletTransaction));
       }
 
       // 2. assessment_purchases
@@ -256,12 +312,12 @@ const Wallet = () => {
       if (subs && subs.length > 0) {
         subscriptionsForUi = subs.map(s => ({
           id: s.id,
-          name: s.name,
-          plan: s.plan,
-          renewal: s.renewal_date || '-',
-          status: s.status,
-          amount: s.amount,
-          period: s.period,
+          name: s.name || s.plan_name || 'Subscription',
+          plan: s.plan || s.plan_name || 'Plan',
+          renewal: formatDateOnly(s.renewal_date || s.current_period_end) || '-',
+          status: normalizeSubscriptionStatus(s.status),
+          amount: Number(s.amount) || 0,
+          period: s.period || 'mo',
           icon: iconMap[s.icon] || Star
         }));
       } else {
@@ -279,7 +335,7 @@ const Wallet = () => {
           name: `${tier} Plan`,
           plan: 'Subscription',
           renewal: '-',
-          status: (p.status === 'completed' || p.status === 'active') ? 'Active' : (p.status || 'Active'),
+          status: normalizeSubscriptionStatus(p.status),
           amount: Number(p.amount) || 0,
           period: 'mo',
           icon: Star
@@ -293,30 +349,34 @@ const Wallet = () => {
         .select('*')
         .eq('patient_email', email);
 
-      setSessionPacks((packs || []).map(p => ({
-        id: p.id,
-        name: p.name,
-        remaining: p.remaining,
-        total: p.total,
-        expiry: p.expiry_date || '-',
-        type: p.credit_type
-      })));
+      setSessionPacks((packs || []).map(p => {
+        const remaining = p.used_at ? 0 : Number(p.remaining ?? p.amount ?? 0);
+        const total = Number(p.total ?? p.amount ?? remaining);
+        return {
+          id: p.id,
+          name: p.name || p.description || 'Wallet Credits',
+          remaining,
+          total,
+          expiry: formatDateOnly(p.expiry_date || p.expires_at) || '-',
+          type: p.credit_type || 'rupees'
+        };
+      }));
 
       // Fetch invoices
       const { data: invs } = await supabase
         .from('wallet_invoices')
         .select('*')
         .eq('patient_email', email)
-        .order('invoice_date', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (invs && invs.length > 0) {
         setInvoices(invs.map(i => ({
-          id: i.invoice_number,
-          date: i.invoice_date,
-          description: i.description,
-          amount: i.amount,
-          status: i.status,
-          dueDate: i.due_date
+          id: i.invoice_number || i.stripe_invoice_id || `INV-${String(i.id).slice(-6).toUpperCase()}`,
+          date: formatDateOnly(i.invoice_date || i.created_at || i.paid_at || i.due_date),
+          description: i.description || 'Wallet invoice',
+          amount: Number(i.amount) || 0,
+          status: normalizePurchaseStatus(i.status),
+          dueDate: formatDateOnly(i.due_date)
         })));
       } else {
         // Derive invoices from the patient's real purchases
@@ -350,7 +410,9 @@ const Wallet = () => {
         .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
       const activeSubs = subscriptionsForUi.filter(s => s.status === 'Active').length;
-      const creditsRow = (packs || []).find(p => p.credit_type === 'rupees');
+      const creditsBalance = (packs || []).reduce((sum, p) => (
+        sum + (p.used_at ? 0 : Number(p.remaining ?? p.amount ?? 0))
+      ), 0);
 
       // Month-over-month spend change (%) — only when there is a prior baseline
       setSpendChange(lastMonthSpent > 0
@@ -361,7 +423,7 @@ const Wallet = () => {
         totalSpent,
         thisMonth: thisMonthSpent,
         lastMonth: lastMonthSpent,
-        credits: Number(creditsRow?.remaining) || 0,
+        credits: creditsBalance,
         pendingRefunds: 0,
         activeSubscriptions: activeSubs
       });
@@ -425,6 +487,7 @@ const Wallet = () => {
     const last4 = newCard.number.replace(/\s/g, '').slice(-4);
     const cardType = newCard.number.startsWith('4') ? 'visa' :
                      newCard.number.startsWith('5') ? 'mastercard' : 'rupay';
+    const expiryParts = parseExpiry(newCard.expiry);
 
     if (!patientEmail) {
       toast.error('Please log in to add a payment method');
@@ -435,8 +498,12 @@ const Wallet = () => {
       patient_email: patientEmail,
       method_type: 'card',
       card_type: cardType,
+      type: cardType,
+      brand: cardType,
       last_four: last4,
+      last4,
       expiry: newCard.expiry,
+      ...expiryParts,
       cardholder_name: newCard.name,
       is_default: newCard.isDefault
     };
@@ -477,6 +544,7 @@ const Wallet = () => {
         .insert([{
           patient_email: patientEmail,
           method_type: 'upi',
+          type: 'upi',
           upi_id: newUPI.upi,
           is_default: newUPI.isDefault
         }]);

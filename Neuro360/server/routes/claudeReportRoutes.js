@@ -128,12 +128,17 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
       try { displayPercents = JSON.parse(req.body.displayPercents); } catch (_) { displayPercents = null; }
     }
 
+    let algorithmResults = null;
+    if (req.body && req.body.algorithmResults) {
+      try { algorithmResults = JSON.parse(req.body.algorithmResults); } catch (_) { algorithmResults = null; }
+    }
+
     // Deterministic build (derives %s, statuses, 5-type classification, profile).
     progress('build');
     const reportData = buildReportDataFromSource(source, {
       name: (req.body && req.body.patientName) || undefined,
       clinicName: (req.body && req.body.clinicName) || undefined,
-    }, displayPercents);
+    }, displayPercents, algorithmResults);
 
     // Call 2 (inside): fetch the doctor-readable narrative, then render to PDF.
     // onProgress fires 'narrative' then 'render' from inside the generator.

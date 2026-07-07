@@ -47,6 +47,43 @@ function score(parameters, name) {
   return p ? p.score : 0;
 }
 
+function normalizeIncomingAlgorithmResults(algorithmResults) {
+  const candidates = Array.isArray(algorithmResults)
+    ? algorithmResults
+    : (algorithmResults && Array.isArray(algorithmResults.parameters)
+      ? algorithmResults.parameters
+      : (algorithmResults && Array.isArray(algorithmResults.results) ? algorithmResults.results : []));
+
+  if (!Array.isArray(candidates)) return [];
+
+  return candidates
+    .map((item) => {
+      const name = item?.parameter || item?.name || 'Unknown';
+      const rawScore = item?.rawScore || item?.raw_score || item?.score || item?.result;
+      const scoreParts = String(rawScore || '').split('/');
+      const score = Number(scoreParts[0]);
+      const maxScore = Number(scoreParts[1]) || 3;
+      const metrics = Array.isArray(item?.metrics)
+        ? item.metrics.map((metric) => ({ ...metric, value: metric?.value ?? metric?.score ?? null }))
+        : [];
+
+      return {
+        name,
+        score: Number.isFinite(score) ? score : 0,
+        maxScore: Number.isFinite(maxScore) && maxScore > 0 ? maxScore : 3,
+        metrics,
+      };
+    })
+    .filter((item) => item.name);
+}
+
+function toParameters(algoResults) {
+  if (Array.isArray(algoResults)) return normalizeIncomingAlgorithmResults(algoResults);
+  if (algoResults && Array.isArray(algoResults.parameters)) return normalizeIncomingAlgorithmResults(algoResults.parameters);
+  if (algoResults && Array.isArray(algoResults.results)) return normalizeIncomingAlgorithmResults(algoResults.results);
+  return [];
+}
+
 /** Stable 7-digit report id from patient id + date (e.g. NS-1773769). */
 function makeReportId(patientId, dateStr) {
   const seed = `${patientId || ''}|${dateStr || ''}`;
@@ -82,7 +119,7 @@ function burnoutResistStatus(red) {
  * @returns {object} reportData consumed by the 12-page template + narrative prompt.
  */
 function buildReportData(qeegData, algoResults, patient = {}, displayPercents = null) {
-  const params = algoResults?.parameters || [];
+  const params = toParameters(algoResults);
 
   const cognition = score(params, 'Cognition');
   const stressRed = score(params, 'Stress');
@@ -231,7 +268,7 @@ function buildReportData(qeegData, algoResults, patient = {}, displayPercents = 
  * @param {object} patient  Fallback meta { id, clinicName } from the request.
  * @returns {object} reportData (same shape as buildReportData).
  */
-function buildReportDataFromSource(source, patient = {}, displayPercents = null) {
+function buildReportDataFromSource(source, patient = {}, displayPercents = null, algorithmResults = null) {
   const markers = source && source.markers;
   if (!markers || Object.values(markers).every((v) => v == null)) {
     throw new Error('Could not read the report: no performance scores were found in the uploaded PDF.');
@@ -246,9 +283,14 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null)
   const dd = source.deepDive || {};
   const mk = (name, value) => ({ name, value: num(value), score: 0 });
 
+  const incomingParameters = toParameters(algorithmResults);
+
   // Assemble the algorithmCalculator-shaped parameters (with metric values so the
-  // 5-type classifier and the deep-dive page have what they need).
-  const parameters = [
+  // 5-type classifier and the deep-dive page have what they need). Prefer the
+  // caller-supplied algorithm results when available so the performance report uses
+  // the same values as the source scan; fall back to the transcribed PDF markers
+  // only when those results are missing.
+  const parameters = incomingParameters.length > 0 ? incomingParameters : [
     { name: 'Cognition', score: pctToScore(markers.cognition), maxScore: 3,
       metrics: [mk('Alpha Peak', dd.alphaPeak)] },
     { name: 'Stress', score: redFromPct(markers.stressRegulation), maxScore: 3,

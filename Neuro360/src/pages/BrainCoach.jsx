@@ -50,6 +50,12 @@ const CALENDLY_LINK = 'https://calendly.com/admin-bettroi/30min';
 const HIDDEN_COACH_NAMES = ['sweta adatia'];
 const excludeHiddenCoaches = (list) =>
   (list || []).filter(c => !HIDDEN_COACH_NAMES.some(h => (c?.name || '').toLowerCase().includes(h)));
+const SUPABASE_STORAGE_URL = (import.meta.env.VITE_SUPABASE_URL || 'https://puzdgwtprcpaaxxwkwtk.supabase.co').replace(/\/$/, '');
+const normalizeCoachPhotoUrl = (url) => {
+  if (!url || typeof url !== 'string') return url;
+  if (!url.includes('/storage/v1/object/public/')) return url;
+  return url.replace(/^https:\/\/[^/]+\.supabase\.co/, SUPABASE_STORAGE_URL);
+};
 
 const BrainCoach = () => {
   const navigate = useNavigate();
@@ -414,7 +420,7 @@ const BrainCoach = () => {
       const transformedCoaches = excludeHiddenCoaches(cityCoaches).map(coach => ({
         id: coach.id,
         name: coach.name,
-        photo: coach.photo,
+        photo: normalizeCoachPhotoUrl(coach.photo),
         credentials: coach.credentials,
         specialties: coach.specialties || [],
         modalities: coach.modalities || [],
@@ -541,7 +547,7 @@ const BrainCoach = () => {
       const transformedCoaches = excludeHiddenCoaches(data).map(coach => ({
         id: coach.id,
         name: coach.name,
-        photo: coach.photo,
+        photo: normalizeCoachPhotoUrl(coach.photo),
         credentials: coach.credentials,
         specialties: coach.specialties || [],
         modalities: coach.modalities || [],
@@ -595,7 +601,7 @@ const BrainCoach = () => {
         const transformedCoaches = excludeHiddenCoaches(data).map(coach => ({
           id: coach.id,
           name: coach.name,
-          photo: coach.photo,
+          photo: normalizeCoachPhotoUrl(coach.photo),
           credentials: coach.credentials,
           specialties: coach.specialties || [],
           modalities: coach.modalities || [],
@@ -662,7 +668,7 @@ const BrainCoach = () => {
       const transformedCoaches = excludeHiddenCoaches(mergedCoaches).map(coach => ({
         id: coach.id,
         name: coach.name,
-        photo: coach.photo,
+        photo: normalizeCoachPhotoUrl(coach.photo),
         credentials: coach.credentials,
         specialties: coach.specialties || [],
         modalities: coach.modalities || [],
@@ -735,7 +741,7 @@ const BrainCoach = () => {
         const transformedCoaches = excludeHiddenCoaches(data).map(coach => ({
           id: coach.id,
           name: coach.name,
-          photo: coach.photo,
+          photo: normalizeCoachPhotoUrl(coach.photo),
           credentials: coach.credentials,
           specialties: coach.specialties || [],
           modalities: coach.modalities || [],
@@ -1216,7 +1222,7 @@ const BrainCoach = () => {
       const transformedCoaches = excludeHiddenCoaches(mergedCoaches).map(coach => ({
         id: coach.id,
         name: coach.name,
-        photo: coach.photo,
+        photo: normalizeCoachPhotoUrl(coach.photo),
         credentials: coach.credentials,
         specialties: coach.specialties || [],
         modalities: coach.modalities || [],
@@ -1270,11 +1276,11 @@ const BrainCoach = () => {
           {/* Photo */}
           <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg sm:rounded-xl bg-gradient-to-br from-[#323956] to-[#4a5578] flex items-center justify-center flex-shrink-0">
             {coach.photo ? (
-              <img
-                src={coach.photo}
-                alt={coach.name}
-                className="w-full h-full object-cover rounded-lg sm:rounded-xl"
-                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
+              <div
+                role="img"
+                aria-label={coach.name}
+                className="w-full h-full bg-cover bg-center rounded-lg sm:rounded-xl"
+                style={{ backgroundImage: `url(${JSON.stringify(coach.photo)})` }}
               />
             ) : null}
             <User

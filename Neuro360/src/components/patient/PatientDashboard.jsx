@@ -1068,6 +1068,69 @@ const PatientDashboard = () => {
 
   const normalizeName = (value) => String(value || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ');
   const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+  const getRecordTimestamp = (item) => new Date(item?.processed_at || item?.updated_at || item?.created_at || item?.createdAt || 0).getTime() || 0;
+  const getReportBrainParameters = (report) => {
+    const reportData = report?.reportData || report?.report_data || {};
+    return reportData.brainParameters || reportData.brain_parameters || null;
+  };
+  const getBrainParameterEntries = (brainParams) => {
+    if (!brainParams) return [];
+    if (Array.isArray(brainParams)) return brainParams;
+    return Object.entries(brainParams).map(([key, value]) => (
+      typeof value === 'object' && value !== null
+        ? { key, ...value }
+        : { key, value }
+    ));
+  };
+  const findBrainParameterValue = (brainParams, keys) => {
+    const entries = getBrainParameterEntries(brainParams);
+
+    for (const item of entries) {
+      const rawName = String(item.parameter || item.name || item.key || '').toLowerCase().replace(/[^a-z]/g, '');
+      if (!rawName) continue;
+
+      const matches = keys.some((key) => {
+        const normalized = String(key || '').toLowerCase().replace(/[^a-z]/g, '');
+        return rawName === normalized || rawName.includes(normalized) || normalized.includes(rawName);
+      });
+      if (!matches) continue;
+
+      const rawScore = item.rawScore ?? item.raw_score ?? item.value ?? item.score ?? item.percentage ?? null;
+      const numericScore = typeof rawScore === 'number'
+        ? rawScore
+        : typeof rawScore === 'string' && rawScore.includes('/')
+          ? Number(rawScore.split('/')[0])
+          : Number(rawScore);
+
+      return {
+        score: Number.isFinite(numericScore) ? numericScore : null,
+        rawScore,
+        status: item.classification || item.bucket || item.status || null
+      };
+    }
+
+    return null;
+  };
+  const getLatestCareProgramSource = () => {
+    const latestReportWithBrainParams = (patientReports || []).find((report) => getReportBrainParameters(report));
+    const latestBrainParams = latestReportWithBrainParams ? getReportBrainParameters(latestReportWithBrainParams) : null;
+
+    if (latestBrainParams) {
+      const reportRows = getBrainParameterEntries(latestBrainParams)
+        .map((item) => ({
+          parameter: item.parameter || item.name || item.key || '',
+          rawScore: item.rawScore ?? item.raw_score ?? item.value ?? item.score ?? item.percentage ?? null,
+          classification: item.classification || item.bucket || item.status || null
+        }))
+        .filter((item) => item.parameter);
+
+      if (reportRows.length > 0) {
+        return reportRows;
+      }
+    }
+
+    return algorithmResults?.data || careProgramScores;
+  };
   const dedupeRecords = (items = []) => {
     const seen = new Set();
     return (items || []).filter((item) => {
@@ -1102,7 +1165,7 @@ const PatientDashboard = () => {
         });
       }
 
-      setPatientReports(dedupeRecords(reports || []));
+      setPatientReports(dedupeRecords(reports || []).sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a)));
     } catch (error) {
       console.error('ERROR: Failed to fetch patient reports:', error);
       setPatientReports([]);
@@ -1514,18 +1577,23 @@ const PatientDashboard = () => {
 
   // Fetch immediately on tab open while on the Neurosense Reports tab.
   useEffect(() => {
-    if (activeTab !== 'neurosense-reports' || !patientDbId) return;
+    if (!patientDbId) return;
     fetchPatientReports(patientDbId, patientData?.profile?.name, patientClinicId, user?.email);
-  }, [activeTab, patientDbId]);
+  }, [patientDbId, patientData?.profile?.name, patientClinicId, user?.email]);
 
-  // Live updates: refetch this patient's reports the instant one changes
-  // (replaces the old 30s poll).
+  // Live updates: refetch this patient's records the instant a new report lands.
   useRealtimeRefetch(
-    (activeTab === 'neurosense-reports' && patientDbId)
-      ? [{ table: 'reports', filter: `patient_id=eq.${patientDbId}` }]
-      : [],
-    () => fetchPatientReports(patientDbId, patientData?.profile?.name, patientClinicId, user?.email),
-    [activeTab, patientDbId]
+    patientDbId ? [
+      { table: 'reports', filter: `patient_id=eq.${patientDbId}` },
+      { table: 'algorithm_results', filter: `patient_id=eq.${patientDbId}` },
+      { table: 'clinical_reports', filter: `patient_id=eq.${user?.id}` }
+    ] : [],
+    () => {
+      fetchClinicalReport(user?.id);
+      fetchPatientReports(patientDbId, patientData?.profile?.name, patientClinicId, user?.email);
+      fetchAlgorithmResults(patientDbId, user?.email, patientData?.profile?.name, patientClinicId);
+    },
+    [patientDbId, user?.id, patientData?.profile?.name, patientClinicId, user?.email]
   );
 
   // Fetch brain parameters for sidebar menu
@@ -3521,7 +3589,18 @@ const PatientDashboard = () => {
 
     // Get brain parameters from algorithm results or uploaded reports
     const getReportBrainParameters = () => {
-      // Priority 1: Algorithm results from Algorithm Data Processor
+      // Priority 1: Latest shared patient report brain parameters
+      const latestReportWithBrainParams = filteredReports.find(report => {
+        const reportData = report.reportData || report.report_data;
+        return reportData?.brainParameters || reportData?.brain_parameters;
+      });
+
+      if (latestReportWithBrainParams) {
+        const reportData = latestReportWithBrainParams.reportData || latestReportWithBrainParams.report_data;
+        return reportData?.brainParameters || reportData?.brain_parameters;
+      }
+
+      // Priority 2: Algorithm results from Algorithm Data Processor
       if (algorithmResults?.data && Array.isArray(algorithmResults.data)) {
         // Convert algorithm format to display format
         return algorithmResults.data.map((result, index) => {
@@ -3576,17 +3655,6 @@ const PatientDashboard = () => {
             subParameters: subParams
           };
         });
-      }
-
-      // Priority 2: Check patient reports with brain parameters data (excluding EDF files)
-      const reportWithBrainParams = filteredReports.find(report => {
-        const reportData = report.reportData || report.report_data;
-        return reportData?.brainParameters || reportData?.brain_parameters;
-      });
-
-      if (reportWithBrainParams) {
-        const reportData = reportWithBrainParams.reportData || reportWithBrainParams.report_data;
-        return reportData?.brainParameters || reportData?.brain_parameters;
       }
 
       // Priority 3: Check clinical report for brain parameters
@@ -6641,6 +6709,10 @@ const PatientDashboard = () => {
       // Helper to find value from object using multiple possible keys
       const findValue = (obj, keys) => {
         if (!obj) return null;
+        if (Array.isArray(obj)) {
+          const matched = findBrainParameterValue(obj, keys);
+          return matched?.score ?? null;
+        }
         for (const key of keys) {
           if (obj[key] !== undefined && obj[key] !== null) {
             // Handle both direct values and objects with score/value properties
@@ -6654,7 +6726,38 @@ const PatientDashboard = () => {
         return null;
       };
 
-      // Source 1: Algorithm Results (from QEEG processing)
+      const latestPatientReportWithBrainParams = (patientReports || []).find((report) => getReportBrainParameters(report));
+      const latestPatientBrainParams = latestPatientReportWithBrainParams ? getReportBrainParameters(latestPatientReportWithBrainParams) : null;
+
+      // Source 1: Latest patient/shared report brain parameters
+      if (latestPatientBrainParams) {
+        const matched = findBrainParameterValue(latestPatientBrainParams, possibleKeys);
+        if (matched?.score !== null && matched?.score !== undefined) {
+          return {
+            score: Math.round(matched.score),
+            source: 'Patient Report',
+            date: latestPatientReportWithBrainParams.created_at || latestPatientReportWithBrainParams.createdAt || null,
+            rawScore: matched.rawScore,
+            status: matched.status
+          };
+        }
+      }
+
+      // Source 2: Clinical Report brain_parameters
+      if (clinicalReport?.brain_parameters) {
+        const matched = findBrainParameterValue(clinicalReport.brain_parameters, possibleKeys);
+        if (matched?.score !== null && matched?.score !== undefined) {
+          return {
+            score: Math.round(matched.score),
+            source: 'Clinical Report',
+            date: clinicalReport.updated_at || clinicalReport.created_at,
+            rawScore: matched.rawScore,
+            status: matched.status
+          };
+        }
+      }
+
+      // Source 3: Algorithm Results (from QEEG processing)
       // Data structure: array of { parameter: 'Cognition', score: 85, rawScore: '3/21', status: 'normal' }
       if (algorithmResults?.data && Array.isArray(algorithmResults.data)) {
         // Search through the array for matching parameter name
@@ -6688,36 +6791,6 @@ const PatientDashboard = () => {
             source: 'NeuroSense Assessment',
             date: algorithmResults.processedAt
           };
-        }
-      }
-
-      // Source 2: Clinical Report brain_parameters
-      if (clinicalReport?.brain_parameters) {
-        const score = findValue(clinicalReport.brain_parameters, possibleKeys);
-        if (score !== null) {
-          return {
-            score: Math.round(score),
-            source: 'Clinical Report',
-            date: clinicalReport.updated_at || clinicalReport.created_at
-          };
-        }
-      }
-
-      // Source 3: Patient Reports with brainParameters
-      if (patientReports && patientReports.length > 0) {
-        for (const report of patientReports) {
-          const reportData = report.reportData || report.report_data;
-          const brainParams = reportData?.brainParameters || reportData?.brain_parameters;
-          if (brainParams) {
-            const score = findValue(brainParams, possibleKeys);
-            if (score !== null) {
-              return {
-                score: Math.round(score),
-                source: 'Patient Report',
-                date: report.created_at
-              };
-            }
-          }
         }
       }
 
@@ -9334,7 +9407,7 @@ const PatientDashboard = () => {
 
     // Get parameter-specific protocol data from P123 structure
     const getParameterProtocolData = () => {
-      const ksbProtocol = getCareProtocol(algorithmResults?.data || careProgramScores);
+      const ksbProtocol = getCareProtocol(getLatestCareProgramSource());
       if (!ksbProtocol) return null;
 
       const protocolData = KSB_27_PROTOCOLS_P123[ksbProtocol.code];
@@ -9535,7 +9608,7 @@ const PatientDashboard = () => {
 
         {/* KSB Protocol Card — dynamic care protocol from NeuroSense scan */}
         {(() => {
-          const ksbProtocol = getCareProtocol(algorithmResults?.data || careProgramScores);
+          const ksbProtocol = getCareProtocol(getLatestCareProgramSource());
           if (!ksbProtocol) return (
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-8 text-center">
               <div className="text-5xl mb-4">🧠</div>

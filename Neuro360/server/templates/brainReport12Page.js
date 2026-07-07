@@ -18,7 +18,13 @@ function esc(s) {
 }
 
 function fmt(value, unit) {
-  if (value == null || value === 'Indeterminate') return '—';
+  if (value == null) return '—';
+  if (value && typeof value === 'object') {
+    const keys = ['fz', 'cz', 'pz'].filter((k) => value[k] != null);
+    const entries = keys.length ? keys.map((k) => [k, value[k]]) : Object.entries(value);
+    const label = { fz: 'Fz', cz: 'Cz', pz: 'Pz' };
+    return entries.map(([k, v]) => `${label[k] || k}:${typeof v === 'number' ? Math.round(v * 100) / 100 : v}`).join(', ');
+  }
   const n = typeof value === 'number' ? (Math.round(value * 100) / 100) : value;
   if (!unit) return `${n}`;
   return unit === '%' ? `${n}%` : `${n} ${unit}`;

@@ -30,16 +30,32 @@ function avgRelative(qeegData, condition, channels, band) {
   return count ? sum / count : null;
 }
 
-/** Pull a numeric sub-metric value from the algorithm results by partial name. */
-function metricValue(parameters, includes) {
+function readMetricValue(m) {
+  const v = m?.value ?? m?.score ?? null;
+  if (typeof v === 'number') return isFinite(v) ? v : null;
+  if (typeof v === 'string') return v || null;
+  if (v && typeof v === 'object') return v;
+  return null;
+}
+
+function metricMatch(parameters, includes) {
+  const needle = includes.toLowerCase();
+  let fallback = null;
   for (const p of parameters || []) {
     for (const m of p.metrics || []) {
-      if (m.name && m.name.toLowerCase().includes(includes.toLowerCase())) {
-        return typeof m.value === 'number' && isFinite(m.value) ? m.value : null;
+      const name = String(m.name || '').toLowerCase();
+      if (name === needle || name.startsWith(`${needle} (`)) return m;
+      if (!fallback && name.includes(needle)) {
+        fallback = m;
       }
     }
   }
-  return null;
+  return fallback;
+}
+
+/** Pull a sub-metric value from the algorithm results by partial name. */
+function metricValue(parameters, includes) {
+  return readMetricValue(metricMatch(parameters, includes));
 }
 
 function score(parameters, name) {
@@ -71,7 +87,7 @@ function normalizeIncomingAlgorithmResults(algorithmResults) {
         name,
         score: Number.isFinite(score) ? score : 0,
         maxScore: Number.isFinite(maxScore) && maxScore > 0 ? maxScore : 3,
-        classification: item?.classification || item?.bucket || null,
+        classification: item?.classification || item?.bucket || item?.status || null,
         metrics,
       };
     })
@@ -134,13 +150,24 @@ function gaugePercent(param, isStress = false) {
   return 90;
 }
 
+function focusScoreStatus(value) {
+  if (value == null || value === 'Indeterminate') return 'N/A';
+  return typeof value === 'number' && value < 1.5 ? 'Good' : 'Above Target';
+}
+
+function alphaThetaStatus(metric, value) {
+  if (value == null || value === 'Indeterminate') return 'N/A';
+  if (metric && typeof metric.score === 'number') return metric.score > 0 ? 'Healthy' : 'Low';
+  return typeof value === 'number' && value >= 1 ? 'Healthy' : 'Low';
+}
+
 /**
  * @param {object} qeegData     Parsed qEEG (EO/EC → absolute/relative/special).
  * @param {object} algoResults  AlgorithmCalculator.calculate() output.
  * @param {object} patient      { name, id, processedAt, clinicName, age, gender }.
  * @returns {object} reportData consumed by the 12-page template + narrative prompt.
  */
-function buildReportData(qeegData, algoResults, patient = {}, displayPercents = null) {
+function buildReportData(qeegData, algoResults, patient = {}) {
   const params = toParameters(algoResults);
 
   const cognition = score(params, 'Cognition');
@@ -152,37 +179,22 @@ function buildReportData(qeegData, algoResults, patient = {}, displayPercents = 
   const creativity = score(params, 'Creativity');
   const paramByName = (name) => params.find((p) => p.name === name) || { score: 0, maxScore: 3 };
 
-  // Continuous display percentages (0–100) computed upstream from the real metric
-  // margins. When present, the snapshot bars use these instead of the coarse
-  // score/3 buckets (which pinned almost every patient at 67%). Clinical pass/fail
-  // scoring is unchanged — this is display granularity only.
-  const dp = displayPercents && typeof displayPercents === 'object' ? displayPercents : {};
-  const useDp = (key, fallback) => {
-    const v = dp[key];
-    return (typeof v === 'number' && isFinite(v)) ? Math.max(0, Math.min(100, Math.round(v))) : fallback;
-  };
-  // Status derived from the continuous % so the bar and label stay coherent.
-  const posStatusPct = (p) => (p >= 75 ? 'Excellent' : p >= 45 ? 'Moderate' : 'Needs Attention');
-  const stressStatusPct = (p) => (p >= 75 ? 'Excellent' : p >= 50 ? 'Good' : p >= 30 ? 'Moderate' : 'Low');
-  const burnoutStatusPct = (p) => (p >= 75 ? 'Strong' : p >= 50 ? 'Mild Load' : p >= 30 ? 'Moderate Load' : 'High Load');
-  const hasDp = Object.keys(dp).length > 0;
-
   // Match the NeuroSense PDF gauge mapping: Low=20%, Medium/Mild/Moderate=55%, High/Severe=90%.
-  const stressPct = useDp('stress', gaugePercent(paramByName('Stress'), true));
-  const cognitionPct = useDp('cognition', gaugePercent(paramByName('Cognition')));
-  const focusPct = useDp('focus', gaugePercent(paramByName('Focus & Attention')));
-  const learningPct = useDp('learning', gaugePercent(paramByName('Learning')));
-  const burnoutPct = useDp('burnout', gaugePercent(paramByName('Burnout & Fatigue'), true));
-  const emotionalPct = useDp('emotional', gaugePercent(paramByName('Emotional Regulation')));
-  const creativityPct = useDp('creativity', gaugePercent(paramByName('Creativity')));
+  const stressPct = gaugePercent(paramByName('Stress'), true);
+  const cognitionPct = gaugePercent(paramByName('Cognition'));
+  const focusPct = gaugePercent(paramByName('Focus & Attention'));
+  const learningPct = gaugePercent(paramByName('Learning'));
+  const burnoutPct = gaugePercent(paramByName('Burnout & Fatigue'), true);
+  const emotionalPct = gaugePercent(paramByName('Emotional Regulation'));
+  const creativityPct = gaugePercent(paramByName('Creativity'));
   const bars = [
-    { key: 'stress', label: 'Stress Regulation', percent: stressPct, status: hasDp ? stressStatusPct(stressPct) : stressRegStatus(stressRed), icon: '⚡' },
-    { key: 'cognition', label: 'Cognition', percent: cognitionPct, status: hasDp ? posStatusPct(cognitionPct) : positiveStatus(cognition), icon: '🧠' },
-    { key: 'focus', label: 'Focus & Attention', percent: focusPct, status: hasDp ? posStatusPct(focusPct) : positiveStatus(focus), icon: '🎯' },
-    { key: 'learning', label: 'Learning', percent: learningPct, status: hasDp ? posStatusPct(learningPct) : positiveStatus(learning), icon: '📚' },
-    { key: 'burnout', label: 'Burnout Resistance', percent: burnoutPct, status: hasDp ? burnoutStatusPct(burnoutPct) : burnoutResistStatus(burnoutRed), icon: '🔋' },
-    { key: 'emotional', label: 'Emotional Regulation', percent: emotionalPct, status: hasDp ? posStatusPct(emotionalPct) : positiveStatus(emotional), icon: '💗' },
-    { key: 'creativity', label: 'Creativity', percent: creativityPct, status: hasDp ? posStatusPct(creativityPct) : positiveStatus(creativity), icon: '🎨' },
+    { key: 'stress', label: 'Stress Regulation', percent: stressPct, status: stressRegStatus(stressRed), icon: '⚡' },
+    { key: 'cognition', label: 'Cognition', percent: cognitionPct, status: positiveStatus(cognition), icon: '🧠' },
+    { key: 'focus', label: 'Focus & Attention', percent: focusPct, status: positiveStatus(focus), icon: '🎯' },
+    { key: 'learning', label: 'Learning', percent: learningPct, status: positiveStatus(learning), icon: '📚' },
+    { key: 'burnout', label: 'Burnout Resistance', percent: burnoutPct, status: burnoutResistStatus(burnoutRed), icon: '🔋' },
+    { key: 'emotional', label: 'Emotional Regulation', percent: emotionalPct, status: positiveStatus(emotional), icon: '💗' },
+    { key: 'creativity', label: 'Creativity', percent: creativityPct, status: positiveStatus(creativity), icon: '🎨' },
   ];
 
   const overall = Math.round(bars.reduce((s, b) => s + b.percent, 0) / bars.length);
@@ -195,6 +207,7 @@ function buildReportData(qeegData, algoResults, patient = {}, displayPercents = 
   const asymmetry = metricValue(params, 'Alpha Asymmetry');
   const daytimeDelta = metricValue(params, 'Excessive Delta');
   const focusScore = metricValue(params, 'Focus Score');
+  const alphaThetaMetric = metricMatch(params, 'Alpha:Theta Balance');
   const alphaTheta = metricValue(params, 'Alpha:Theta Balance');
 
   const deepDive = {
@@ -224,11 +237,11 @@ function buildReportData(qeegData, algoResults, patient = {}, displayPercents = 
     },
     focusScore: {
       label: 'Focus Score', value: focusScore, unit: '', optimal: '< 1.5',
-      status: focusScore == null ? 'N/A' : focusScore < 1.5 ? 'Good' : 'Above Target',
+      status: focusScoreStatus(focusScore),
     },
     alphaTheta: {
       label: 'Alpha:Theta Balance', value: alphaTheta, unit: '', optimal: '> 1.0 (healthy)',
-      status: alphaTheta == null ? 'N/A' : alphaTheta >= 1 ? 'Healthy' : 'Low',
+      status: alphaThetaStatus(alphaThetaMetric, alphaTheta),
     },
   };
 
@@ -285,7 +298,7 @@ function buildReportData(qeegData, algoResults, patient = {}, displayPercents = 
  * @param {object} patient  Fallback meta { id, clinicName } from the request.
  * @returns {object} reportData (same shape as buildReportData).
  */
-function buildReportDataFromSource(source, patient = {}, displayPercents = null, algorithmResults = null) {
+function buildReportDataFromSource(source, patient = {}, algorithmResults = null) {
   const markers = source && source.markers;
   if (!markers || Object.values(markers).every((v) => v == null)) {
     throw new Error('Could not read the report: no performance scores were found in the uploaded PDF.');
@@ -294,6 +307,12 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null,
   const num = (v) => (typeof v === 'number' && isFinite(v) ? v : null);
   // Displayed NeuroSense gauge % -> 0-3 score.
   const pctToScore = (pct) => (pct == null ? 0 : Math.round((Math.max(0, Math.min(100, pct)) / 100) * 3));
+  const pctToClass = (pct, stress = false) => {
+    if (pct == null) return stress ? 'Low' : 'Low';
+    if (pct <= 37.5) return 'Low';
+    if (pct < 72.5) return stress ? 'Moderate' : 'Medium';
+    return stress ? 'Severe' : 'High';
+  };
 
   const dd = source.deepDive || {};
   const mk = (name, value) => ({ name, value: num(value), score: 0 });
@@ -308,7 +327,7 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null,
       name: 'Cognition',
       score: pctToScore(markers.cognition),
       maxScore: 3,
-      classification: positiveClass(pctToScore(markers.cognition)),
+      classification: pctToClass(markers.cognition),
       metrics: [
         mk('Alpha Peak', dd.alphaPeak ?? incomingMetricValue('Alpha Peak')),
       ],
@@ -317,19 +336,19 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null,
       name: 'Stress',
       score: pctToScore(markers.stressRegulation),
       maxScore: 3,
-      classification: stressClass(pctToScore(markers.stressRegulation)),
+      classification: pctToClass(markers.stressRegulation, true),
       metrics: [
         mk('Arousal Score', dd.arousal ?? incomingMetricValue('Arousal Score')),
         mk('Relaxation Score', dd.relaxation ?? incomingMetricValue('Relaxation Score')),
         mk('Regeneration (Alpha Modulation)', dd.regeneration ?? incomingMetricValue('Regeneration')),
       ],
     },
-    { name: 'Focus & Attention', score: pctToScore(markers.focusAttention), maxScore: 3, classification: positiveClass(pctToScore(markers.focusAttention)), metrics: [] },
+    { name: 'Focus & Attention', score: pctToScore(markers.focusAttention), maxScore: 3, classification: pctToClass(markers.focusAttention), metrics: [] },
     {
       name: 'Burnout & Fatigue',
       score: pctToScore(markers.burnoutResistance),
       maxScore: 3,
-      classification: stressClass(pctToScore(markers.burnoutResistance)),
+      classification: pctToClass(markers.burnoutResistance, true),
       metrics: [
         mk('Excessive Delta', dd.daytimeDelta ?? incomingMetricValue('Excessive Delta')),
       ],
@@ -338,18 +357,20 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null,
       name: 'Emotional Regulation',
       score: pctToScore(markers.emotionalRegulation),
       maxScore: 3,
-      classification: positiveClass(pctToScore(markers.emotionalRegulation)),
+      classification: pctToClass(markers.emotionalRegulation),
       metrics: [
         mk('Alpha Asymmetry (Frontal)', dd.frontalAsymmetry ?? incomingMetricValue('Alpha Asymmetry')),
         mk('Arousal Score', dd.arousal ?? incomingMetricValue('Arousal Score')),
         mk('Regeneration (Alpha Modulation)', dd.regeneration ?? incomingMetricValue('Regeneration')),
       ],
     },
-    { name: 'Learning', score: pctToScore(markers.learning), maxScore: 3, classification: positiveClass(pctToScore(markers.learning)), metrics: [] },
-    { name: 'Creativity', score: pctToScore(markers.creativity), maxScore: 3, classification: positiveClass(pctToScore(markers.creativity)), metrics: [] },
+    { name: 'Learning', score: pctToScore(markers.learning), maxScore: 3, classification: pctToClass(markers.learning), metrics: [] },
+    { name: 'Creativity', score: pctToScore(markers.creativity), maxScore: 3, classification: pctToClass(markers.creativity), metrics: [] },
   ];
 
+  const focusScoreMetric = metricMatch(incomingParameters, 'Focus Score');
   const focusScore = incomingMetricValue('Focus Score');
+  const alphaThetaMetric = metricMatch(incomingParameters, 'Alpha:Theta Balance');
   const alphaTheta = incomingMetricValue('Alpha:Theta Balance');
   const alphaPeak = metricValue(parameters, 'Alpha Peak');
   const arousal = metricValue(parameters, 'Arousal Score');
@@ -383,7 +404,7 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null,
     id: patient.id,
     clinicName: patient.clinicName,
     processedAt,
-  }, null);
+  });
 
   // If a deep-dive metric was missing but the brainwave block had alpha peak,
   // surface it on the profile so page 4 still shows the peak.
@@ -394,17 +415,19 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null,
   if (rd.deepDive) {
     rd.deepDive.focusScore = {
       label: 'Focus Score',
-      value: num(focusScore),
+      value: focusScore,
       unit: '',
       optimal: '< 1.5',
-      status: focusScore == null ? 'N/A' : focusScore < 1.5 ? 'Good' : 'Above Target',
+      status: focusScoreMetric && typeof focusScoreMetric.score === 'number'
+        ? (focusScoreMetric.score > 0 ? 'Good' : 'Above Target')
+        : focusScoreStatus(focusScore),
     };
     rd.deepDive.alphaTheta = {
       label: 'Alpha:Theta Balance',
-      value: num(alphaTheta),
+      value: alphaTheta,
       unit: '',
       optimal: '> 1.0 (healthy)',
-      status: alphaTheta == null ? 'N/A' : alphaTheta >= 1 ? 'Healthy' : 'Low',
+      status: alphaThetaStatus(alphaThetaMetric, alphaTheta),
     };
     rd.deepDive.alphaPeak = rd.deepDive.alphaPeak || {
       label: 'Alpha Peak Frequency', value: alphaPeak, unit: 'Hz', optimal: '9.5 – 11.5 Hz',

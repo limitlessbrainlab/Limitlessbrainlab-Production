@@ -1339,10 +1339,8 @@ const AlgorithmDataProcessor = () => {
       console.log(`[Claude Report] Step 2: NeuroSense PDF loaded (${(blob.size / 1024).toFixed(1)} KB), building upload payload…`);
       const formData = new FormData();
       formData.append('pdf', new File([blob], 'neurosense-report.pdf', { type: 'application/pdf' }));
-      // Send continuous per-parameter % from the real algorithm metrics so the
-      // performance report shows distinct values instead of the pinned 67% buckets.
-      // Also forward the raw algorithm results so the backend can keep the
-      // underlying scores aligned with the report values.
+      // Forward the raw algorithm results so the backend uses the same buckets and
+      // metric values that generated the NeuroSense report.
       try {
         if (results && results.length) formData.append('algorithmResults', JSON.stringify(results));
       } catch (dpErr) {

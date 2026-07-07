@@ -116,6 +116,12 @@ import ProfileGate from './ProfileGate';
 import { getCareProtocol } from '../../utils/careProtocolLookup';
 
 const CARE_PROGRAM_YOGA_NIDRA_URL = 'https://sweta8238.graphy.com/products/Yoga-Nidra---The-Ultimate-Whole-Brain-Synchronization-6788054d6cd6065534a49399';
+const getGuideThumbnailUrl = (url) => {
+  if (!url || typeof url !== 'string') return null;
+  const youtubeMatch = url.match(/(?:youtube\.com\/embed\/|youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (youtubeMatch) return `https://img.youtube.com/vi/${youtubeMatch[1]}/hqdefault.jpg`;
+  return null;
+};
 
 const LEGACY_ASSESSMENTS = {
   brain_fitness: { title: 'Brain Fitness Score', link: 'https://form.jotform.com/233250136675151', price: 2.99 },
@@ -5469,6 +5475,7 @@ const PatientDashboard = () => {
       title: 'Cognition',
       icon: Lightbulb,
       color: '#4F46E5',
+      thumbnailUrl: 'https://img.youtube.com/vi/brendan_conway_smith_metacognition_an_important_skill_for_modern_times/hqdefault.jpg',
       intro: 'Cognition encompasses your brain\'s ability to process information, think critically, and make decisions. It\'s the foundation of your mental performance, affecting everything from problem-solving to memory recall. Understanding your cognitive patterns helps optimize your mental capabilities.',
       videoUrl: 'https://embed.ted.com/talks/brendan_conway_smith_metacognition_an_important_skill_for_modern_times',
       brainRegion: {
@@ -5634,6 +5641,7 @@ const PatientDashboard = () => {
       title: 'Stress',
       icon: Zap,
       color: '#EF4444',
+      thumbnailUrl: 'https://img.youtube.com/vi/RcGyVTAoXEU/hqdefault.jpg',
       intro: 'Stress response is your brain\'s alarm system. While acute stress can sharpen focus, chronic stress damages neural pathways and impairs cognitive function. Understanding your stress patterns helps you build resilience and maintain optimal brain health.',
       videoUrl: 'https://www.youtube.com/embed/RcGyVTAoXEU',
       brainRegion: {
@@ -5785,6 +5793,7 @@ const PatientDashboard = () => {
       title: 'Focus and Attention',
       icon: Target,
       color: '#F59E0B',
+      thumbnailUrl: 'https://img.youtube.com/vi/Hu4Yvq-g7_Y/hqdefault.jpg',
       intro: 'Focus and attention are the spotlight of your mind, determining what information gets processed deeply. In our distraction-filled world, the ability to sustain attention is a superpower. Training your focus improves productivity, learning, and overall cognitive performance.',
       videoUrl: 'https://www.youtube.com/embed/Hu4Yvq-g7_Y',
       brainRegion: {
@@ -5938,6 +5947,7 @@ const PatientDashboard = () => {
       title: 'Burnout and Fatigue',
       icon: Battery,
       color: '#6B7280',
+      thumbnailUrl: 'https://img.youtube.com/vi/Oht0-qKeUGE/hqdefault.jpg',
       intro: 'Burnout is the result of chronic stress depleting your mental and physical resources. It\'s not just tiredness, it\'s a state where your brain\'s energy systems are overwhelmed. Recognizing early signs and implementing recovery strategies is essential for long-term brain health.',
       videoUrl: 'https://www.youtube.com/embed/Oht0-qKeUGE',
       brainRegion: {
@@ -6089,6 +6099,7 @@ const PatientDashboard = () => {
       title: 'Emotional Regulation',
       icon: Smile,
       color: '#EF4444',
+      thumbnailUrl: 'https://img.youtube.com/vi/JD4O7ama3o8/hqdefault.jpg',
       intro: 'Emotional regulation is your brain\'s ability to manage and respond to emotional experiences appropriately. It\'s not about suppressing emotions but understanding and channeling them effectively. Strong emotional regulation improves relationships, decision-making, and overall well-being.',
       videoUrl: 'https://www.youtube.com/embed/JD4O7ama3o8',
       brainRegion: {
@@ -6240,6 +6251,7 @@ const PatientDashboard = () => {
       title: 'Learning',
       icon: GraduationCap,
       color: '#10B981',
+      thumbnailUrl: 'https://img.youtube.com/vi/5MgBikgcWnY/hqdefault.jpg',
       intro: 'Learning is your brain\'s ability to acquire, process, and retain new information and skills. Neuroplasticity, the brain\'s ability to reorganize itself, makes lifelong learning possible. Optimizing your learning capacity unlocks new opportunities and keeps your brain young.',
       videoUrl: 'https://www.youtube.com/embed/5MgBikgcWnY',
       brainRegion: {
@@ -6391,6 +6403,7 @@ const PatientDashboard = () => {
       title: 'Creativity',
       icon: Star,
       color: '#8B5CF6',
+      thumbnailUrl: 'https://img.youtube.com/vi/Oht0-qKeUGE/hqdefault.jpg',
       intro: 'Creativity is your brain\'s ability to generate novel ideas, make unique connections, and think outside conventional patterns. It involves the interplay of focused attention and relaxed, diffuse thinking. Nurturing creativity enhances problem-solving and brings innovation to all areas of life.',
       videoUrl: 'https://www.youtube.com/embed/Oht0-qKeUGE',
       brainRegion: {
@@ -6546,10 +6559,41 @@ const PatientDashboard = () => {
 
     const Icon = data.icon;
     const [showVisualGuide, setShowVisualGuide] = useState(false);
+    const [visualGuideThumbnail, setVisualGuideThumbnail] = useState('');
 
     useEffect(() => {
+      let alive = true;
       setShowVisualGuide(false);
-    }, [data.videoUrl, parameterKey]);
+
+      const directThumbnail = data.thumbnailUrl || getGuideThumbnailUrl(data.videoUrl);
+      if (directThumbnail) {
+        setVisualGuideThumbnail(directThumbnail);
+        return () => {
+          alive = false;
+        };
+      }
+
+      setVisualGuideThumbnail('');
+
+      if (data.videoUrl?.includes('ted.com')) {
+        const tedSlug = data.videoUrl.match(/talks\/([^/?#]+)/)?.[1];
+        if (tedSlug) {
+          const tedUrl = `https://www.ted.com/talks/${tedSlug}`;
+          fetch(`https://www.ted.com/services/v1/oembed.json?url=${encodeURIComponent(tedUrl)}`)
+            .then((response) => (response.ok ? response.json() : null))
+            .then((json) => {
+              if (alive && json?.thumbnail_url) {
+                setVisualGuideThumbnail(json.thumbnail_url);
+              }
+            })
+            .catch(() => {});
+        }
+      }
+
+      return () => {
+        alive = false;
+      };
+    }, [data.videoUrl, data.thumbnailUrl, parameterKey]);
 
     // Get patient's actual scores from multiple sources (priority order)
     const getPatientScoreData = (paramKey) => {
@@ -7394,13 +7438,26 @@ const PatientDashboard = () => {
                   <button
                     type="button"
                     onClick={() => setShowVisualGuide(true)}
-                    className="w-full h-full bg-gradient-to-br from-[#323956] to-[#4a5578] flex flex-col items-center justify-center text-white hover:from-[#283047] hover:to-[#3d4666] transition-colors"
+                    className="relative w-full h-full overflow-hidden text-white group"
                   >
-                    <span className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center mb-3">
-                      <Play className="h-7 w-7 ml-1" />
-                    </span>
-                    <span className="text-sm sm:text-base font-semibold">Play visual guide</span>
-                    </button>
+                      {visualGuideThumbnail ? (
+                        <img
+                          src={visualGuideThumbnail}
+                          alt={`${data.title} visual guide thumbnail`}
+                          className="absolute inset-0 h-full w-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : null}
+                      <div className={`absolute inset-0 ${visualGuideThumbnail ? 'bg-black/35 group-hover:bg-black/25' : 'bg-gradient-to-br from-[#323956] to-[#4a5578] group-hover:from-[#283047] group-hover:to-[#3d4666]'} transition-colors`} />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center mb-3">
+                          <Play className="h-7 w-7 ml-1" />
+                        </span>
+                        <span className="text-sm sm:text-base font-semibold">Play visual guide</span>
+                      </div>
+                  </button>
                   )}
                 </div>
               </div>

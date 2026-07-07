@@ -196,7 +196,7 @@ function renderReportHtml(reportData, narrative = {}) {
     waveRow('Delta', '0.5–4 Hz · Deep rest', fmt(prof.delta, '%'), prof.delta, '#2b6cb0'),
     waveRow('Theta', '4–7 Hz · Creativity', fmt(prof.theta, '%'), prof.theta, '#3b82f6'),
     waveRow('Alpha', '8–12 Hz · Calm focus', `Peak ${fmt(prof.alphaPeakHz, 'Hz')}`, prof.alpha, '#14b8c4'),
-    waveRow('Beta', '13–20 Hz · Active thinking', fmt(prof.beta, '%'), prof.beta, '#94a3c8'),
+    waveRow('Beta', '13–30 Hz · Active thinking', fmt(prof.beta, '%'), prof.beta, '#94a3c8'),
     waveRow('Hi-Beta', '20–30 Hz · Vigilance', fmt(prof.hiBeta, '%'), prof.hiBeta, '#94a3c8'),
   ].join('');
 

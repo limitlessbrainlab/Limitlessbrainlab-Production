@@ -71,6 +71,7 @@ function normalizeIncomingAlgorithmResults(algorithmResults) {
         name,
         score: Number.isFinite(score) ? score : 0,
         maxScore: Number.isFinite(maxScore) && maxScore > 0 ? maxScore : 3,
+        classification: item?.classification || item?.bucket || null,
         metrics,
       };
     })
@@ -111,6 +112,27 @@ function stressRegStatus(red) {
 function burnoutResistStatus(red) {
   return ['Strong', 'Mild Load', 'Moderate Load', 'High Load'][Math.min(red, 3)];
 }
+function positiveClass(score) {
+  if (score <= 1) return 'Low';
+  if (score === 2) return 'Medium';
+  return 'High';
+}
+function stressClass(score) {
+  if (score === 0) return 'Low';
+  if (score === 1) return 'Mild';
+  if (score === 2) return 'Moderate';
+  return 'Severe';
+}
+function gaugePercent(param, isStress = false) {
+  const bucket = String(param?.classification || (isStress ? stressClass(param?.score || 0) : positiveClass(param?.score || 0))).toLowerCase();
+  if (bucket === 'low') return 20;
+  if (bucket === 'mild' || bucket === 'moderate' || bucket === 'medium') return 55;
+  if (bucket === 'high' || bucket === 'severe') return 90;
+  if ((param?.score || 0) === 0) return 10;
+  if ((param?.score || 0) === 1) return 25;
+  if ((param?.score || 0) === 2) return 55;
+  return 90;
+}
 
 /**
  * @param {object} qeegData     Parsed qEEG (EO/EC → absolute/relative/special).
@@ -128,12 +150,7 @@ function buildReportData(qeegData, algoResults, patient = {}, displayPercents = 
   const emotional = score(params, 'Emotional Regulation');
   const learning = score(params, 'Learning');
   const creativity = score(params, 'Creativity');
-
-  // 8% floor so a fully-failed marker never renders as a hard 0% (which looked
-  // broken). Only the fallback path when no continuous displayPercents arrive;
-  // clinical pass/fail scoring is unchanged.
-  const pct = (s) => Math.max(8, Math.round((s / 3) * 100));
-  const invPct = (red) => Math.max(8, Math.round(((3 - red) / 3) * 100));
+  const paramByName = (name) => params.find((p) => p.name === name) || { score: 0, maxScore: 3 };
 
   // Continuous display percentages (0–100) computed upstream from the real metric
   // margins. When present, the snapshot bars use these instead of the coarse
@@ -150,14 +167,14 @@ function buildReportData(qeegData, algoResults, patient = {}, displayPercents = 
   const burnoutStatusPct = (p) => (p >= 75 ? 'Strong' : p >= 50 ? 'Mild Load' : p >= 30 ? 'Moderate Load' : 'High Load');
   const hasDp = Object.keys(dp).length > 0;
 
-  // Snapshot bars in the report's display order.
-  const stressPct = useDp('stress', invPct(stressRed));
-  const cognitionPct = useDp('cognition', pct(cognition));
-  const focusPct = useDp('focus', pct(focus));
-  const learningPct = useDp('learning', pct(learning));
-  const burnoutPct = useDp('burnout', invPct(burnoutRed));
-  const emotionalPct = useDp('emotional', pct(emotional));
-  const creativityPct = useDp('creativity', pct(creativity));
+  // Match the NeuroSense PDF gauge mapping: Low=20%, Medium/Mild/Moderate=55%, High/Severe=90%.
+  const stressPct = useDp('stress', gaugePercent(paramByName('Stress'), true));
+  const cognitionPct = useDp('cognition', gaugePercent(paramByName('Cognition')));
+  const focusPct = useDp('focus', gaugePercent(paramByName('Focus & Attention')));
+  const learningPct = useDp('learning', gaugePercent(paramByName('Learning')));
+  const burnoutPct = useDp('burnout', gaugePercent(paramByName('Burnout & Fatigue'), true));
+  const emotionalPct = useDp('emotional', gaugePercent(paramByName('Emotional Regulation')));
+  const creativityPct = useDp('creativity', gaugePercent(paramByName('Creativity')));
   const bars = [
     { key: 'stress', label: 'Stress Regulation', percent: stressPct, status: hasDp ? stressStatusPct(stressPct) : stressRegStatus(stressRed), icon: '⚡' },
     { key: 'cognition', label: 'Cognition', percent: cognitionPct, status: hasDp ? posStatusPct(cognitionPct) : positiveStatus(cognition), icon: '🧠' },
@@ -275,10 +292,8 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null,
   }
 
   const num = (v) => (typeof v === 'number' && isFinite(v) ? v : null);
-  // Displayed % (healthy side) → 0-3 score. For Stress/Burnout we want the RED
-  // count the algorithm uses, which is the inverse of the displayed regulation %.
+  // Displayed NeuroSense gauge % -> 0-3 score.
   const pctToScore = (pct) => (pct == null ? 0 : Math.round((Math.max(0, Math.min(100, pct)) / 100) * 3));
-  const redFromPct = (pct) => (pct == null ? 0 : 3 - pctToScore(pct));
 
   const dd = source.deepDive || {};
   const mk = (name, value) => ({ name, value: num(value), score: 0 });
@@ -286,34 +301,35 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null,
   const incomingParameters = toParameters(algorithmResults);
   const incomingMetricValue = (includes) => metricValue(incomingParameters, includes);
 
-  // The uploaded NeuroSense PDF is the source of truth for the seven snapshot
-  // bars. We still merge in raw algorithm metrics for deep-dive fields that are
-  // not always transcribed from the PDF text, but we do not let the incoming
-  // displayPercents or algorithm score buckets overwrite the source markers.
-  const parameters = [
+  // Current admin flow sends the original deterministic algorithm results; those
+  // are the same values the NeuroSense PDF used. PDF extraction remains fallback.
+  const parameters = incomingParameters.length ? incomingParameters : [
     {
       name: 'Cognition',
       score: pctToScore(markers.cognition),
       maxScore: 3,
+      classification: positiveClass(pctToScore(markers.cognition)),
       metrics: [
         mk('Alpha Peak', dd.alphaPeak ?? incomingMetricValue('Alpha Peak')),
       ],
     },
     {
       name: 'Stress',
-      score: redFromPct(markers.stressRegulation),
+      score: pctToScore(markers.stressRegulation),
       maxScore: 3,
+      classification: stressClass(pctToScore(markers.stressRegulation)),
       metrics: [
         mk('Arousal Score', dd.arousal ?? incomingMetricValue('Arousal Score')),
         mk('Relaxation Score', dd.relaxation ?? incomingMetricValue('Relaxation Score')),
         mk('Regeneration (Alpha Modulation)', dd.regeneration ?? incomingMetricValue('Regeneration')),
       ],
     },
-    { name: 'Focus & Attention', score: pctToScore(markers.focusAttention), maxScore: 3, metrics: [] },
+    { name: 'Focus & Attention', score: pctToScore(markers.focusAttention), maxScore: 3, classification: positiveClass(pctToScore(markers.focusAttention)), metrics: [] },
     {
       name: 'Burnout & Fatigue',
-      score: redFromPct(markers.burnoutResistance),
+      score: pctToScore(markers.burnoutResistance),
       maxScore: 3,
+      classification: stressClass(pctToScore(markers.burnoutResistance)),
       metrics: [
         mk('Excessive Delta', dd.daytimeDelta ?? incomingMetricValue('Excessive Delta')),
       ],
@@ -322,14 +338,15 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null,
       name: 'Emotional Regulation',
       score: pctToScore(markers.emotionalRegulation),
       maxScore: 3,
+      classification: positiveClass(pctToScore(markers.emotionalRegulation)),
       metrics: [
         mk('Alpha Asymmetry (Frontal)', dd.frontalAsymmetry ?? incomingMetricValue('Alpha Asymmetry')),
         mk('Arousal Score', dd.arousal ?? incomingMetricValue('Arousal Score')),
         mk('Regeneration (Alpha Modulation)', dd.regeneration ?? incomingMetricValue('Regeneration')),
       ],
     },
-    { name: 'Learning', score: pctToScore(markers.learning), maxScore: 3, metrics: [] },
-    { name: 'Creativity', score: pctToScore(markers.creativity), maxScore: 3, metrics: [] },
+    { name: 'Learning', score: pctToScore(markers.learning), maxScore: 3, classification: positiveClass(pctToScore(markers.learning)), metrics: [] },
+    { name: 'Creativity', score: pctToScore(markers.creativity), maxScore: 3, classification: positiveClass(pctToScore(markers.creativity)), metrics: [] },
   ];
 
   const focusScore = incomingMetricValue('Focus Score');

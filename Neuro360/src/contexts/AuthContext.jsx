@@ -8,9 +8,30 @@ import { getFriendlyErrorMessage } from '../utils/friendlyError';
 import { clearAllAndSignOut } from '../utils/sessionCleanup';
 
 /* global __APP_BUILD_ID__ */
-// Unique id of the deployed build (injected by vite define). Changes every deployment.
-const APP_BUILD_ID = typeof __APP_BUILD_ID__ !== 'undefined' ? __APP_BUILD_ID__ : 'dev';
+// Unique id of the deployed build (injected by vite define). Changes every deployment,
+// and prefers a commit-aware signature when the build environment provides one.
+const DEPLOY_SIGNATURE = import.meta.env.VITE_DEPLOY_SIGNATURE ||
+  import.meta.env.VITE_APP_BUILD_ID ||
+  import.meta.env.VITE_COMMIT_SHA ||
+  import.meta.env.VITE_GIT_COMMIT ||
+  import.meta.env.VITE_GIT_SHA ||
+  'dev';
+const APP_BUILD_ID = typeof __APP_BUILD_ID__ !== 'undefined' ? __APP_BUILD_ID__ : DEPLOY_SIGNATURE;
 const INACTIVITY_LIMIT_MS = 20 * 60 * 1000; // 20 minutes
+
+// In production, the backend API may be hosted on a different origin from the
+// static frontend. Use VITE_API_URL for backend deploy-version polling.
+const BACKEND_API_URL = import.meta.env.VITE_API_URL
+  ? import.meta.env.VITE_API_URL.replace(/\/$/, '')
+  : (typeof window !== 'undefined' ? window.location.origin : '');
+
+const getBackendAppVersionUrl = () => {
+  if (!BACKEND_API_URL) return '/api/app-version';
+  if (BACKEND_API_URL.endsWith('/api')) {
+    return `${BACKEND_API_URL}/app-version`;
+  }
+  return `${BACKEND_API_URL}/api/app-version`;
+};
 
 // START: DEVELOPMENT MODE: Bypass authentication
 const BYPASS_AUTH = import.meta.env.VITE_BYPASS_AUTH === 'true' || false; // Set to false to enable authentication
@@ -90,11 +111,15 @@ export const AuthProvider = ({ children }) => {
       try {
         const [f, b] = await Promise.allSettled([
           fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)),
-          fetch(`/api/app-version?t=${Date.now()}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)),
+          fetch(`${getBackendAppVersionUrl()}?t=${Date.now()}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)),
         ]);
         if (stopped) return;
-        const front = f.status === 'fulfilled' && f.value ? f.value.buildId : null;
-        const back = b.status === 'fulfilled' && b.value ? b.value.version : null;
+        const front = f.status === 'fulfilled' && f.value
+          ? (f.value.buildId || f.value.deploySignature || f.value.version || null)
+          : null;
+        const back = b.status === 'fulfilled' && b.value
+          ? (b.value.deploySignature || b.value.buildId || b.value.version || null)
+          : null;
         if (back != null && backendBaseline == null) backendBaseline = back; // first capture (no action)
         const frontChanged = front && front !== APP_BUILD_ID;                 // Vercel redeployed
         const backChanged = back != null && backendBaseline != null && back !== backendBaseline; // Render redeployed
@@ -122,7 +147,15 @@ export const AuthProvider = ({ children }) => {
       if (!BYPASS_AUTH) {
         const storedBuildId = localStorage.getItem('app_build_id');
         if (storedBuildId !== APP_BUILD_ID) {
-          const hadSession = !!(localStorage.getItem('authToken') || localStorage.getItem('user'));
+          let hadSession = !!(localStorage.getItem('authToken') || localStorage.getItem('user'));
+          if (!hadSession && supabase) {
+            try {
+              const { data: { session: maybeSession } } = await supabase.auth.getSession();
+              hadSession = !!maybeSession?.user;
+            } catch (e) {
+              // ignore failures while checking persisted Supabase session
+            }
+          }
           await clearAllAndSignOut();
           localStorage.setItem('app_build_id', APP_BUILD_ID); // set AFTER clear → no reload loop
           if (hadSession) { window.location.reload(); return; } // hard refresh into login

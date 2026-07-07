@@ -6,7 +6,17 @@ import { compression } from 'vite-plugin-compression2'
 
 // Unique per-build id — baked into the bundle AND emitted to dist/version.json so the
 // running app can detect a new deployment at runtime and force logout + clean reload.
-const BUILD_ID = String(Date.now())
+// Prefer a commit-aware value when the build environment provides one; otherwise fall back
+// to a timestamp so every build still gets a fresh signature.
+const BUILD_ID = String(
+  process.env.VITE_DEPLOY_SIGNATURE ||
+  process.env.VITE_APP_BUILD_ID ||
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+  process.env.RENDER_GIT_COMMIT ||
+  process.env.GIT_COMMIT ||
+  process.env.COMMIT_SHA ||
+  Date.now()
+)
 
 // https://vitejs.dev/config/
 export default defineConfig({

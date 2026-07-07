@@ -438,6 +438,12 @@ const PatientDashboard = () => {
     fetchAvailableAssessments();
   }, [fetchAvailableAssessments]);
 
+  useRealtimeRefetch(
+    [{ table: 'neurosense_assessments' }],
+    fetchAvailableAssessments,
+    []
+  );
+
   // Fetch purchased assessments by patient_email
   const fetchPurchasedAssessments = useCallback(async () => {
     if (!user?.email) return;

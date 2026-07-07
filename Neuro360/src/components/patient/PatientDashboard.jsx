@@ -117,6 +117,40 @@ import { getCareProtocol } from '../../utils/careProtocolLookup';
 
 const CARE_PROGRAM_YOGA_NIDRA_URL = 'https://sweta8238.graphy.com/products/Yoga-Nidra---The-Ultimate-Whole-Brain-Synchronization-6788054d6cd6065534a49399';
 
+const LEGACY_ASSESSMENTS = {
+  brain_fitness: { title: 'Brain Fitness Score', link: 'https://form.jotform.com/233250136675151', price: 2.99 },
+  brain_burnout: { title: 'Brain Burnout Score', link: 'https://form.jotform.com/260117244562148', price: 2.99 },
+  brain_age: { title: 'Neuro Age Estimator', link: 'https://form.jotform.com/252245065792056', price: 2.99 },
+  dementia_index: { title: 'Dementia Probability Index', link: 'https://form.jotform.com/260034749079159', price: 2.99 },
+  assessment_bundle: {
+    title: 'Complete Brain Assessment Bundle',
+    link: 'https://form.jotform.com/233250136675151,https://form.jotform.com/260117244562148,https://form.jotform.com/252245065792056,https://form.jotform.com/260034749079159',
+    price: 19.99,
+    bundleIds: ['brain_fitness', 'brain_burnout', 'brain_age', 'dementia_index']
+  }
+};
+
+const ASSESSMENT_CARD_STYLES = [
+  { icon: Brain, color: 'from-blue-500 to-blue-600' },
+  { icon: Zap, color: 'from-orange-500 to-red-500' },
+  { icon: Calendar, color: 'from-green-500 to-teal-500' },
+  { icon: Shield, color: 'from-purple-500 to-indigo-500' }
+];
+
+const numberOrZero = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const assessmentCategory = (assessment) => String(assessment?.category || 'individual').toLowerCase();
+
+const bundleLinkFrom = (assessments, bundle) =>
+  bundle?.link || assessments
+    .filter((assessment) => assessmentCategory(assessment) !== 'bundle')
+    .map((assessment) => assessment.link)
+    .filter(Boolean)
+    .join(',');
+
 const normalizeCareProgramText = (value) =>
   String(value || '')
     .toLowerCase()
@@ -372,11 +406,37 @@ const PatientDashboard = () => {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Assessment purchase state
+  const [availableAssessments, setAvailableAssessments] = useState([]);
+  const [assessmentsLoading, setAssessmentsLoading] = useState(true);
   const [purchasedAssessments, setPurchasedAssessments] = useState([]);
   const [isProcessingAssessmentPayment, setIsProcessingAssessmentPayment] = useState(null);
 
   // JotForm iframe modal state
   const [activeJotForm, setActiveJotForm] = useState(null); // { title, link }
+
+  const fetchAvailableAssessments = useCallback(async () => {
+    try {
+      setAssessmentsLoading(true);
+      const { data, error } = await supabase
+        .from('neurosense_assessments')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAvailableAssessments(data || []);
+    } catch (error) {
+      console.error('Error fetching available assessments:', error);
+      setAvailableAssessments([]);
+    } finally {
+      setAssessmentsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAvailableAssessments();
+  }, [fetchAvailableAssessments]);
 
   // Fetch purchased assessments by patient_email
   const fetchPurchasedAssessments = useCallback(async () => {
@@ -402,6 +462,78 @@ const PatientDashboard = () => {
     }
   }, [user?.id, fetchPurchasedAssessments]);
 
+  const assessmentRows = availableAssessments.filter((assessment) => assessmentCategory(assessment) !== 'bundle');
+  const patientAssessmentCards = assessmentRows.map((assessment, index) => {
+    const style = ASSESSMENT_CARD_STYLES[index % ASSESSMENT_CARD_STYLES.length];
+    const price = numberOrZero(assessment.sale_price_usd);
+    const originalPrice = numberOrZero(assessment.original_price_usd);
+    const isFree = Boolean(assessment.is_free);
+
+    return {
+      id: assessment.id,
+      title: assessment.title || 'Brain Assessment',
+      subtitle: isFree ? 'Free' : 'Assessment',
+      desc: assessment.description || '',
+      icon: style.icon,
+      color: style.color,
+      link: assessment.link || '',
+      price,
+      originalPrice,
+      isFree,
+      isInquire: Boolean(assessment.is_inquire)
+    };
+  });
+  const patientAssessmentBundleRow = availableAssessments.find((assessment) => assessmentCategory(assessment) === 'bundle');
+  const patientAssessmentBundle = patientAssessmentBundleRow
+    ? {
+      id: patientAssessmentBundleRow.id,
+      title: patientAssessmentBundleRow.title || 'Complete Brain Assessment Bundle',
+      description: patientAssessmentBundleRow.description || `Get all ${patientAssessmentCards.length} assessments: ${patientAssessmentCards.map((assessment) => assessment.title).join(', ')}`,
+      price: numberOrZero(patientAssessmentBundleRow.sale_price_usd),
+      originalPrice: numberOrZero(patientAssessmentBundleRow.original_price_usd),
+      link: bundleLinkFrom(availableAssessments, patientAssessmentBundleRow),
+      isFree: Boolean(patientAssessmentBundleRow.is_free)
+    }
+    : null;
+
+  const getAssessmentDetails = useCallback((assessmentId) => {
+    const assessment = availableAssessments.find((item) => item.id === assessmentId);
+    if (assessment) {
+      const category = assessmentCategory(assessment);
+      const price = numberOrZero(assessment.sale_price_usd);
+      return {
+        name: assessment.title || 'Brain Assessment',
+        link: category === 'bundle' ? bundleLinkFrom(availableAssessments, assessment) : (assessment.link || ''),
+        price,
+        amountLabel: `$${price.toFixed(2)} USD`,
+        bundleIds: category === 'bundle'
+          ? availableAssessments.filter((item) => assessmentCategory(item) !== 'bundle').map((item) => item.id)
+          : []
+      };
+    }
+
+    const legacy = LEGACY_ASSESSMENTS[assessmentId];
+    if (legacy) {
+      return {
+        name: legacy.title,
+        link: legacy.link || '',
+        price: legacy.price,
+        amountLabel: `$${legacy.price.toFixed(2)} USD`,
+        bundleIds: legacy.bundleIds || []
+      };
+    }
+
+    return { name: 'Brain Assessment', link: '', price: 0, amountLabel: '$0.00 USD', bundleIds: [] };
+  }, [availableAssessments]);
+
+  const openAssessment = (assessment) => {
+    if (!assessment.link) {
+      toast.error('Assessment link is not configured yet.');
+      return;
+    }
+    setActiveJotForm({ title: assessment.title, link: assessment.link });
+  };
+
   // Show clinical history popup when entering profile page
   useEffect(() => {
     if (activeTab === 'profile' && !loading && clinicalReport === null) {
@@ -414,7 +546,7 @@ const PatientDashboard = () => {
   }, [activeTab, loading, clinicalReport]);
 
   // Handle assessment purchase
-  const handleAssessmentPurchase = async (assessmentId, assessmentTitle, price) => {
+  const handleAssessmentPurchase = async (assessmentId, assessmentTitle, price, assessmentLink = '') => {
     if (!user?.email) {
       toast.error('Please log in to make a purchase');
       return;
@@ -422,15 +554,6 @@ const PatientDashboard = () => {
     setIsProcessingAssessmentPayment(assessmentId);
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-      // Find assessment link for email delivery
-      const assessmentData = [
-        { id: 'brain_fitness', link: 'https://form.jotform.com/233250136675151' },
-        { id: 'brain_burnout', link: 'https://form.jotform.com/260117244562148' },
-        { id: 'brain_age', link: 'https://form.jotform.com/252245065792056' },
-        { id: 'dementia_index', link: 'https://form.jotform.com/260034749079159' },
-        { id: 'assessment_bundle', link: 'https://form.jotform.com/233250136675151,https://form.jotform.com/260117244562148,https://form.jotform.com/252245065792056,https://form.jotform.com/260034749079159' }
-      ];
-      const assessmentLink = assessmentData.find(a => a.id === assessmentId)?.link || '';
 
       const response = await fetch(`${API_URL}/create-assessment-checkout`, {
         method: 'POST',
@@ -471,24 +594,13 @@ const PatientDashboard = () => {
     const sessionId = urlParams.get('session_id');
 
     if (paymentStatus === 'success' && assessmentId) {
+      if (!LEGACY_ASSESSMENTS[assessmentId] && assessmentsLoading) return;
+
+      const assessmentDetails = getAssessmentDetails(assessmentId);
+
       // Save payment directly to database
       const savePatientPayment = async () => {
         try {
-          const assessmentNames = {
-            brain_fitness: 'Brain Fitness Score',
-            brain_burnout: 'Brain Burnout Score',
-            brain_age: 'Neuro Age Estimator',
-            dementia_index: 'Dementia Probability Index',
-            assessment_bundle: 'Complete Brain Assessment Bundle'
-          };
-          const assessmentLinks = {
-            brain_fitness: 'https://form.jotform.com/233250136675151',
-            brain_burnout: 'https://form.jotform.com/260117244562148',
-            brain_age: 'https://form.jotform.com/252245065792056',
-            dementia_index: 'https://form.jotform.com/260034749079159',
-            assessment_bundle: 'https://form.jotform.com/233250136675151,https://form.jotform.com/260117244562148,https://form.jotform.com/252245065792056,https://form.jotform.com/260034749079159'
-          };
-
           // Check if already saved (prevent duplicates on page refresh)
           if (sessionId) {
             const { data: existing } = await supabase
@@ -541,13 +653,13 @@ const PatientDashboard = () => {
               patient_id: user.id || null,
               patient_email: user.email.toLowerCase(),
               patient_name: user.name || user.user_metadata?.full_name || '',
-              amount: assessmentId === 'assessment_bundle' ? 19.99 : 2.99,
+              amount: assessmentDetails.price,
               currency: 'USD',
               status: 'completed',
               type: 'assessment',
-              item_name: assessmentNames[assessmentId] || 'Brain Assessment',
+              item_name: assessmentDetails.name,
               assessment_id: assessmentId,
-              assessment_link: assessmentLinks[assessmentId] || '',
+              assessment_link: assessmentDetails.link,
               stripe_session_id: sessionId || null,
               source: 'About the Brain',
               created_at: new Date().toISOString()
@@ -564,10 +676,10 @@ const PatientDashboard = () => {
             .insert({
               patient_email: user.email.toLowerCase(),
               assessment_id: assessmentId,
-              assessment_name: assessmentNames[assessmentId] || 'Brain Assessment',
-              assessment_link: assessmentLinks[assessmentId] || '',
+              assessment_name: assessmentDetails.name,
+              assessment_link: assessmentDetails.link,
               stripe_session_id: sessionId || null,
-              amount_paid: assessmentId === 'assessment_bundle' ? 19.99 : 2.99,
+              amount_paid: assessmentDetails.price,
               currency: 'USD',
               status: 'completed',
               purchased_at: new Date().toISOString()
@@ -576,29 +688,29 @@ const PatientDashboard = () => {
           if (apError) {
           }
 
-          // Handle bundle — mark all 4 assessments as purchased
-          if (assessmentId === 'assessment_bundle') {
-            const bundleIds = ['brain_fitness', 'brain_burnout', 'brain_age', 'dementia_index'];
+          // Handle bundle — mark all included assessments as purchased.
+          if (assessmentDetails.bundleIds.length > 0) {
             // Insert all bundle items in parallel (was sequential awaits).
-            await Promise.all(bundleIds.map((bId) =>
-              supabase.from('assessment_purchases').insert({
+            await Promise.all(assessmentDetails.bundleIds.map((bId) => {
+              const bundleDetails = getAssessmentDetails(bId);
+              return supabase.from('assessment_purchases').insert({
                 patient_email: user.email.toLowerCase(),
                 assessment_id: bId,
-                assessment_name: assessmentNames[bId],
-                assessment_link: assessmentLinks[bId],
+                assessment_name: bundleDetails.name,
+                assessment_link: bundleDetails.link,
                 stripe_session_id: sessionId ? `${sessionId}_${bId}` : null,
                 amount_paid: 0,
                 currency: 'USD',
                 status: 'completed',
                 purchased_at: new Date().toISOString()
-              }).catch(err => console.warn(`Bundle item ${bId} save skipped:`, err.message))
-            ));
+              }).catch(err => console.warn(`Bundle item ${bId} save skipped:`, err.message));
+            }));
           }
           // Send JotForm link email to patient
           try {
             const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-            const emailAssessmentLink = assessmentLinks[assessmentId] || '';
-            const emailAmountPaid = assessmentId === 'assessment_bundle' ? '19.99' : '2.99';
+            const emailAssessmentLink = assessmentDetails.link;
+            const emailAmountPaid = assessmentDetails.price.toFixed(2);
 
             // Fetch clinic name and patient details from DB directly (patientData may still be loading)
             let emailClinicName = '';
@@ -629,7 +741,7 @@ const PatientDashboard = () => {
               body: JSON.stringify({
                 customerEmail: user.email,
                 customerName: patientDetails.name,
-                assessmentName: assessmentNames[assessmentId] || 'Brain Assessment',
+                assessmentName: assessmentDetails.name,
                 assessmentLink: emailAssessmentLink,
                 amountPaid: emailAmountPaid,
                 currency: 'USD',
@@ -651,24 +763,9 @@ const PatientDashboard = () => {
         }
       };
 
-      const assessmentNames = {
-        brain_fitness: 'Brain Fitness Score',
-        brain_burnout: 'Brain Burnout Score',
-        brain_age: 'Neuro Age Estimator',
-        dementia_index: 'Dementia Probability Index',
-        assessment_bundle: 'Complete Brain Assessment Bundle'
-      };
-      const prices = {
-        brain_fitness: '$2.99 USD',
-        brain_burnout: '$2.99 USD',
-        brain_age: '$2.99 USD',
-        dementia_index: '$2.99 USD',
-        assessment_bundle: '$19.99 USD'
-      };
-
       setPaymentSuccessDetails({
-        name: assessmentNames[assessmentId] || 'Brain Assessment',
-        amount: prices[assessmentId] || '$9.99 USD',
+        name: assessmentDetails.name,
+        amount: assessmentDetails.amountLabel,
         email: user?.email || '',
         date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
         transactionId: sessionId || 'N/A'
@@ -682,7 +779,7 @@ const PatientDashboard = () => {
       toast.error('Payment was cancelled');
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [fetchPurchasedAssessments, user?.id, user?.email, patientClinicId]);
+  }, [assessmentsLoading, fetchPurchasedAssessments, getAssessmentDetails, user?.id, user?.email, patientClinicId]);
 
   const handleLogout = async () => {
     await logout();
@@ -5215,61 +5312,27 @@ const PatientDashboard = () => {
           <div className="p-3 sm:p-6">
             {/* Assessment Links with Detailed Descriptions */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-              {[
-                {
-                  id: 'brain_fitness',
-                  title: 'Brain Fitness Score',
-                  subtitle: 'Your Readiness Score',
-                  desc: 'Your Brain Fitness Score is a simple, at-a-glance number that summarizes how well your brain is currently operating across core systems like focus, resilience, recovery, and cognitive efficiency. Think of it like a "readiness score" for your mind, showing how prepared you are for daily performance, learning, decision-making, and emotional steadiness, and where targeted habits can move the needle quickly.',
-                  icon: Brain,
-                  color: 'from-blue-500 to-blue-600',
-                  link: 'https://form.jotform.com/233250136675151',
-                  price: 2.99,
-                  originalPrice: 9.99
-                },
-                {
-                  id: 'brain_burnout',
-                  title: 'Brain Burnout Score',
-                  subtitle: 'Neuro Stress Meter',
-                  desc: 'Your Brain Burnout Index reflects the load your brain is carrying, how strained your nervous system is, how depleted your recovery is, and whether stress is starting to show up as fog, irritability, low motivation, or reduced focus. It helps you distinguish "I\'m busy" from "I\'m running on empty," so you can intervene before burnout takes hold.',
-                  icon: Zap,
-                  color: 'from-orange-500 to-red-500',
-                  link: 'https://form.jotform.com/260117244562148',
-                  price: 2.99,
-                  originalPrice: 9.99
-                },
-                {
-                  id: 'brain_age',
-                  title: 'Neuro Age Estimator',
-                  subtitle: 'Neuro-Longevity',
-                  desc: 'Your Brain Age Estimator compares how your brain is functioning today (attention, speed, memory, regulation) against typical patterns across age groups, so you can see whether your brain is performing "younger," "on track," or "older" than your chronological age. It\'s not a label, it\'s a directional snapshot that helps you track progress over time and spot areas where sleep, stress, and lifestyle may be quietly aging your brain faster than they should.',
-                  icon: Calendar,
-                  color: 'from-green-500 to-teal-500',
-                  link: 'https://form.jotform.com/252245065792056',
-                  price: 2.99,
-                  originalPrice: 9.99
-                },
-                {
-                  id: 'dementia_index',
-                  title: 'Dementia Probability Index',
-                  subtitle: 'Risk Assessment',
-                  desc: 'This index evaluates your cognitive risk factors based on lifestyle, genetics, and brain health markers. It provides early warning signals and actionable preventive measures to help maintain long-term brain health and reduce the probability of cognitive decline.',
-                  icon: Shield,
-                  color: 'from-purple-500 to-indigo-500',
-                  link: 'https://form.jotform.com/260034749079159',
-                  price: 2.99,
-                  originalPrice: 9.99
-                }
-              ].map((assessment, idx) => {
+              {assessmentsLoading ? (
+                <div className="md:col-span-2 text-center py-6 text-sm text-gray-500 dark:text-gray-400">
+                  Loading assessments...
+                </div>
+              ) : patientAssessmentCards.length === 0 ? (
+                <div className="md:col-span-2 text-center py-6 text-sm text-gray-500 dark:text-gray-400">
+                  No active assessments available.
+                </div>
+              ) : patientAssessmentCards.map((assessment) => {
                 const isPurchased = purchasedAssessments.includes(assessment.id);
+                const hasAccess = isPurchased || assessment.isFree;
+                const canInquire = assessment.isInquire && assessment.link;
+                const canBuy = !assessment.isInquire && assessment.price > 0 && assessment.link;
                 return (
                   <div
-                    key={idx}
+                    key={assessment.id}
                     className="bg-gray-50 dark:bg-gray-700 rounded-xl p-3 sm:p-5 hover:shadow-lg transition-all cursor-pointer group border border-gray-200 dark:border-gray-600 hover:border-[#323956] relative"
                   >
                     {/* Lock/Unlocked Icon */}
-                    <div className={`absolute top-2.5 right-2.5 sm:top-3 sm:right-3 ${isPurchased ? 'bg-green-100 dark:bg-green-900' : 'bg-gray-200 dark:bg-gray-600'} rounded-full p-1 sm:p-1.5`}>
-                      {isPurchased ? (
+                    <div className={`absolute top-2.5 right-2.5 sm:top-3 sm:right-3 ${hasAccess ? 'bg-green-100 dark:bg-green-900' : 'bg-gray-200 dark:bg-gray-600'} rounded-full p-1 sm:p-1.5`}>
+                      {hasAccess ? (
                         <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-green-600 dark:text-green-400" />
                       ) : (
                         <Lock className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-gray-500 dark:text-gray-400" />
@@ -5295,12 +5358,12 @@ const PatientDashboard = () => {
                           {assessment.desc}
                         </p>
 
-                        {isPurchased ? (
+                        {hasAccess ? (
                           <button
                             className="mt-2 sm:mt-3 px-3 sm:px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm font-semibold rounded-lg inline-flex items-center space-x-1.5 transition-all"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setActiveJotForm({ title: assessment.title, link: assessment.link });
+                              openAssessment(assessment);
                             }}
                           >
                             <Play className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
@@ -5309,15 +5372,21 @@ const PatientDashboard = () => {
                         ) : (
                           <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-2 sm:gap-3">
                             <div className="flex items-center space-x-1">
-                              <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">{assessment.price} USD</span>
-                              <span className="text-xs sm:text-sm text-gray-400 line-through">{assessment.originalPrice} USD</span>
+                              <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">{assessment.price.toFixed(2)} USD</span>
+                              {assessment.originalPrice > assessment.price && (
+                                <span className="text-xs sm:text-sm text-gray-400 line-through">{assessment.originalPrice.toFixed(2)} USD</span>
+                              )}
                             </div>
                             <button
                               className="px-3 sm:px-4 py-1.5 bg-gradient-to-r from-[#323956] to-[#232D3C] hover:from-[#3d4569] hover:to-[#2d3a4d] disabled:opacity-50 text-white text-xs sm:text-sm font-semibold rounded-lg flex items-center space-x-1.5 transition-all"
-                              disabled={isProcessingAssessmentPayment === assessment.id}
+                              disabled={!(canBuy || canInquire) || isProcessingAssessmentPayment === assessment.id}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleAssessmentPurchase(assessment.id, assessment.title, assessment.price);
+                                if (assessment.isInquire) {
+                                  openAssessment(assessment);
+                                } else {
+                                  handleAssessmentPurchase(assessment.id, assessment.title, assessment.price, assessment.link);
+                                }
                               }}
                             >
                               {isProcessingAssessmentPayment === assessment.id ? (
@@ -5328,7 +5397,7 @@ const PatientDashboard = () => {
                               ) : (
                                 <>
                                   <ShoppingCart className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                                  <span>Buy Now</span>
+                                  <span>{assessment.isInquire ? 'Inquire' : canBuy ? 'Buy Now' : 'Unavailable'}</span>
                                 </>
                               )}
                             </button>
@@ -5341,37 +5410,46 @@ const PatientDashboard = () => {
               })}
             </div>
 
-            {/* Bundle Card - All 4 Assessments */}
-            <div className="mt-4 sm:mt-6 bg-gradient-to-r from-[#323956] to-[#232D3C] rounded-xl p-4 sm:p-6 text-white relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2"></div>
-              <div className="relative z-10 flex flex-col gap-4">
-                <div className="flex items-start space-x-3 sm:space-x-4">
-                  <div className="p-2.5 sm:p-3 bg-white/10 rounded-xl flex-shrink-0">
-                    <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-300" />
+            {/* Bundle Card */}
+            {patientAssessmentBundle && (
+              <div className="mt-4 sm:mt-6 bg-gradient-to-r from-[#323956] to-[#232D3C] rounded-xl p-4 sm:p-6 text-white relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+                <div className="relative z-10 flex flex-col gap-4">
+                  <div className="flex items-start space-x-3 sm:space-x-4">
+                    <div className="p-2.5 sm:p-3 bg-white/10 rounded-xl flex-shrink-0">
+                      <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-300" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm sm:text-lg font-bold mb-1">{patientAssessmentBundle.title}</h4>
+                      <p className="text-xs sm:text-sm text-gray-300">{patientAssessmentBundle.description}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-sm sm:text-lg font-bold mb-1">Complete Brain Assessment Bundle</h4>
-                    <p className="text-xs sm:text-sm text-gray-300">Get all 4 assessments: Brain Fitness Score, Brain Burnout Score, Neuro Age Estimator & Dementia Probability Index</p>
+                  <div className="flex items-center justify-between sm:justify-end sm:space-x-4">
+                    <div className="text-left sm:text-right">
+                      <span className="text-lg sm:text-2xl font-bold">{patientAssessmentBundle.price.toFixed(2)} USD</span>
+                      {patientAssessmentBundle.originalPrice > patientAssessmentBundle.price && (
+                        <span className="block text-xs sm:text-sm text-gray-400 line-through">{patientAssessmentBundle.originalPrice.toFixed(2)} USD</span>
+                      )}
+                    </div>
+                    <button
+                      className="px-4 sm:px-5 py-2 sm:py-2.5 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-60 text-gray-900 font-bold rounded-lg transition-all text-xs sm:text-sm flex items-center space-x-1.5 sm:space-x-2"
+                      disabled={!patientAssessmentBundle.isFree && (!patientAssessmentBundle.link || patientAssessmentBundle.price <= 0 || isProcessingAssessmentPayment === patientAssessmentBundle.id)}
+                      onClick={() => {
+                        if (patientAssessmentBundle.isFree) {
+                          openAssessment(patientAssessmentBundle);
+                        } else {
+                          handleAssessmentPurchase(patientAssessmentBundle.id, patientAssessmentBundle.title, patientAssessmentBundle.price, patientAssessmentBundle.link);
+                        }
+                      }}
+                    >
+                      <ShoppingCart className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      <span>{patientAssessmentBundle.isFree ? 'Get Bundle' : 'Buy Bundle'}</span>
+                    </button>
                   </div>
-                </div>
-                <div className="flex items-center justify-between sm:justify-end sm:space-x-4">
-                  <div className="text-left sm:text-right">
-                    <span className="text-lg sm:text-2xl font-bold">19.99 USD</span>
-                    <span className="block text-xs sm:text-sm text-gray-400 line-through">89.95 USD</span>
-                  </div>
-                  <button
-                    className="px-4 sm:px-5 py-2 sm:py-2.5 bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-bold rounded-lg transition-all text-xs sm:text-sm flex items-center space-x-1.5 sm:space-x-2"
-                    onClick={() => {
-                      handleAssessmentPurchase('assessment_bundle', 'Neurosense Bundle', 19.99);
-                    }}
-                  >
-                    <ShoppingCart className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    <span>Buy Bundle</span>
-                  </button>
                 </div>
               </div>
-            </div>
+            )}
 
           </div>
         </div>

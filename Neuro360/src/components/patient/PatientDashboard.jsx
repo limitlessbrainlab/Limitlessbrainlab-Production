@@ -8001,7 +8001,7 @@ const PatientDashboard = () => {
         benefits: ['Raise awareness', 'Higher self connection', 'Spiritual insight', 'Third eye activation'],
         bestTime: 'Spiritual practice',
         driveId: '1vEFc2wuiSkRANWkTozTcH7-Wnni8KkQo',
-        image: '/meditation/852 Hz_page-0001.webp',
+        image: '/meditation/852_Hz_page-0001.webp',
         stripeProductId: 'prod_solfeggio_852',
         price: 25,
         originalPrice: 49
@@ -8018,7 +8018,7 @@ const PatientDashboard = () => {
         benefits: ['Pineal gland activation', 'Divine consciousness', 'Unlock potential', 'Connect to infinite'],
         bestTime: 'Deep meditation',
         driveId: '14hDaC2Ud7YwDlmX7JEHMVkLNKKmDogP7',
-        image: '/meditation/963 Hz_page-0001.webp',
+        image: '/meditation/963_Hz_page-0001.webp',
         stripeProductId: 'prod_solfeggio_963',
         price: 25,
         originalPrice: 49

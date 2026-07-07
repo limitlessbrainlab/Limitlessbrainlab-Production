@@ -418,7 +418,7 @@ const FrequenciesMusic = () => {
       category: 'Tissue Healing & Energy Fields Restoration',
       color: 'from-amber-500 to-yellow-600',
       driveId: '13C0mos5wHHi1zuYFyPM8XEiv83CCax0i',
-      image: '/meditation/285 Hz_page-0001.webp',
+      image: '/meditation/285_Hz_page-0001.webp',
       price: 29,
       originalPrice: 49
     },
@@ -430,7 +430,7 @@ const FrequenciesMusic = () => {
       category: 'Release Fear & Guilt',
       color: 'from-slate-500 to-gray-600',
       driveId: '1vEFc2wuiSkRANWkTozTcH7-Wnni8KkQo',
-      image: '/meditation/396 Hz_page-0001.webp',
+      image: '/meditation/396_Hz_page-0001.webp',
       price: 29,
       originalPrice: 49
     },
@@ -442,7 +442,7 @@ const FrequenciesMusic = () => {
       category: 'Initiate Positive Change',
       color: 'from-cyan-500 to-blue-600',
       driveId: '14hDaC2Ud7YwDlmX7JEHMVkLNKKmDogP7',
-      image: '/meditation/417 Hz_page-0001.webp',
+      image: '/meditation/417_Hz_page-0001.webp',
       price: 29,
       originalPrice: 49
     },
@@ -454,7 +454,7 @@ const FrequenciesMusic = () => {
       category: 'Activate DNA & Love Frequency',
       color: 'from-rose-500 to-orange-500',
       driveId: '1x6gj-41wpTNVv-Ng76zse1CWUoAN60N8',
-      image: '/meditation/528 Hz_page-0001.webp',
+      image: '/meditation/528_Hz_page-0001.webp',
       price: 29,
       originalPrice: 49
     },
@@ -466,7 +466,7 @@ const FrequenciesMusic = () => {
       category: 'Harmonize Relationships',
       color: 'from-blue-500 to-purple-600',
       driveId: '13zc55FIM9zThAi06BKy4NC_6nVNFX1Bn',
-      image: '/meditation/639 Hz_page-0001.webp',
+      image: '/meditation/639_Hz_page-0001.webp',
       price: 29,
       originalPrice: 49
     },
@@ -478,7 +478,7 @@ const FrequenciesMusic = () => {
       category: 'Cleanse Toxins & Awaken Intuition',
       color: 'from-teal-500 to-emerald-600',
       driveId: '13C0mos5wHHi1zuYFyPM8XEiv83CCax0i',
-      image: '/meditation/741 Hz_page-0001.webp',
+      image: '/meditation/741_Hz_page-0001.webp',
       price: 29,
       originalPrice: 49
     },
@@ -490,7 +490,7 @@ const FrequenciesMusic = () => {
       category: 'Awaken Spiritual Insight',
       color: 'from-indigo-600 to-purple-700',
       driveId: '1vEFc2wuiSkRANWkTozTcH7-Wnni8KkQo',
-      image: '/meditation/852 Hz_page-0001.webp',
+      image: '/meditation/852_Hz_page-0001.webp',
       price: 25,
       originalPrice: 49
     },
@@ -502,7 +502,7 @@ const FrequenciesMusic = () => {
       category: 'Pineal Gland & Divine Consciousness',
       color: 'from-orange-500 to-red-600',
       driveId: '14hDaC2Ud7YwDlmX7JEHMVkLNKKmDogP7',
-      image: '/meditation/963 Hz_page-0001.webp',
+      image: '/meditation/963_Hz_page-0001.webp',
       price: 25,
       originalPrice: 49
     },

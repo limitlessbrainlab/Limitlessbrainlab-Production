@@ -37,6 +37,12 @@ const getSupabasePublicStorageUrl = (bucket, objectPath) =>
   `${SUPABASE_STORAGE_URL}/storage/v1/object/public/${bucket}/${objectPath.split('/').map(encodeURIComponent).join('/')}`;
 const getFrequencyMediaUrl = (objectPath) => getSupabasePublicStorageUrl('frequncies', objectPath);
 
+const getYouTubeThumbnail = (url) => {
+  if (!url) return null;
+  const m = url.match(/(?:youtube\.com\/embed\/|youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m ? `https://img.youtube.com/vi/${m[1]}/maxresdefault.jpg` : null;
+};
+
 const ANSResetProtocol = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -2231,9 +2237,18 @@ const ANSResetProtocol = () => {
                           playsInline
                         />
                       ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-gray-900 to-green-900 flex items-center justify-center">
-                          <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center">
-                            <Play className="h-7 w-7 text-white ml-1" />
+                        <div className="relative w-full h-full">
+                          <img
+                            src={getYouTubeThumbnail(video.url)}
+                            alt={video.name}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            loading="lazy"
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                          <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-gray-900 to-green-900 flex items-center justify-center">
+                            <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center">
+                              <Play className="h-7 w-7 text-white ml-1" />
+                            </div>
                           </div>
                         </div>
                       )}

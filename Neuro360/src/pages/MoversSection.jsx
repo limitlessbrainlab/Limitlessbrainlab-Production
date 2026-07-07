@@ -64,6 +64,7 @@ const normalizeMoverActivity = (activity) => {
 const MoversSection = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('daily');
+  const [showMoversVideo, setShowMoversVideo] = useState(false);
   const [completedActivities, setCompletedActivities] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -249,6 +250,7 @@ const MoversSection = () => {
 
   // Theory video URL
   const theoryVideoUrl = 'https://www.youtube.com/embed/Uo5bx0ZPoTU';
+  const theoryVideoThumbnail = 'https://img.youtube.com/vi/Uo5bx0ZPoTU/hqdefault.jpg';
 
   // Mapping of brain parameters to MOVERS categories
   const parameterToMoversMap = {
@@ -900,14 +902,38 @@ const MoversSection = () => {
               </div>
               <div className="p-3 sm:p-6">
                 <div className="aspect-video rounded-lg sm:rounded-xl overflow-hidden bg-gray-900">
-                  <iframe
-                    src={theoryVideoUrl}
-                    title="Movers Video"
-                    className="w-full h-full"
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
+                  {showMoversVideo ? (
+                    <iframe
+                      src={theoryVideoUrl}
+                      title="Movers Video"
+                      className="w-full h-full"
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowMoversVideo(true)}
+                      className="relative w-full h-full text-white"
+                    >
+                      <img
+                        src={theoryVideoThumbnail}
+                        alt="MOVERS introduction video thumbnail"
+                        className="absolute inset-0 h-full w-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-black/35" />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                        <span className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center">
+                          <Play className="h-7 w-7 ml-1" />
+                        </span>
+                        <span className="text-sm sm:text-base font-semibold">Play MOVERS video</span>
+                      </div>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

@@ -2032,12 +2032,12 @@ const BrainCoach = () => {
               >
                 <Users className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
-              <button
+              {/* <button
                 onClick={() => setViewMode('map')}
                 className={`p-2 ${viewMode === 'map' ? 'bg-[#E4EFFF] dark:bg-blue-900/30 text-[#323956]' : 'text-gray-400'}`}
               >
                 <MapIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-              </button>
+              </button> */}
             </div>
           </div>
         </div>

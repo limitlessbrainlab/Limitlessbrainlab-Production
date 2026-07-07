@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import useRealtimeRefetch from '../hooks/useRealtimeRefetch';
 import {
   Brain,
   Activity,
@@ -43,6 +44,7 @@ const HomeNeurofeedback = () => {
   // State
   const [isLoading, setIsLoading] = useState(true);
   const [patientName, setPatientName] = useState('');
+  const [patientDbId, setPatientDbId] = useState('');
   const [parameterScores, setParameterScores] = useState({});
   const [lowestParameters, setLowestParameters] = useState([]);
   const [sessions, setSessions] = useState([]);
@@ -79,6 +81,53 @@ const HomeNeurofeedback = () => {
     { key: 'learning', label: 'Learning', icon: BookOpen, color: 'teal', bgColor: 'bg-teal-100', textColor: 'text-teal-600' },
     { key: 'creativity', label: 'Creativity', icon: Moon, color: 'indigo', bgColor: 'bg-indigo-100', textColor: 'text-indigo-600' }
   ];
+
+  const normalizeName = (value) => String(value || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ');
+  const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+  const toScoreOutOf3 = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'object') {
+      return toScoreOutOf3(value.score ?? value.rawScore ?? value.raw_score ?? value.percentage);
+    }
+    if (typeof value === 'string') {
+      const fraction = value.match(/^\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*$/);
+      if (fraction) return Number(fraction[1]);
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? toScoreOutOf3(parsed) : null;
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      if (value <= 3) return Math.round(value);
+      if (value <= 100) return value <= 33 ? 1 : value <= 66 ? 2 : 3;
+      return Math.max(0, Math.min(3, Math.round(value)));
+    }
+    return null;
+  };
+
+  const AnimatedScore = ({ value }) => {
+    const [displayValue, setDisplayValue] = useState(0);
+
+    useEffect(() => {
+      const target = Number.isFinite(value) ? value : 0;
+      let start = 0;
+      let raf = 0;
+      const animate = (now) => {
+        if (!start) start = now;
+        const progress = Math.min(1, (now - start) / 700);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setDisplayValue(target * eased);
+        if (progress < 1) raf = requestAnimationFrame(animate);
+      };
+      raf = requestAnimationFrame(animate);
+      return () => cancelAnimationFrame(raf);
+    }, [value]);
+
+    return (
+      <>
+        {Math.round(displayValue)}
+        <span className="text-[0.7em] align-super">/3</span>
+      </>
+    );
+  };
 
   // Fetch patient data
   const fetchData = useCallback(async () => {
@@ -123,12 +172,86 @@ const HomeNeurofeedback = () => {
 
       const displayName = patientData?.name || patientData?.full_name || user?.name || '';
       setPatientName(displayName);
+      setPatientDbId(patientId || '');
 
-      // Fetch algorithm results - try multiple approaches
+      const fetchLatestSharedReport = async () => {
+        let reports = [];
+
+        if (patientId) {
+          const { data } = await supabase
+            .from('reports')
+            .select('*')
+            .eq('patient_id', patientId)
+            .order('created_at', { ascending: false })
+            .limit(10);
+          reports = data || [];
+        }
+
+        if (!reports.length && displayName) {
+          const { data } = await supabase
+            .from('reports')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          const nameKey = normalizeName(displayName);
+          const emailKey = normalizeEmail(patientEmail);
+          reports = (data || []).filter((report) => {
+            const rd = report.reportData || report.report_data || {};
+            const reportName = normalizeName(report.patient_name || rd.patientName || rd.patient_name || '');
+            const reportEmail = normalizeEmail(rd.patientEmail || rd.patient_email || '');
+            return (nameKey && reportName === nameKey) || (emailKey && reportEmail === emailKey);
+          });
+        }
+
+        return (reports || []).find((report) => {
+          const rd = report.reportData || report.report_data || {};
+          return rd.brainParameters || rd.brain_parameters;
+        }) || null;
+      };
+
+      const formatReportScores = (brainParams) => {
+        const scoreMap = {};
+        const items = Array.isArray(brainParams)
+          ? brainParams
+          : Object.entries(brainParams || {}).map(([key, value]) => ({ key, ...((typeof value === 'object' && value) ? value : { score: value }) }));
+
+        items.forEach((item) => {
+          const rawKey = (item.key || item.name || '').toLowerCase();
+          const normalizedKey = rawKey.replace(/[^a-z]/g, '');
+          const resolvedKey = normalizedKey.includes('stress') ? 'stress'
+            : normalizedKey.includes('focus') ? 'focus-attention'
+            : normalizedKey.includes('burnout') || normalizedKey.includes('fatigue') ? 'burnout-fatigue'
+            : normalizedKey.includes('emotion') ? 'emotional-regulation'
+            : normalizedKey.includes('learning') ? 'learning'
+            : normalizedKey.includes('creativ') ? 'creativity'
+            : normalizedKey.includes('cognit') ? 'cognition'
+            : null;
+          if (!resolvedKey) return;
+          const score = toScoreOutOf3(item.score ?? item.rawScore ?? item.raw_score ?? item.value ?? item.percentage);
+          if (score !== null) scoreMap[resolvedKey] = score;
+        });
+
+        return scoreMap;
+      };
+
+      // Fetch report data first, then fall back to legacy algorithm results.
+      let reportData = null;
+      try {
+        reportData = await fetchLatestSharedReport();
+      } catch (error) {
+        console.error('Error fetching shared report:', error);
+      }
+
       let algorithmData = null;
+      let resolvedScores = null;
+      if (reportData) {
+        const rd = reportData.reportData || reportData.report_data || {};
+        resolvedScores = formatReportScores(rd.brainParameters || rd.brain_parameters);
+      }
 
       // Method 1: Try fetching with patient_id (UUID)
-      if (patientId) {
+      if (!resolvedScores && patientId) {
         const { data: algData1, error: err1 } = await supabase
           .from('algorithm_results')
           .select('results, patient_name, input_data, output_data')
@@ -144,7 +267,7 @@ const HomeNeurofeedback = () => {
       }
 
       // Method 2: Try fetching by patient_name
-      if (!algorithmData && displayName) {
+      if (!resolvedScores && !algorithmData && displayName) {
         const { data: algData2, error: err2 } = await supabase
           .from('algorithm_results')
           .select('results, patient_name, input_data, output_data')
@@ -160,7 +283,7 @@ const HomeNeurofeedback = () => {
       }
 
       // Method 3: Get latest algorithm result and check if it matches
-      if (!algorithmData) {
+      if (!resolvedScores && !algorithmData) {
         const { data: allResults, error: err3 } = await supabase
           .from('algorithm_results')
           .select('results, patient_name, input_data, output_data, patient_id')
@@ -183,9 +306,17 @@ const HomeNeurofeedback = () => {
 
 
       // Use results or output_data (both contain the same data)
-      const resultsData = algorithmData?.results || algorithmData?.output_data;
+      const resultsData = resolvedScores ? null : (algorithmData?.results || algorithmData?.output_data);
 
-      if (resultsData) {
+      if (resolvedScores) {
+        setParameterScores(resolvedScores);
+        const sortedParams = allParameters
+          .map(p => ({ ...p, score: resolvedScores[p.key] }))
+          .filter(p => p.score !== undefined && p.score !== null)
+          .sort((a, b) => a.score - b.score)
+          .slice(0, 2);
+        setLowestParameters(sortedParams);
+      } else if (resultsData) {
         const results = resultsData;
         const scores = {};
 
@@ -266,24 +397,18 @@ const HomeNeurofeedback = () => {
           scores['creativity'] = toScore3(results.creativity || 50);
         }
 
-        // Fill any missing scores with 2 (middle value out of 3) - but keep 0 if explicitly set
-        allParameters.forEach(p => {
-          if (scores[p.key] === undefined || scores[p.key] === null || isNaN(scores[p.key])) {
-            scores[p.key] = 2; // Default to 2/3
-          }
-        });
-
         setParameterScores(scores);
 
         // Find lowest 2 parameters (scores are now 0-3, not percentages)
         const sortedParams = allParameters
-          .map(p => ({ ...p, score: scores[p.key] ?? 2 }))
+          .map(p => ({ ...p, score: scores[p.key] }))
+          .filter(p => p.score !== undefined && p.score !== null)
           .sort((a, b) => a.score - b.score)
           .slice(0, 2);
         setLowestParameters(sortedParams);
 
       } else {
-        // No algorithm results found - keep empty state
+        // No report data found - keep empty state instead of showing fake values.
         setParameterScores({});
         setLowestParameters([]);
       }
@@ -336,6 +461,12 @@ const HomeNeurofeedback = () => {
       setIsLoading(false);
     }
   }, [patientEmail]);
+
+  useRealtimeRefetch(
+    patientDbId ? [{ table: 'reports', filter: `patient_id=eq.${patientDbId}` }] : [],
+    () => fetchData(),
+    [patientDbId, patientEmail, user?.name]
+  );
 
   useEffect(() => {
     fetchData();
@@ -540,7 +671,9 @@ const HomeNeurofeedback = () => {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{param.score}</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                        <AnimatedScore value={param.score} />
+                      </p>
                     </div>
                   </div>
                 </div>

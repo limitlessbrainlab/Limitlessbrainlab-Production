@@ -117,6 +117,13 @@ import { getCareProtocol } from '../../utils/careProtocolLookup';
 
 const CARE_PROGRAM_YOGA_NIDRA_URL = 'https://sweta8238.graphy.com/products/Yoga-Nidra---The-Ultimate-Whole-Brain-Synchronization-6788054d6cd6065534a49399';
 
+const getGuideThumbnailUrl = (url) => {
+  if (!url) return null;
+  const youtubeMatch = url.match(/(?:youtube\.com\/embed\/|youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (youtubeMatch) return `https://img.youtube.com/vi/${youtubeMatch[1]}/hqdefault.jpg`;
+  return null;
+};
+
 const LEGACY_ASSESSMENTS = {
   brain_fitness: { title: 'Brain Fitness Score', link: 'https://form.jotform.com/233250136675151', price: 2.99 },
   brain_burnout: { title: 'Brain Burnout Score', link: 'https://form.jotform.com/260117244562148', price: 2.99 },
@@ -1709,7 +1716,7 @@ const PatientDashboard = () => {
     { id: 'neurosense-reports', label: 'Neurosense Performance Reports', icon: Download },
     { id: 'care-program', label: 'Customized Care Program', icon: ClipboardList },
     { id: 'ans-reset', label: 'Breath Reset Protocol', icon: RefreshCw },
-    { id: 'movers', label: 'MOVERS', icon: Activity },
+    // { id: 'movers', label: 'MOVERS', icon: Activity },
     // NeuroCoaching hidden per Dr. Sweta directive (moved to separate page, not on platform)
     // { id: 'neurocoaching', label: 'NeuroCoaching', icon: BrainCircuit },
     { id: 'frequencies', label: 'Frequencies', icon: Music },
@@ -5469,6 +5476,7 @@ const PatientDashboard = () => {
       title: 'Cognition',
       icon: Lightbulb,
       color: '#4F46E5',
+      thumbnailUrl: '/meditation-thumbs/thumb-0.webp',
       intro: 'Cognition encompasses your brain\'s ability to process information, think critically, and make decisions. It\'s the foundation of your mental performance, affecting everything from problem-solving to memory recall. Understanding your cognitive patterns helps optimize your mental capabilities.',
       videoUrl: 'https://embed.ted.com/talks/brendan_conway_smith_metacognition_an_important_skill_for_modern_times',
       brainRegion: {
@@ -5634,6 +5642,7 @@ const PatientDashboard = () => {
       title: 'Stress',
       icon: Zap,
       color: '#EF4444',
+      thumbnailUrl: '/meditation-thumbs/thumb-10.webp',
       intro: 'Stress response is your brain\'s alarm system. While acute stress can sharpen focus, chronic stress damages neural pathways and impairs cognitive function. Understanding your stress patterns helps you build resilience and maintain optimal brain health.',
       videoUrl: 'https://www.youtube.com/embed/RcGyVTAoXEU',
       brainRegion: {
@@ -5785,6 +5794,7 @@ const PatientDashboard = () => {
       title: 'Focus and Attention',
       icon: Target,
       color: '#F59E0B',
+      thumbnailUrl: '/meditation-thumbs/thumb-2.webp',
       intro: 'Focus and attention are the spotlight of your mind, determining what information gets processed deeply. In our distraction-filled world, the ability to sustain attention is a superpower. Training your focus improves productivity, learning, and overall cognitive performance.',
       videoUrl: 'https://www.youtube.com/embed/Hu4Yvq-g7_Y',
       brainRegion: {
@@ -5938,6 +5948,7 @@ const PatientDashboard = () => {
       title: 'Burnout and Fatigue',
       icon: Battery,
       color: '#6B7280',
+      thumbnailUrl: '/meditation-thumbs/thumb-11.webp',
       intro: 'Burnout is the result of chronic stress depleting your mental and physical resources. It\'s not just tiredness, it\'s a state where your brain\'s energy systems are overwhelmed. Recognizing early signs and implementing recovery strategies is essential for long-term brain health.',
       videoUrl: 'https://www.youtube.com/embed/Oht0-qKeUGE',
       brainRegion: {
@@ -6089,6 +6100,7 @@ const PatientDashboard = () => {
       title: 'Emotional Regulation',
       icon: Smile,
       color: '#EF4444',
+      thumbnailUrl: '/meditation-thumbs/thumb-4.webp',
       intro: 'Emotional regulation is your brain\'s ability to manage and respond to emotional experiences appropriately. It\'s not about suppressing emotions but understanding and channeling them effectively. Strong emotional regulation improves relationships, decision-making, and overall well-being.',
       videoUrl: 'https://www.youtube.com/embed/JD4O7ama3o8',
       brainRegion: {
@@ -6240,6 +6252,7 @@ const PatientDashboard = () => {
       title: 'Learning',
       icon: GraduationCap,
       color: '#10B981',
+      thumbnailUrl: '/meditation-thumbs/thumb-1.webp',
       intro: 'Learning is your brain\'s ability to acquire, process, and retain new information and skills. Neuroplasticity, the brain\'s ability to reorganize itself, makes lifelong learning possible. Optimizing your learning capacity unlocks new opportunities and keeps your brain young.',
       videoUrl: 'https://www.youtube.com/embed/5MgBikgcWnY',
       brainRegion: {
@@ -6391,6 +6404,7 @@ const PatientDashboard = () => {
       title: 'Creativity',
       icon: Star,
       color: '#8B5CF6',
+      thumbnailUrl: '/meditation-thumbs/thumb-9.webp',
       intro: 'Creativity is your brain\'s ability to generate novel ideas, make unique connections, and think outside conventional patterns. It involves the interplay of focused attention and relaxed, diffuse thinking. Nurturing creativity enhances problem-solving and brings innovation to all areas of life.',
       videoUrl: 'https://www.youtube.com/embed/Oht0-qKeUGE',
       brainRegion: {
@@ -6546,6 +6560,41 @@ const PatientDashboard = () => {
 
     const Icon = data.icon;
     const [showVisualGuide, setShowVisualGuide] = useState(false);
+    const [visualGuideThumbnail, setVisualGuideThumbnail] = useState('');
+
+    useEffect(() => {
+      let alive = true;
+      setShowVisualGuide(false);
+
+      const directThumbnail = data.thumbnailUrl || getGuideThumbnailUrl(data.videoUrl);
+      if (directThumbnail) {
+        setVisualGuideThumbnail(directThumbnail);
+        return () => {
+          alive = false;
+        };
+      }
+
+      setVisualGuideThumbnail('');
+
+      if (data.videoUrl?.includes('ted.com')) {
+        const tedSlug = data.videoUrl.match(/talks\/([^/?#]+)/)?.[1];
+        if (tedSlug) {
+          const tedUrl = `https://www.ted.com/talks/${tedSlug}`;
+          fetch(`https://www.ted.com/services/v1/oembed.json?url=${encodeURIComponent(tedUrl)}`)
+            .then((response) => (response.ok ? response.json() : null))
+            .then((json) => {
+              if (alive && json?.thumbnail_url) {
+                setVisualGuideThumbnail(json.thumbnail_url);
+              }
+            })
+            .catch(() => {});
+        }
+      }
+
+      return () => {
+        alive = false;
+      };
+    }, [data.videoUrl, parameterKey]);
 
     // Get patient's actual scores from multiple sources (priority order)
     const getPatientScoreData = (paramKey) => {
@@ -7086,6 +7135,34 @@ const PatientDashboard = () => {
       }
 
       const color = isGood ? '#22c55e' : '#ef4444';
+      const [animatedRotation, setAnimatedRotation] = useState(0);
+      const [animatedValue, setAnimatedValue] = useState(null);
+
+      useEffect(() => {
+        let raf = requestAnimationFrame(() => setAnimatedRotation(rotation));
+        return () => cancelAnimationFrame(raf);
+      }, [rotation]);
+
+      useEffect(() => {
+        const numericValue = typeof value === 'number' ? value : Number.parseFloat(value);
+        if (!Number.isFinite(numericValue)) {
+          setAnimatedValue(value);
+          return;
+        }
+
+        let start = 0;
+        let raf = 0;
+        const duration = 700;
+        const animate = (now) => {
+          if (!start) start = now;
+          const progress = Math.min(1, (now - start) / duration);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          setAnimatedValue(numericValue * eased);
+          if (progress < 1) raf = requestAnimationFrame(animate);
+        };
+        raf = requestAnimationFrame(animate);
+        return () => cancelAnimationFrame(raf);
+      }, [value]);
 
       return (
         <div className="flex flex-col items-center">
@@ -7123,7 +7200,8 @@ const PatientDashboard = () => {
                 bottom: '8px',
                 left: '70px',
                 transformOrigin: 'center bottom',
-                transform: `translateX(-50%) rotate(${rotation}deg)`,
+                transform: `translateX(-50%) rotate(${animatedRotation}deg)`,
+                transition: 'transform 700ms cubic-bezier(0.22, 1, 0.36, 1)',
                 zIndex: 5
               }}
             >
@@ -7156,7 +7234,9 @@ const PatientDashboard = () => {
             />
           </div>
           {value ? (
-            <p className="mt-2 text-xs sm:text-sm font-bold" style={{ color }}>Value: {value}</p>
+            <p className="mt-2 text-xs sm:text-sm font-bold" style={{ color }}>
+              Value: {typeof animatedValue === 'number' ? animatedValue.toFixed(Number.isInteger(animatedValue) ? 0 : 2) : animatedValue}
+            </p>
           ) : (
             <p className="mt-2 text-xs sm:text-sm font-bold" style={{ color }}>{score}%</p>
           )}
@@ -7359,12 +7439,25 @@ const PatientDashboard = () => {
                     <button
                       type="button"
                       onClick={() => setShowVisualGuide(true)}
-                      className="w-full h-full bg-gradient-to-br from-[#323956] to-[#4a5578] flex flex-col items-center justify-center text-white hover:from-[#283047] hover:to-[#3d4666] transition-colors"
+                      className="relative w-full h-full overflow-hidden text-white group"
                     >
-                      <span className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center mb-3">
-                        <Play className="h-7 w-7 ml-1" />
-                      </span>
-                      <span className="text-sm sm:text-base font-semibold">Play visual guide</span>
+                      {visualGuideThumbnail ? (
+                        <img
+                          src={visualGuideThumbnail}
+                          alt={`${data.title} visual guide thumbnail`}
+                          className="absolute inset-0 h-full w-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : null}
+                      <div className={`absolute inset-0 ${visualGuideThumbnail ? 'bg-black/35 group-hover:bg-black/25' : 'bg-gradient-to-br from-[#323956] to-[#4a5578] group-hover:from-[#283047] group-hover:to-[#3d4666]'} transition-colors`} />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center mb-3">
+                          <Play className="h-7 w-7 ml-1" />
+                        </span>
+                        <span className="text-sm sm:text-base font-semibold">Play visual guide</span>
+                      </div>
                     </button>
                   )}
                 </div>
@@ -8345,32 +8438,6 @@ const PatientDashboard = () => {
           </div>
         )}
 
-        {/* Tips */}
-        <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl sm:rounded-2xl p-3 sm:p-5 border border-amber-200 dark:border-amber-700">
-          <h3 className="font-bold text-amber-800 dark:text-amber-300 mb-2 sm:mb-3 flex items-center space-x-2 text-xs sm:text-base">
-            <Lightbulb className="h-4 w-4 sm:h-5 sm:w-5" />
-            <span>Meditation Tips for Best Results</span>
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm text-amber-900 dark:text-amber-200">
-            <div className="flex items-start space-x-2 p-2.5 bg-amber-100/50 dark:bg-amber-800/20 rounded-lg">
-              <CheckCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-              <p>Find a quiet, comfortable space where you won't be disturbed</p>
-            </div>
-            <div className="flex items-start space-x-2 p-2.5 bg-amber-100/50 dark:bg-amber-800/20 rounded-lg">
-              <CheckCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-              <p>Use headphones for the best immersive experience</p>
-            </div>
-            <div className="flex items-start space-x-2 p-2.5 bg-amber-100/50 dark:bg-amber-800/20 rounded-lg">
-              <CheckCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-              <p>Practice at the same time daily to build a habit</p>
-            </div>
-            <div className="flex items-start space-x-2 p-2.5 bg-amber-100/50 dark:bg-amber-800/20 rounded-lg">
-              <CheckCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-              <p>Start with shorter sessions and gradually increase</p>
-            </div>
-          </div>
-        </div>
-
         {/* Meditation Guide — "When to Use Each Meditation" table moved to the Frequencies page ("When to Use Each Frequency"). Commented out per request.
         <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg p-3 sm:p-6 border border-gray-200 dark:border-gray-700">
           <h3 className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">When to Use Each Meditation</h3>
@@ -8410,7 +8477,7 @@ const PatientDashboard = () => {
         */}
 
         {/* Meditation Packs Grid */}
-        {meditationPacks.length > 0 && (
+        {false && (
         <div>
           <div className="flex items-center space-x-2 mb-3">
             <div className="bg-[#323956] rounded-lg p-1.5">
@@ -8802,6 +8869,7 @@ const PatientDashboard = () => {
   // MOVERS Section - Simple layout with video and care plan info
   const MoversSection = () => {
     const [showMoversVideo, setShowMoversVideo] = useState(false);
+    const moversVideoThumbnail = 'https://img.youtube.com/vi/Uo5bx0ZPoTU/hqdefault.jpg';
     // State for dynamic 12-week progress tracking (6 Foundation + 6 Mastery)
     const [moversProgress, setMoversProgress] = useState({
       journeyStartDate: null,
@@ -8941,12 +9009,23 @@ const PatientDashboard = () => {
                 <button
                   type="button"
                   onClick={() => setShowMoversVideo(true)}
-                  className="w-full h-[350px] rounded-xl bg-gradient-to-br from-[#323956] to-[#4a5578] flex flex-col items-center justify-center text-white hover:from-[#283047] hover:to-[#3d4666] transition-colors"
+                  className="relative w-full h-[350px] rounded-xl overflow-hidden text-white"
                 >
-                  <span className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center mb-3">
-                    <Play className="h-7 w-7 ml-1" />
-                  </span>
-                  <span className="text-sm sm:text-base font-semibold">Play MOVERS video</span>
+                  <img
+                    src={moversVideoThumbnail}
+                    alt="MOVERS introduction video thumbnail"
+                    className="absolute inset-0 h-full w-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-black/35" />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center mb-3">
+                      <Play className="h-7 w-7 ml-1" />
+                    </span>
+                    <span className="text-sm sm:text-base font-semibold">Play MOVERS video</span>
+                  </div>
                 </button>
               )}
             </div>
@@ -9542,8 +9621,18 @@ const PatientDashboard = () => {
                     key={i}
                     onClick={() => {
                       if (!m.link) return;
-                      if (/^https?:\/\//.test(m.link)) window.open(m.link, '_blank', 'noopener,noreferrer');
-                      else navigate(m.link);
+                      if (/^https?:\/\//.test(m.link)) {
+                        window.open(m.link, '_blank', 'noopener,noreferrer');
+                        return;
+                      }
+                      if (m.link.startsWith('/dashboard/ans-reset')) {
+                        const returnTo = `${location.pathname}${location.search}`;
+                        const nextUrl = new URL(m.link, window.location.origin);
+                        nextUrl.searchParams.set('returnTo', returnTo);
+                        navigate(`${nextUrl.pathname}${nextUrl.search}`);
+                        return;
+                      }
+                      navigate(m.link);
                     }}
                     className="flex items-start space-x-2.5 p-2.5 sm:p-3 bg-gray-50 dark:bg-gray-700/40 rounded-lg border border-gray-100 dark:border-gray-600 text-left w-full hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-700 transition-colors cursor-pointer group"
                   >

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import DatabaseService from '../services/databaseService';
@@ -40,12 +40,15 @@ const getFrequencyMediaUrl = (objectPath) => getSupabasePublicStorageUrl('frequn
 const getYouTubeThumbnail = (url) => {
   if (!url) return null;
   const m = url.match(/(?:youtube\.com\/embed\/|youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-  return m ? `https://img.youtube.com/vi/${m[1]}/maxresdefault.jpg` : null;
+  // ponytail: use the always-available thumbnail; maxresdefault often 404s and drops the card into the fallback state.
+  return m ? `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg` : null;
 };
 
 const ANSResetProtocol = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
+  const returnTo = new URLSearchParams(location.search).get('returnTo') || '/dashboard/welcome';
 
   // Mode and timer state
   const [selectedMode, setSelectedMode] = useState('box'); // 478, sigh, bhramari, box, custom
@@ -1588,11 +1591,11 @@ const ANSResetProtocol = () => {
       <div className="bg-gradient-to-r from-[#323956] to-[#4a5578] text-white">
         <div className="max-w-4xl px-3 sm:px-6 py-4 sm:py-6">
           <button
-            onClick={() => navigate('/dashboard/welcome')}
+            onClick={() => navigate(returnTo)}
             className="flex items-center space-x-2 text-blue-200 hover:text-white mb-3 sm:mb-4 transition-colors"
           >
             <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
-            <span className="text-sm sm:text-base">Back to Dashboard</span>
+            <span className="text-sm sm:text-base">Back</span>
           </button>
 
           <div className="flex items-center space-x-2.5 sm:space-x-4">

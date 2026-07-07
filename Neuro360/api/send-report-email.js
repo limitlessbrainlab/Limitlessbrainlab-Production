@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { createClient } from '@supabase/supabase-js';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
 const FROM_ADDRESS = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@limitlessbrainlab.com';
@@ -24,12 +25,32 @@ function getBody(req) {
   return req.body;
 }
 
+let supabase;
+
+async function requireUser(req) {
+  const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  if (!token) return null;
+
+  const url = process.env.VITE_SUPABASE_URL;
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) throw new Error('Auth service not configured');
+
+  supabase ||= createClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error) return null;
+  return data?.user || null;
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ success: false, message: 'Method not allowed' });
 
   try {
-    if (!String(req.headers.authorization || '').startsWith('Bearer ')) {
+    const user = await requireUser(req);
+    if (!user) {
       return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 

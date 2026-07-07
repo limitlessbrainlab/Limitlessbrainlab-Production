@@ -1144,28 +1144,29 @@ const PatientDashboard = () => {
   // Fetch all reports for the patient (including response reports from super admin)
   const fetchPatientReports = async (patientId, patientName, clinicId, patientEmail) => {
     try {
+      const directReports = await DatabaseService.getReportsByPatient(patientId);
 
-      let reports = await DatabaseService.getReportsByPatient(patientId);
+      // Match shared reports by the patient signature as well. Some legacy rows
+      // were saved with a mismatched patient_id, but their report payload still
+      // carries the correct patient name/email/clinic.
+      const allReports = await DatabaseService.get('reports');
+      const nameKey = normalizeName(patientName);
+      const emailKey = normalizeEmail(patientEmail);
+      const signatureReports = (allReports || []).filter((r) => {
+        const rd = r.reportData || r.report_data || {};
+        const rn = normalizeName(rd.patientName || rd.patient_name || rd.patient || '');
+        const remail = normalizeEmail(rd.patientEmail || rd.patient_email || '');
+        const rcid = r.clinicId || r.clinic_id || rd.clinicId || rd.clinic_id || r.orgId || r.org_id;
+        const rid = r.patientId || r.patient_id || rd.patientId || rd.patient_id;
+        const clinicOk = !clinicId || !rcid || rcid === clinicId;
+        const nameOk = !!nameKey && !!rn && rn === nameKey;
+        const emailOk = !!emailKey && !!remail && remail === emailKey;
+        const idOk = !!patientId && rid === patientId;
+        return clinicOk && (idOk || nameOk || emailOk);
+      });
 
-      // Fallback: if nothing matched by patient_id, match by a stronger clinic +
-      // email/name signature so same-name patients at other clinics don't leak.
-      if ((!reports || reports.length === 0) && (patientName || patientEmail)) {
-        const all = await DatabaseService.get('reports');
-        const nameKey = normalizeName(patientName);
-        const emailKey = normalizeEmail(patientEmail);
-        reports = (all || []).filter((r) => {
-          const rd = r.reportData || r.report_data || {};
-          const rn = normalizeName(rd.patientName || rd.patient_name || rd.patient || '');
-          const remail = normalizeEmail(rd.patientEmail || rd.patient_email || '');
-          const rcid = r.clinicId || r.clinic_id || rd.clinicId || rd.clinic_id || r.orgId || r.org_id;
-          const clinicOk = !clinicId || !rcid || rcid === clinicId;
-          const nameOk = !!nameKey && !!rn && rn === nameKey;
-          const emailOk = !!emailKey && !!remail && remail === emailKey;
-          return (nameOk || emailOk) && clinicOk;
-        });
-      }
-
-      setPatientReports(dedupeRecords(reports || []).sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a)));
+      const reports = dedupeRecords([...(directReports || []), ...signatureReports]);
+      setPatientReports(reports.sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a)));
     } catch (error) {
       console.error('ERROR: Failed to fetch patient reports:', error);
       setPatientReports([]);
@@ -1584,7 +1585,7 @@ const PatientDashboard = () => {
   // Live updates: refetch this patient's records the instant a new report lands.
   useRealtimeRefetch(
     patientDbId ? [
-      { table: 'reports', filter: `patient_id=eq.${patientDbId}` },
+      { table: 'reports', filter: patientClinicId ? `clinic_id=eq.${patientClinicId}` : `patient_id=eq.${patientDbId}` },
       { table: 'algorithm_results', filter: `patient_id=eq.${patientDbId}` },
       { table: 'clinical_reports', filter: `patient_id=eq.${user?.id}` }
     ] : [],

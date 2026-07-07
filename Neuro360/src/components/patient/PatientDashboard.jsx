@@ -6560,6 +6560,33 @@ const PatientDashboard = () => {
     const Icon = data.icon;
     const [showVisualGuide, setShowVisualGuide] = useState(true);
     const [visualGuideThumbnail, setVisualGuideThumbnail] = useState('');
+    const [animatedMainScore, setAnimatedMainScore] = useState(null);
+
+    const parseScoreDisplay = (scoreValue) => {
+      if (scoreValue === null || scoreValue === undefined || scoreValue === '') return null;
+      if (typeof scoreValue === 'string') {
+        const fraction = scoreValue.match(/^\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*$/);
+        if (fraction) {
+          return {
+            numerator: Number(fraction[1]),
+            denominator: Number(fraction[2])
+          };
+        }
+
+        const parsed = Number(scoreValue);
+        if (Number.isFinite(parsed)) {
+          return { numerator: parsed, denominator: null };
+        }
+
+        return null;
+      }
+
+      if (typeof scoreValue === 'number' && Number.isFinite(scoreValue)) {
+        return { numerator: scoreValue, denominator: null };
+      }
+
+      return null;
+    };
 
     useEffect(() => {
       let alive = true;
@@ -6708,6 +6735,40 @@ const PatientDashboard = () => {
     const assessmentDate = patientScoreData?.date ? new Date(patientScoreData.date).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3, hour12: true }) : null;
     const rawScore = patientScoreData?.rawScore || null;
     const paramStatus = patientScoreData?.status || null;
+
+    useEffect(() => {
+      const parsed = parseScoreDisplay(rawScore);
+      if (!parsed) {
+        setAnimatedMainScore(rawScore);
+        return;
+      }
+
+      let start = 0;
+      let raf = 0;
+      const duration = 700;
+      const animate = (now) => {
+        if (!start) start = now;
+        const progress = Math.min(1, (now - start) / duration);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setAnimatedMainScore({
+          numerator: parsed.numerator * eased,
+          denominator: parsed.denominator
+        });
+        if (progress < 1) raf = requestAnimationFrame(animate);
+      };
+
+      raf = requestAnimationFrame(animate);
+      return () => cancelAnimationFrame(raf);
+    }, [rawScore]);
+
+    const renderAnimatedMainScore = () => {
+      if (animatedMainScore && typeof animatedMainScore === 'object') {
+        const numerator = Math.round(animatedMainScore.numerator);
+        return animatedMainScore.denominator ? `${numerator}/${animatedMainScore.denominator}` : `${numerator}`;
+      }
+
+      return animatedMainScore ?? rawScore ?? '--';
+    };
 
     // Determine score level: Low (0-1/3), Medium (2/3), High (3/3)
     const getScoreLevel = () => {
@@ -7134,7 +7195,7 @@ const PatientDashboard = () => {
       }
 
       const color = isGood ? '#22c55e' : '#ef4444';
-      const [animatedRotation, setAnimatedRotation] = useState(0);
+      const [animatedRotation, setAnimatedRotation] = useState(-90);
       const [animatedValue, setAnimatedValue] = useState(null);
 
       useEffect(() => {
@@ -7298,7 +7359,7 @@ const PatientDashboard = () => {
                       className="w-14 h-14 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-white font-bold text-lg sm:text-2xl shadow-lg"
                       style={{ backgroundColor: scoreColor }}
                     >
-                      {rawScore !== null ? rawScore : '--'}
+      {renderAnimatedMainScore()}
                     </div>
                     <p className="text-[10px] sm:text-xs text-blue-200 mt-1">
                       {hasAssessmentData ? 'Your Score' : 'Demo'}

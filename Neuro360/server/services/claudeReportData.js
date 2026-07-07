@@ -284,25 +284,62 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null,
   const mk = (name, value) => ({ name, value: num(value), score: 0 });
 
   const incomingParameters = toParameters(algorithmResults);
+  const incomingMetricValue = (includes) => metricValue(incomingParameters, includes);
 
-  // Assemble the algorithmCalculator-shaped parameters (with metric values so the
-  // 5-type classifier and the deep-dive page have what they need). Prefer the
-  // caller-supplied algorithm results when available so the performance report uses
-  // the same values as the source scan; fall back to the transcribed PDF markers
-  // only when those results are missing.
-  const parameters = incomingParameters.length > 0 ? incomingParameters : [
-    { name: 'Cognition', score: pctToScore(markers.cognition), maxScore: 3,
-      metrics: [mk('Alpha Peak', dd.alphaPeak)] },
-    { name: 'Stress', score: redFromPct(markers.stressRegulation), maxScore: 3,
-      metrics: [mk('Arousal Score', dd.arousal), mk('Relaxation Score', dd.relaxation), mk('Regeneration (Alpha Modulation)', dd.regeneration)] },
+  // The uploaded NeuroSense PDF is the source of truth for the seven snapshot
+  // bars. We still merge in raw algorithm metrics for deep-dive fields that are
+  // not always transcribed from the PDF text, but we do not let the incoming
+  // displayPercents or algorithm score buckets overwrite the source markers.
+  const parameters = [
+    {
+      name: 'Cognition',
+      score: pctToScore(markers.cognition),
+      maxScore: 3,
+      metrics: [
+        mk('Alpha Peak', dd.alphaPeak ?? incomingMetricValue('Alpha Peak')),
+      ],
+    },
+    {
+      name: 'Stress',
+      score: redFromPct(markers.stressRegulation),
+      maxScore: 3,
+      metrics: [
+        mk('Arousal Score', dd.arousal ?? incomingMetricValue('Arousal Score')),
+        mk('Relaxation Score', dd.relaxation ?? incomingMetricValue('Relaxation Score')),
+        mk('Regeneration (Alpha Modulation)', dd.regeneration ?? incomingMetricValue('Regeneration')),
+      ],
+    },
     { name: 'Focus & Attention', score: pctToScore(markers.focusAttention), maxScore: 3, metrics: [] },
-    { name: 'Burnout & Fatigue', score: redFromPct(markers.burnoutResistance), maxScore: 3,
-      metrics: [mk('Excessive Delta', dd.daytimeDelta)] },
-    { name: 'Emotional Regulation', score: pctToScore(markers.emotionalRegulation), maxScore: 3,
-      metrics: [mk('Alpha Asymmetry (Frontal)', dd.frontalAsymmetry), mk('Arousal Score', dd.arousal), mk('Regeneration (Alpha Modulation)', dd.regeneration)] },
+    {
+      name: 'Burnout & Fatigue',
+      score: redFromPct(markers.burnoutResistance),
+      maxScore: 3,
+      metrics: [
+        mk('Excessive Delta', dd.daytimeDelta ?? incomingMetricValue('Excessive Delta')),
+      ],
+    },
+    {
+      name: 'Emotional Regulation',
+      score: pctToScore(markers.emotionalRegulation),
+      maxScore: 3,
+      metrics: [
+        mk('Alpha Asymmetry (Frontal)', dd.frontalAsymmetry ?? incomingMetricValue('Alpha Asymmetry')),
+        mk('Arousal Score', dd.arousal ?? incomingMetricValue('Arousal Score')),
+        mk('Regeneration (Alpha Modulation)', dd.regeneration ?? incomingMetricValue('Regeneration')),
+      ],
+    },
     { name: 'Learning', score: pctToScore(markers.learning), maxScore: 3, metrics: [] },
     { name: 'Creativity', score: pctToScore(markers.creativity), maxScore: 3, metrics: [] },
   ];
+
+  const focusScore = incomingMetricValue('Focus Score');
+  const alphaTheta = incomingMetricValue('Alpha:Theta Balance');
+  const alphaPeak = metricValue(parameters, 'Alpha Peak');
+  const arousal = metricValue(parameters, 'Arousal Score');
+  const relaxation = metricValue(parameters, 'Relaxation Score');
+  const regeneration = metricValue(parameters, 'Regeneration');
+  const asymmetry = metricValue(parameters, 'Alpha Asymmetry');
+  const daytimeDelta = metricValue(parameters, 'Excessive Delta');
 
   // Overall /21 (Stress & Burnout scores are RED counts → inverted for health).
   const overallScore = parameters.reduce((sum, p) => {
@@ -329,12 +366,53 @@ function buildReportDataFromSource(source, patient = {}, displayPercents = null,
     id: patient.id,
     clinicName: patient.clinicName,
     processedAt,
-  }, displayPercents);
+  }, null);
 
   // If a deep-dive metric was missing but the brainwave block had alpha peak,
   // surface it on the profile so page 4 still shows the peak.
   if (rd.profile && rd.profile.alphaPeakHz == null && num(bw.alphaPeakHz) != null) {
     rd.profile.alphaPeakHz = num(bw.alphaPeakHz);
+  }
+
+  if (rd.deepDive) {
+    rd.deepDive.focusScore = {
+      label: 'Focus Score',
+      value: num(focusScore),
+      unit: '',
+      optimal: '< 1.5',
+      status: focusScore == null ? 'N/A' : focusScore < 1.5 ? 'Good' : 'Above Target',
+    };
+    rd.deepDive.alphaTheta = {
+      label: 'Alpha:Theta Balance',
+      value: num(alphaTheta),
+      unit: '',
+      optimal: '> 1.0 (healthy)',
+      status: alphaTheta == null ? 'N/A' : alphaTheta >= 1 ? 'Healthy' : 'Low',
+    };
+    rd.deepDive.alphaPeak = rd.deepDive.alphaPeak || {
+      label: 'Alpha Peak Frequency', value: alphaPeak, unit: 'Hz', optimal: '9.5 – 11.5 Hz',
+      status: alphaPeak == null ? 'N/A' : alphaPeak > 9 ? 'Healthy' : 'Low',
+    };
+    rd.deepDive.arousal = rd.deepDive.arousal || {
+      label: 'Arousal Score', value: arousal, unit: '', optimal: '< 1.0',
+      status: arousal == null ? 'N/A' : arousal < 1 ? 'Balanced' : 'Elevated',
+    };
+    rd.deepDive.relaxation = rd.deepDive.relaxation || {
+      label: 'Relaxation Score', value: relaxation, unit: '', optimal: '> 8',
+      status: relaxation == null ? 'N/A' : relaxation > 8 ? 'Good' : 'Low',
+    };
+    rd.deepDive.regeneration = rd.deepDive.regeneration || {
+      label: 'Regeneration (Alpha Modulation)', value: regeneration, unit: '%', optimal: '> 30%',
+      status: regeneration == null ? 'N/A' : regeneration > 30 ? 'Healthy' : 'Low',
+    };
+    rd.deepDive.frontalAsymmetry = rd.deepDive.frontalAsymmetry || {
+      label: 'Frontal Alpha Asymmetry', value: asymmetry, unit: '', optimal: 'Balanced (near 0)',
+      status: asymmetry == null ? 'N/A' : asymmetry < 0 ? 'Right-Shifted' : asymmetry > 0 ? 'Left-Shifted' : 'Balanced',
+    };
+    rd.deepDive.daytimeDelta = rd.deepDive.daytimeDelta || {
+      label: 'Excessive / Daytime Delta', value: daytimeDelta, unit: '%', optimal: '< 20%',
+      status: daytimeDelta == null ? 'N/A' : daytimeDelta < 20 ? 'Normal' : daytimeDelta <= 30 ? 'Borderline' : 'Elevated',
+    };
   }
 
   return rd;

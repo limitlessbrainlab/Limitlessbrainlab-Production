@@ -725,10 +725,30 @@ class DatabaseService {
   }
 
   async addReport(reportData) {
-    const report = await this.add('reports', reportData);
-
-    // Get clinic ID from reportData (could be clinicId, orgId, or org_id)
     const clinicId = reportData.clinicId || reportData.orgId || reportData.org_id;
+    const patientId = reportData.patientId || reportData.patient_id || null;
+    const fileName = reportData.fileName || reportData.file_name || null;
+    const filePath = reportData.filePath || reportData.file_path || null;
+
+    try {
+      const actualTable = this.mapTableName('reports');
+      const query = this.supabaseService.supabase.from(actualTable).select('*').limit(1);
+      if (clinicId) query.eq('clinic_id', clinicId);
+      if (patientId) query.eq('patient_id', patientId);
+      if (fileName) query.eq('file_name', fileName);
+      if (filePath) query.eq('file_path', filePath);
+
+      const { data: existing, error: lookupError } = await query;
+      if (lookupError) {
+        console.warn('WARNING: Could not check for existing report, inserting anyway:', lookupError.message);
+      } else if (existing && existing.length > 0) {
+        return this.convertToCamelCase(existing[0]);
+      }
+    } catch (lookupError) {
+      console.warn('WARNING: Report dedupe lookup failed, inserting anyway:', lookupError?.message || lookupError);
+    }
+
+    const report = await this.add('reports', reportData);
 
     // Update clinic usage
     if (clinicId) {

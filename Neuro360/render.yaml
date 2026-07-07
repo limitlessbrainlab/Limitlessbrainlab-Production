@@ -42,12 +42,7 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
-      # Gmail SMTP is primary when EMAIL_USER + EMAIL_PASS are set. Brevo remains
-      # a fallback only if Gmail is not configured. See server/index.js.
-      - key: BREVO_SMTP_USER
-        sync: false
-      - key: BREVO_SMTP_KEY
-        sync: false
+      # Gmail SMTP only. Outbound mail is sent directly via EMAIL_USER/EMAIL_PASS.
       - key: EMAIL_USER
         value: info@limitlessbrainlab.com
       - key: EMAIL_PASS

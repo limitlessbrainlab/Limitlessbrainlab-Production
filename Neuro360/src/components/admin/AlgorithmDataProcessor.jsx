@@ -24,70 +24,6 @@ const parseResultsData = (data) => {
   return [];
 };
 
-// ── Continuous per-parameter display % (fixes "everything 67%") ──────────────
-// Each parameter = 3 pass/fail sub-metrics summed 0–3, previously shown as
-// score/3 (only 0/33/67/100) which pinned most patients at 67%. Here we derive a
-// smooth 0–100% from how far each metric sits from its clinical threshold
-// (threshold = 50% midpoint, scaled by margin). Clinical pass/fail thresholds are
-// NOT changed — display granularity only. Sub-metric value is in the "healthy
-// direction" so the average is directly the displayed % (higher = better), which
-// also gives Stress→Regulation and Burnout→Resistance correctly.
-const METRIC_RULES = [
-  { match: 'arousal', threshold: 1, better: 'less' },
-  { match: 'relaxation', threshold: 8, better: 'greater' },
-  { match: 'alpha peak', threshold: 9, better: 'greater' },
-  { match: 'theta:beta', threshold: 1.5, better: 'less' },
-  { match: 'focus theta', threshold: 20, better: 'less' },
-  { match: 'excessive delta', threshold: 20, better: 'less' },
-  { match: 'regeneration', threshold: 30, better: 'greater' },
-];
-const metricNorm = (m) => {
-  const name = (m?.name || '').toLowerCase();
-  const v = m?.value;
-  const rule = METRIC_RULES.find((r) => name.includes(r.match));
-  if (rule && typeof v === 'number' && isFinite(v)) {
-    // Gentler slope: the full 0–1 range spans ±1.5× the threshold (was ±0.5×,
-    // which saturated moderately-poor metrics to exactly 0). The 0.08 floor
-    // keeps a real-but-poor reading from rendering as a hard 0% (which looked
-    // broken to clients) — e.g. a deeply abnormal stress/burnout profile now
-    // reads ~8–20% instead of 0%. Display granularity only; clinical pass/fail
-    // scoring in algorithmCalculator.js is unchanged.
-    const scale = Math.max(Math.abs(rule.threshold) * 1.5, 1e-6);
-    const dir = rule.better === 'greater' ? 1 : -1;
-    const n = 0.5 + (0.5 * dir * (v - rule.threshold)) / scale;
-    return Math.max(0.08, Math.min(1, n));
-  }
-  // Band / non-numeric metric (Alpha:Theta Balance, Alpha Asymmetry) → use pass/fail.
-  // If a RULE metric (arousal/relaxation/regeneration/…) arrives non-numeric
-  // (e.g. 'Indeterminate' from a failed extraction), still apply the 0.08 floor so
-  // it can't sneak a hard 0% back into the snapshot via displayPercents. True
-  // band/pass-fail metrics (no rule) keep their hard 0.
-  if (rule) return Math.max(0.08, (m?.score >= 1) ? 1 : 0);
-  return (m?.score >= 1) ? 1 : 0;
-};
-const paramPercent = (param) => {
-  const ms = (param && param.metrics) || [];
-  if (!ms.length) return null;
-  const avg = ms.reduce((a, m) => a + metricNorm(m), 0) / ms.length;
-  return Math.round(avg * 100);
-};
-const computeParameterPercents = (resultsArr) => {
-  const byName = {};
-  (resultsArr || []).forEach((p) => { byName[String(p.parameter || p.name || '').toLowerCase()] = p; });
-  const map = {
-    cognition: 'cognition', stress: 'stress', focus: 'focus & attention',
-    learning: 'learning', burnout: 'burnout & fatigue',
-    emotional: 'emotional regulation', creativity: 'creativity',
-  };
-  const out = {};
-  for (const [key, pname] of Object.entries(map)) {
-    const p = byName[pname];
-    const v = p ? paramPercent(p) : null;
-    if (v != null) out[key] = v;
-  }
-  return out;
-};
-
 // Build the NeuroSense Performance Report download name: NPR-<ReportID>-<YYYYMMDD>.pdf
 // ReportID = the 7-digit number from the report id (e.g. "NS-1773769" -> "1773769");
 // date = the assessment/processed date (falls back to today).
@@ -1408,8 +1344,6 @@ const AlgorithmDataProcessor = () => {
       // Also forward the raw algorithm results so the backend can keep the
       // underlying scores aligned with the report values.
       try {
-        const dp = computeParameterPercents(results);
-        if (dp && Object.keys(dp).length) formData.append('displayPercents', JSON.stringify(dp));
         if (results && results.length) formData.append('algorithmResults', JSON.stringify(results));
       } catch (dpErr) {
         console.warn('Could not compute display percents:', dpErr?.message);

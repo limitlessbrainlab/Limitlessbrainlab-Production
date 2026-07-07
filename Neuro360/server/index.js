@@ -54,9 +54,8 @@ if (process.env.STRIPE_SECRET_KEY) {
   stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 }
 
-// Email transporter — Gmail is primary when configured; Brevo remains as fallback.
+// Email transporter — Gmail only.
 const gmailConfigured = !!(process.env.EMAIL_USER && process.env.EMAIL_PASS);
-const brevoConfigured = !!(process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_KEY);
 const activeTransporter = (() => {
   if (gmailConfigured) {
     return nodemailer.createTransport({
@@ -73,41 +72,11 @@ const activeTransporter = (() => {
     });
   }
 
-  if (brevoConfigured) {
-    return nodemailer.createTransport({
-      host: 'smtp-relay.brevo.com',
-      port: Number(process.env.BREVO_SMTP_PORT) || 2525,
-      secure: false,
-      auth: {
-        user: process.env.BREVO_SMTP_USER,
-        pass: process.env.BREVO_SMTP_KEY
-      },
-      connectionTimeout: 30000,
-      greetingTimeout: 30000,
-      socketTimeout: 30000
-    });
-  }
-
   return null;
 })();
 
-const fallbackTransporter = gmailConfigured && brevoConfigured
-  ? nodemailer.createTransport({
-      host: 'smtp-relay.brevo.com',
-      port: Number(process.env.BREVO_SMTP_PORT) || 2525,
-      secure: false,
-      auth: {
-        user: process.env.BREVO_SMTP_USER,
-        pass: process.env.BREVO_SMTP_KEY
-      },
-      connectionTimeout: 30000,
-      greetingTimeout: 30000,
-      socketTimeout: 30000
-    })
-  : null;
-
 const emailTransporter = activeTransporter;
-const mailerConfigured = gmailConfigured || brevoConfigured;
+const mailerConfigured = gmailConfigured;
 
 // Deliverability: HTML-only mail scores worse with spam filters, so derive a
 // plain-text alternative for every outbound mail, and set Reply-To so replies
@@ -192,28 +161,16 @@ function enhanceMailOptions(mailOptions) {
 }
 
 // Patch any nodemailer transporter so every email it sends gets the shared footer/enhancements.
-function patchSendMail(t, fallback) {
+function patchSendMail(t) {
   const raw = t.sendMail.bind(t);
   t.sendMail = async (opts, ...rest) => {
     const enhanced = enhanceMailOptions(opts);
-    try {
-      return await raw(enhanced, ...rest);
-    } catch (error) {
-      if (fallback) {
-        console.error('Primary email transport failed, retrying with fallback:', error.message);
-        return await fallback.sendMail(enhanced, ...rest);
-      }
-      throw error;
-    }
+    return raw(enhanced, ...rest);
   };
   return t;
 }
 if (emailTransporter) {
-  patchSendMail(emailTransporter, fallbackTransporter);
-}
-
-if (fallbackTransporter && fallbackTransporter !== emailTransporter) {
-  patchSendMail(fallbackTransporter);
+  patchSendMail(emailTransporter);
 }
 
 if (emailTransporter) {
@@ -224,11 +181,11 @@ if (emailTransporter) {
       console.error('EMAIL_PASS length:', (process.env.EMAIL_PASS || '').length);
       console.error('EMAIL_PASS has spaces:', (process.env.EMAIL_PASS || '').includes(' '));
     } else {
-      console.log('Email transporter ready - connected via', gmailConfigured ? 'gmail' : 'brevo');
+      console.log('Email transporter ready - connected via gmail');
     }
   });
 } else {
-  console.warn('Email transporter not configured. Set EMAIL_USER/EMAIL_PASS or BREVO_SMTP_USER/BREVO_SMTP_KEY.');
+  console.warn('Email transporter not configured. Set EMAIL_USER/EMAIL_PASS.');
 }
 
 const app = express();
@@ -240,10 +197,16 @@ const PORT = process.env.PORT || 5000;
 // specific hop count (1), not `true`, to satisfy express-rate-limit's proxy validation.
 app.set('trust proxy', 1);
 
-// Per-deploy backend version — changes on every Render deploy (each deploy restarts the
-// process → new boot timestamp). The frontend polls /api/app-version and forces logout +
-// reload when this changes since the user's session started.
-const SERVER_VERSION = `${process.env.RENDER_GIT_COMMIT || 'local'}-${Date.now()}`;
+// Per-deploy backend version — changes whenever the deployed commit changes. The frontend
+// polls /api/app-version and forces logout + reload when this changes since the user's
+// session started.
+const DEPLOY_SIGNATURE = process.env.DEPLOY_SIGNATURE ||
+  process.env.RENDER_GIT_COMMIT ||
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+  process.env.GIT_COMMIT ||
+  process.env.COMMIT_SHA ||
+  `local-${Date.now()}`;
+const SERVER_VERSION = DEPLOY_SIGNATURE;
 
 // Outbound email "From" address (all emails to users/patients/clinics)
 const EMAIL_FROM = `"Limitless Brain Lab" <${process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@limitlessbrainlab.com'}>`;
@@ -902,10 +865,14 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Per-deploy backend version — the frontend polls this to force logout on a new Render deploy.
+// Per-deploy backend version — the frontend polls this to force logout on a new deploy.
 app.get('/api/app-version', (req, res) => {
   res.set('Cache-Control', 'no-store');
-  res.status(200).json({ version: SERVER_VERSION });
+  res.status(200).json({
+    version: SERVER_VERSION,
+    deploySignature: DEPLOY_SIGNATURE,
+    buildId: DEPLOY_SIGNATURE,
+  });
 });
 
 // ===== PROTECTED ROUTES (Auth Required) =====
@@ -6426,7 +6393,7 @@ app.post('/api/send-report-email', async (req, res) => {
       });
     }
 
-    const transporter = emailTransporter || fallbackTransporter;
+    const transporter = emailTransporter;
     if (!transporter) {
       console.error('❌ send-report-email failed: no email transporter configured');
       return res.status(500).json({
@@ -6434,19 +6401,6 @@ app.post('/api/send-report-email', async (req, res) => {
         message: 'Email service not configured'
       });
     }
-
-    const sendWithFallback = async (mailOptions) => {
-      try {
-        return await transporter.sendMail(mailOptions);
-      } catch (sendError) {
-        console.warn('⚠️ Primary email transport failed:', sendError.message);
-        if (fallbackTransporter && fallbackTransporter !== transporter) {
-          console.log('🔁 Retrying email send with fallback transporter');
-          return await fallbackTransporter.sendMail(mailOptions);
-        }
-        throw sendError;
-      }
-    };
 
     const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
     const patientLoginUrl = `${FRONTEND_URL}/patient/login`;
@@ -6472,7 +6426,7 @@ app.post('/api/send-report-email', async (req, res) => {
     let clinicEmailSent = false;
 
     // Always send to the patient first. The clinic copy is non-fatal.
-    await sendWithFallback(patientMailOptions);
+    await transporter.sendMail(patientMailOptions);
     console.log('✉️ Patient report email sent:', patientEmail);
 
     if (clinicEmail) {
@@ -6485,7 +6439,7 @@ app.post('/api/send-report-email', async (req, res) => {
         html: reportHtmlClinic
       };
       try {
-        await sendWithFallback(clinicMailOptions);
+        await transporter.sendMail(clinicMailOptions);
         clinicEmailSent = true;
         console.log('✉️ Clinic report email sent:', clinicEmail);
       } catch (clinicError) {

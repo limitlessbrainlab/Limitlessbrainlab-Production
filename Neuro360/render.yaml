@@ -42,9 +42,8 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
-      # Brevo SMTP relay is the PRIMARY mail transport in production (Gmail SMTP
-      # is blocked on Render). These MUST be listed here or they are not picked
-      # up on redeploy and ALL outbound email silently dies. See server/index.js.
+      # Gmail SMTP is primary when EMAIL_USER + EMAIL_PASS are set. Brevo remains
+      # a fallback only if Gmail is not configured. See server/index.js.
       - key: BREVO_SMTP_USER
         sync: false
       - key: BREVO_SMTP_KEY

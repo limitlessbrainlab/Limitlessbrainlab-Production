@@ -54,26 +54,12 @@ if (process.env.STRIPE_SECRET_KEY) {
   stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 }
 
-// Email transporter — Brevo SMTP relay (works on Render; Gmail SMTP is blocked by cloud providers)
-// Fallback to Gmail if BREVO_SMTP_USER not set
+// Email transporter — Gmail is primary when configured; Brevo stays as fallback.
+const gmailConfigured = !!(process.env.EMAIL_USER && process.env.EMAIL_PASS);
+const brevoConfigured = !!(process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_KEY);
 const emailTransporter = nodemailer.createTransport(
-  process.env.BREVO_SMTP_USER
+  gmailConfigured
     ? {
-        host: 'smtp-relay.brevo.com',
-        // Render's free plan blocks outbound SMTP on 25/465/587, but NOT 2525 (which
-        // Brevo also serves). Default to 2525 so email works on Render free; override
-        // with BREVO_SMTP_PORT if needed.
-        port: Number(process.env.BREVO_SMTP_PORT) || 2525,
-        secure: false,
-        auth: {
-          user: process.env.BREVO_SMTP_USER,
-          pass: process.env.BREVO_SMTP_KEY
-        },
-        connectionTimeout: 30000,
-        greetingTimeout: 30000,
-        socketTimeout: 30000
-      }
-    : {
         host: 'smtp.gmail.com',
         port: 587,
         secure: false,
@@ -85,13 +71,21 @@ const emailTransporter = nodemailer.createTransport(
         greetingTimeout: 30000,
         socketTimeout: 30000
       }
+    : {
+        host: 'smtp-relay.brevo.com',
+        port: Number(process.env.BREVO_SMTP_PORT) || 2525,
+        secure: false,
+        auth: {
+          user: process.env.BREVO_SMTP_USER,
+          pass: process.env.BREVO_SMTP_KEY
+        },
+        connectionTimeout: 30000,
+        greetingTimeout: 30000,
+        socketTimeout: 30000
+      }
 );
 
-// True when an SMTP transport is actually configured — Brevo (primary) OR Gmail
-// (fallback). Email-send sites must gate on THIS, not on EMAIL_USER/EMAIL_PASS
-// alone: production uses Brevo, so gating on the Gmail-only vars silently
-// suppressed payment/credits/confirmation emails when EMAIL_USER was unset.
-const mailerConfigured = !!(process.env.BREVO_SMTP_USER || process.env.EMAIL_USER);
+const mailerConfigured = gmailConfigured || brevoConfigured;
 
 // Deliverability: HTML-only mail scores worse with spam filters, so derive a
 // plain-text alternative for every outbound mail, and set Reply-To so replies
@@ -187,10 +181,9 @@ emailTransporter.verify((error, success) => {
     console.error('EMAIL TRANSPORTER ERROR:', error.message);
     console.error('EMAIL_USER:', process.env.EMAIL_USER);
     console.error('EMAIL_PASS length:', (process.env.EMAIL_PASS || '').length);
-    console.error('EMAIL_PASS first 4 chars:', (process.env.EMAIL_PASS || '').substring(0, 4));
     console.error('EMAIL_PASS has spaces:', (process.env.EMAIL_PASS || '').includes(' '));
   } else {
-    console.log('Email transporter ready - connected to', process.env.EMAIL_USER);
+    console.log('Email transporter ready - connected via', gmailConfigured ? 'gmail' : 'brevo');
   }
 });
 

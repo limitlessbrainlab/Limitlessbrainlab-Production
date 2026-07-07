@@ -30,6 +30,7 @@
     "framer-motion": "^12.23.14",
     "js-cookie": "^3.0.5",
     "lucide-react": "^0.294.0",
+    "nodemailer": "^9.0.3",
     "pdfmake": "^0.3.8",
     "prop-types": "^15.8.1",
     "puppeteer": "^24.43.0",

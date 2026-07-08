@@ -4325,7 +4325,8 @@ app.get('/api/test-gemini', async (req, res) => {
 // Clinic Credentials Email API endpoint
 app.post('/api/clinic-credentials', async (req, res) => {
   try {
-    const { clinicName, email, contactPerson, password, otp } = req.body;
+    const { clinicName, contactPerson, password, otp } = req.body;
+    const email = String(req.body.email || '').trim().toLowerCase();
 
     if (!email || !password) {
       return res.status(400).json({

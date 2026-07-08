@@ -109,7 +109,7 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             clinicName: clinic.name || clinic.clinic_name,
-            email: clinic.email,
+            email: (clinic.email || '').trim().toLowerCase(),
             contactPerson: clinic.contact_person || clinic.name,
             password: newPassword,
             otp: otp

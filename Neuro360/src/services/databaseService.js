@@ -346,6 +346,9 @@ class DatabaseService {
 
       // Filter valid fields based on table
       const filteredUpdates = this.filterValidFields(actualTable, updates);
+      if (actualTable === 'clinics' && filteredUpdates.email) {
+        filteredUpdates.email = filteredUpdates.email.trim().toLowerCase();
+      }
 
       const supabaseUpdates = this.convertToSnakeCase(filteredUpdates);
 
@@ -528,7 +531,7 @@ class DatabaseService {
       // Preserve the data passed from authService (including pending approval status)
       const clinicRecord = {
         name: clinicData.name || clinicData.clinicName,
-        email: clinicData.email,
+        email: (clinicData.email || '').trim().toLowerCase(),
         password: clinicData.password || '', // ✅ PASSWORD FIELD ADDED - Required for clinic login
         contact_person: clinicData.contact_person || clinicData.contactPerson || clinicData.name,
         country_code: clinicData.country_code || clinicData.countryCode || '+91', // ✅ COUNTRY CODE - Save separately

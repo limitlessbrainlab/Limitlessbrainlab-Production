@@ -78,7 +78,7 @@ export const authService = {
       // Helper: check clinics table
       const checkClinicsTable = async () => {
         const clinics = await DatabaseService.get('clinics') || [];
-        const clinicByEmail = clinics.find(c => c.email === normalizedEmail);
+        const clinicByEmail = clinics.find(c => (c.email || '').trim().toLowerCase() === normalizedEmail);
 
         if (clinicByEmail) {
 

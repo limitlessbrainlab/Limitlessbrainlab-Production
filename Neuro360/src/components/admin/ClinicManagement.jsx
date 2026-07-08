@@ -428,7 +428,7 @@ const ClinicManagement = ({ onUpdate }) => {
     try {
       // Each email can only be used once — one clinic OR one partner
       const normalizedEmail = data.email.trim().toLowerCase();
-      const emailExists = clinics.some(c => c.email?.toLowerCase() === normalizedEmail);
+      const emailExists = clinics.some(c => (c.email || '').trim().toLowerCase() === normalizedEmail);
       if (emailExists) {
         toast.error(`A clinic/partner with email "${data.email}" already exists. Please use a different email.`);
         return;
@@ -436,6 +436,7 @@ const ClinicManagement = ({ onUpdate }) => {
 
       const clinicData = {
         ...data,
+        email: normalizedEmail,
         clinic_type: data.clinicType || 'lbl_partner', // Snake_case for Supabase
         countryCode: data.countryCode || '+91', // Save country code separately
         phone: data.phone, // Save phone number separately
@@ -471,11 +472,11 @@ const ClinicManagement = ({ onUpdate }) => {
       // Send login credentials email to the verified email
       try {
         await sendCredentialsEmail(
-          { name: data.name, email: data.email, contactPerson: data.contactPerson || data.name },
+          { name: data.name, email: normalizedEmail, contactPerson: data.contactPerson || data.name },
           data.password,
           null
         );
-        toast.success(`Clinic "${data.name}" created successfully! Login credentials sent to ${data.email}.`, { duration: 5000 });
+        toast.success(`Clinic "${data.name}" created successfully! Login credentials sent to ${normalizedEmail}.`, { duration: 5000 });
       } catch (emailError) {
         console.warn('Credentials email failed:', emailError);
         toast.success(`Clinic "${data.name}" created successfully! But failed to send credentials email. Please share credentials manually.`, { duration: 6000 });
@@ -519,16 +520,17 @@ const ClinicManagement = ({ onUpdate }) => {
       }
 
       const hashedPassword = data.editPassword ? await hashPassword(data.editPassword) : undefined;
+      const normalizedEmail = data.email.trim().toLowerCase();
 
       // Check if email has changed
-      const emailChanged = selectedClinic?.email !== data.email;
+      const emailChanged = (selectedClinic?.email || '').trim().toLowerCase() !== normalizedEmail;
 
       // Keep country code and phone separate
       const updateData = {
         name: data.name,
         clinicType: data.clinicType,
         city: data.city,
-        email: data.email,
+        email: normalizedEmail,
         contactPerson: data.contactPerson,
         countryCode: data.countryCode || '+91',
         phone: data.phone,
@@ -545,11 +547,11 @@ const ClinicManagement = ({ onUpdate }) => {
       await DatabaseService.update('clinics', selectedClinic.id, updateData);
 
       // Send "email updated" notification to the new address if the email changed
-      if (emailChanged && data.email) {
+      if (emailChanged && normalizedEmail) {
         fetch(`${getBaseUrl()}/api/send-partner-email-update`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ partnerName: data.name, newEmail: data.email })
+          body: JSON.stringify({ partnerName: data.name, newEmail: normalizedEmail })
         }).catch(err => console.error('Failed to send clinic email update notification:', err));
       }
 
@@ -557,11 +559,11 @@ const ClinicManagement = ({ onUpdate }) => {
         // Send new credentials to clinic email
         try {
           await sendCredentialsEmail(
-            { name: data.name, email: data.email, contactPerson: data.contactPerson || data.name },
+            { name: data.name, email: normalizedEmail, contactPerson: data.contactPerson || data.name },
             data.editPassword,
             null
           );
-          toast.success('Clinic updated! New credentials sent to ' + data.email, { duration: 5000 });
+          toast.success('Clinic updated! New credentials sent to ' + normalizedEmail, { duration: 5000 });
         } catch (emailError) {
           toast.success('Clinic and password updated successfully', { duration: 4000 });
           toast.error('Could not send credentials email. Please share password manually.', { duration: 5000 });
@@ -858,13 +860,14 @@ const ClinicManagement = ({ onUpdate }) => {
   const sendCredentialsEmail = async (clinic, password, otp) => {
     try {
       const BASE_URL = getBaseUrl();
+      const email = (clinic.email || '').trim().toLowerCase();
 
       const response = await fetch(`${BASE_URL}/api/clinic-credentials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clinicName: clinic.name,
-          email: clinic.email,
+          email,
           contactPerson: clinic.contactPerson || clinic.name,
           password: password,
           otp: otp || null

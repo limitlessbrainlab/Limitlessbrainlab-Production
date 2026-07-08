@@ -338,7 +338,7 @@ const BrainCoach = () => {
   };
 
   // Fetch patient's city for location-based recommendations
-  const fetchPatientClinic = async () => {
+  async function fetchPatientClinic() {
     if (user?.email) {
       try {
         const { data: patient } = await supabase
@@ -403,10 +403,10 @@ const BrainCoach = () => {
     } else {
       setIsLoadingRecommended(false);
     }
-  };
+  }
 
   // Fetch recommended coaches based on patient's registered city
-  const fetchRecommendedCoaches = async (cityName) => {
+  async function fetchRecommendedCoaches(cityName) {
     if (!cityName) {
       setIsLoadingRecommended(false);
       return;
@@ -448,11 +448,11 @@ const BrainCoach = () => {
     } finally {
       setIsLoadingRecommended(false);
     }
-  };
+  }
 
   // Fetch patient clinic and coaches on component mount
   // Fetch user's paid/booked coaches
-  const fetchPaidCoaches = async () => {
+  async function fetchPaidCoaches() {
     if (!user?.email) return;
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -468,7 +468,7 @@ const BrainCoach = () => {
     } catch (error) {
       console.error('Error fetching paid coaches:', error);
     }
-  };
+  }
 
   // Check if user has paid for a coach
   const hasUserPaidForCoach = (coach) => {
@@ -531,7 +531,7 @@ const BrainCoach = () => {
     };
   }, [locationInput]);
 
-  const fetchCoaches = async () => {
+  async function fetchCoaches() {
     try {
       setIsLoading(true);
       const filters = {
@@ -575,9 +575,9 @@ const BrainCoach = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  const fetchSpecialties = async () => {
+  async function fetchSpecialties() {
     try {
       const data = await coachService.getSpecialties();
       if (data && data.length > 0) {
@@ -589,7 +589,7 @@ const BrainCoach = () => {
       console.error('Error fetching specialties:', error);
       setSpecialtyOptions(defaultSpecialties);
     }
-  };
+  }
 
   const handleSearch = async () => {
     if (searchQuery.trim()) {
@@ -980,7 +980,7 @@ const BrainCoach = () => {
 
   // Record a booking (no calendar). Admin emails the session link to the patient.
   // Used for the free-credit flow; the paid flow is handled in the payment-success callback.
-  const proceedToBooking = async (coach, useFreeCredit = false) => {
+  async function proceedToBooking(coach, useFreeCredit = false) {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -1076,7 +1076,7 @@ const BrainCoach = () => {
       console.error('Error:', error);
       toast.error('Something went wrong while saving your booking. Please contact support.');
     }
-  };
+  }
 
   // Filter coaches based on criteria
   const filteredCoaches = coaches.filter(coach => {
@@ -1190,7 +1190,7 @@ const BrainCoach = () => {
   };
 
   // Search with specific location and city (used by "Use my location" button)
-  const searchWithLocation = async (location, cityName) => {
+  async function searchWithLocation(location, cityName) {
     setIsLoading(true);
     try {
       // Fetch coaches by location (for in-person coaches with lat/lng)
@@ -1265,7 +1265,7 @@ const BrainCoach = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   // Coach Card Component
   const CoachCard = ({ coach }) => (

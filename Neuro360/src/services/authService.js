@@ -94,9 +94,6 @@ export const authService = {
             throw new Error('Invalid email or password');
           }
 
-          try {
-            await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
-          } catch (e) { /* non-critical */ }
           return {
             success: true,
             token: `local_token_${Date.now()}`,
@@ -134,9 +131,6 @@ export const authService = {
           }
 
           if (patient) {
-            try {
-              await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
-            } catch (e) { /* non-critical */ }
             return {
               success: true,
               token: `patient_token_${Date.now()}`,
@@ -189,21 +183,17 @@ export const authService = {
 
       // PRIORITY 2: Check super admins — always check even if clinic password failed
       // (same email may be registered as both a clinic applicant and a super admin)
-      // Super admin passwords are verified via Supabase Auth (no local password stored)
       const superAdmins = await DatabaseService.get('superAdmins') || [];
       const superAdminProfile = superAdmins.find(a => a.email === normalizedEmail && a.role === 'super_admin');
 
       if (superAdminProfile) {
-        const { data: saData, error: saError } = await supabase.auth.signInWithPassword({
-          email: normalizedEmail,
-          password
-        });
-        if (saError || !saData?.session) {
+        const adminPasswordMatch = await comparePassword(password, superAdminProfile.password);
+        if (!adminPasswordMatch) {
           throw new Error('Invalid email or password');
         }
         return {
           success: true,
-          token: saData.session.access_token,
+          token: `admin_token_${Date.now()}`,
           user: {
             id: superAdminProfile.id,
             email: superAdminProfile.email,
@@ -225,65 +215,7 @@ export const authService = {
         throw new Error('Invalid email or password');
       }
 
-      // PRIORITY 3: Try Supabase Auth (fallback for legacy users)
-      if (!supabase || !SupabaseService.isAvailable()) {
-        throw new Error('Invalid email or password');
-      }
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password: password
-      });
-
-      if (error) {
-        throw new Error('Invalid email or password');
-      }
-
-      if (!data.user) {
-        throw new Error('Login failed - no user returned');
-      }
-
-      // Get user profile from database
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
-
-      // If user is clinic_admin, check clinic activation status
-      if (profile?.role === 'clinic_admin') {
-        const { data: clinicData } = await supabase
-          .from('clinics')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-
-        // Check if clinic is activated
-        if (clinicData && !clinicData.is_active) {
-          throw new Error('Your clinic account is pending activation by super admin. Please wait for approval.');
-        }
-
-        // Check subscription status
-        if (clinicData && clinicData.subscription_status === 'pending_approval') {
-          throw new Error('Your clinic registration is pending approval. You will be notified once approved.');
-        }
-      }
-
-      const user = {
-        id: data.user.id,
-        email: data.user.email,
-        name: profile?.full_name || data.user.user_metadata?.full_name || 'User',
-        role: profile?.role || data.user.user_metadata?.role || 'patient',
-        avatar: profile?.avatar_url,
-        isActivated: true
-      };
-
-
-      return {
-        success: true,
-        token: data.session.access_token,
-        user: user
-      };
+      throw new Error('Invalid email or password');
 
     } catch (error) {
       console.error('ALERT: Login error:', error.message);

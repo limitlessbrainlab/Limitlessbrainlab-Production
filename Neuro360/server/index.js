@@ -6297,7 +6297,16 @@ app.post('/api/send-email-update-notification', async (req, res) => {
 // Send QEEG Report Email to Clinic and Patient
 app.post('/api/send-report-email', async (req, res) => {
   try {
-    const { patientName, patientEmail, clinicName, clinicEmail, reportUrl, generatedAt } = req.body;
+    const {
+      patientName,
+      patientEmail,
+      clinicName,
+      clinicEmail,
+      clinicSmtpEmail,
+      clinicSmtpPassword,
+      reportUrl,
+      generatedAt
+    } = req.body;
 
     console.log('📧 send-report-email called:', {
       patientName,
@@ -6317,13 +6326,34 @@ app.post('/api/send-report-email', async (req, res) => {
       });
     }
 
-    const transporter = emailTransporter;
-    if (!transporter) {
+    if (!emailTransporter) {
       console.error('❌ send-report-email failed: no email transporter configured');
       return res.status(500).json({
         success: false,
         message: 'Email service not configured'
       });
+    }
+
+    let transporter = emailTransporter;
+    let fromEmail = EMAIL_FROM;
+    if (clinicSmtpEmail && clinicSmtpPassword) {
+      try {
+        transporter = patchSendMail(nodemailer.createTransport({
+          host: 'smtp.gmail.com',
+          port: 465,
+          secure: true,
+          auth: { user: clinicSmtpEmail, pass: clinicSmtpPassword },
+          connectionTimeout: 30000,
+          greetingTimeout: 30000,
+          socketTimeout: 30000,
+          tls: { rejectUnauthorized: false, minVersion: 'TLSv1.2' }
+        }));
+        fromEmail = `"${clinicName || 'Limitless Brain Lab'}" <${clinicSmtpEmail}>`;
+      } catch (smtpError) {
+        console.error('❌ Clinic SMTP setup failed for report email, falling back to default:', smtpError.message);
+        transporter = emailTransporter;
+        fromEmail = EMAIL_FROM;
+      }
     }
 
     const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
@@ -6334,11 +6364,11 @@ app.post('/api/send-report-email', async (req, res) => {
     const reportHtmlClinic = getReportEmailHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl: clinicLoginUrl, generatedAt });
 
     const patientMailOptions = {
-      from: EMAIL_FROM,
+      from: fromEmail,
       to: patientEmail,
-      replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || EMAIL_FROM,
+      replyTo: process.env.EMAIL_REPLY_TO || clinicSmtpEmail || process.env.EMAIL_USER || EMAIL_FROM,
       headers: {
-        'List-Unsubscribe': `<mailto:${process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || 'noreply@limitlessbrainlab.com'}?subject=unsubscribe>`,
+        'List-Unsubscribe': `<mailto:${process.env.EMAIL_REPLY_TO || clinicSmtpEmail || process.env.EMAIL_USER || 'noreply@limitlessbrainlab.com'}?subject=unsubscribe>`,
         'X-Mailer': 'Limitless Brain Lab Mailer'
       },
       subject: `Your Neuro Performance Report is Ready`,
@@ -6355,7 +6385,7 @@ app.post('/api/send-report-email', async (req, res) => {
 
     if (clinicEmail) {
       const clinicMailOptions = {
-        from: EMAIL_FROM,
+        from: fromEmail,
         to: clinicEmail,
         subject: `Neuro Performance Report — ${patientName || 'Patient'}`,
         text: `Hello ${clinicName || 'Clinic'},\n\nThe Neuro Performance Report for ${patientName || 'your patient'} is ready for clinical review.\n\nDownload the report (PDF): ${reportUrl}\nLog in to your portal: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,

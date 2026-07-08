@@ -45,7 +45,7 @@ export default async function handler(req, res) {
       return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
-    const { patientName, patientEmail, clinicName, clinicEmail, reportUrl, generatedAt } = getBody(req);
+    const { patientName, patientEmail, clinicName, clinicEmail, clinicSmtpEmail, clinicSmtpPassword, reportUrl, generatedAt } = getBody(req);
 
     if (!patientEmail || !reportUrl) {
       return res.status(400).json({ success: false, message: 'Patient email and report URL are required' });
@@ -54,7 +54,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ success: false, message: 'Email service not configured' });
     }
 
-    const transporter = nodemailer.createTransport({
+    let transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 465,
       secure: true,
@@ -63,14 +63,32 @@ export default async function handler(req, res) {
       greetingTimeout: 30000,
       socketTimeout: 30000,
     });
+    let fromEmail = EMAIL_FROM;
+
+    if (clinicSmtpEmail && clinicSmtpPassword) {
+      transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: { user: clinicSmtpEmail, pass: clinicSmtpPassword },
+        connectionTimeout: 30000,
+        greetingTimeout: 30000,
+        socketTimeout: 30000,
+      });
+      fromEmail = `"${clinicName || 'Limitless Brain Lab'}" <${clinicSmtpEmail}>`;
+    }
 
     const patientLoginUrl = `${FRONTEND_URL}/patient/login`;
     const clinicLoginUrl = `${FRONTEND_URL}/clinic/login`;
 
     await transporter.sendMail({
-      from: EMAIL_FROM,
+      from: fromEmail,
       to: patientEmail,
-      replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || FROM_ADDRESS,
+      replyTo: process.env.EMAIL_REPLY_TO || clinicSmtpEmail || process.env.EMAIL_USER || FROM_ADDRESS,
+      headers: {
+        'List-Unsubscribe': `<mailto:${process.env.EMAIL_REPLY_TO || clinicSmtpEmail || process.env.EMAIL_USER || FROM_ADDRESS}?subject=unsubscribe>`,
+        'X-Mailer': 'Limitless Brain Lab Mailer'
+      },
       subject: 'Your Neuro Performance Report is Ready',
       text: `Hi ${patientName || 'there'},\n\nYour Neuro Performance Report is ready.\n\nDownload your report: ${reportUrl}\nLog in: ${patientLoginUrl}\n\nThe Limitless Brain Lab Team`,
       html: getReportEmailHtml({ isClinic: false, patientName, clinicName, reportUrl, loginUrl: patientLoginUrl, generatedAt, logoSrc: LOGO_URL }),
@@ -80,9 +98,9 @@ export default async function handler(req, res) {
     if (clinicEmail) {
       try {
         await transporter.sendMail({
-          from: EMAIL_FROM,
+          from: fromEmail,
           to: clinicEmail,
-          replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || FROM_ADDRESS,
+          replyTo: process.env.EMAIL_REPLY_TO || clinicSmtpEmail || process.env.EMAIL_USER || FROM_ADDRESS,
           subject: `Neuro Performance Report - ${patientName || 'Patient'}`,
           text: `Hello ${clinicName || 'Clinic'},\n\nThe Neuro Performance Report for ${patientName || 'your patient'} is ready.\n\nDownload: ${reportUrl}\nLog in: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
           html: getReportEmailHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl: clinicLoginUrl, generatedAt, logoSrc: LOGO_URL }),

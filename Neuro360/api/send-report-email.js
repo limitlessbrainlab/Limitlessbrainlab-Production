@@ -8,6 +8,8 @@ const EMAIL_FROM = `"Limitless Brain Lab" <${FROM_ADDRESS}>`;
 const LOGO_URL = `${FRONTEND_URL}/IBW%20Logo.png`;
 const { getReportEmailHtml } = reportEmailTemplate;
 
+const isAuthError = (error) => error?.code === 'EAUTH' || /Invalid login|Username and Password not accepted/i.test(error?.message || '');
+
 function getBody(req) {
   if (!req.body) return {};
   if (typeof req.body === 'string') {
@@ -54,7 +56,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ success: false, message: 'Email service not configured' });
     }
 
-    let transporter = nodemailer.createTransport({
+    const defaultTransporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 465,
       secure: true,
@@ -63,7 +65,9 @@ export default async function handler(req, res) {
       greetingTimeout: 30000,
       socketTimeout: 30000,
     });
+    let transporter = defaultTransporter;
     let fromEmail = EMAIL_FROM;
+    let usingClinicSmtp = false;
 
     if (clinicSmtpEmail && clinicSmtpPassword) {
       transporter = nodemailer.createTransport({
@@ -76,17 +80,19 @@ export default async function handler(req, res) {
         socketTimeout: 30000,
       });
       fromEmail = `"${clinicName || 'Limitless Brain Lab'}" <${clinicSmtpEmail}>`;
+      usingClinicSmtp = true;
     }
 
     const patientLoginUrl = `${FRONTEND_URL}/patient/login`;
     const clinicLoginUrl = `${FRONTEND_URL}/clinic/login`;
+    const replyTo = () => process.env.EMAIL_REPLY_TO || (usingClinicSmtp ? clinicSmtpEmail : process.env.EMAIL_USER) || FROM_ADDRESS;
 
-    await transporter.sendMail({
+    const sendPatientMail = () => transporter.sendMail({
       from: fromEmail,
       to: patientEmail,
-      replyTo: process.env.EMAIL_REPLY_TO || clinicSmtpEmail || process.env.EMAIL_USER || FROM_ADDRESS,
+      replyTo: replyTo(),
       headers: {
-        'List-Unsubscribe': `<mailto:${process.env.EMAIL_REPLY_TO || clinicSmtpEmail || process.env.EMAIL_USER || FROM_ADDRESS}?subject=unsubscribe>`,
+        'List-Unsubscribe': `<mailto:${replyTo()}?subject=unsubscribe>`,
         'X-Mailer': 'Limitless Brain Lab Mailer'
       },
       subject: 'Your Neuro Performance Report is Ready',
@@ -94,13 +100,24 @@ export default async function handler(req, res) {
       html: getReportEmailHtml({ isClinic: false, patientName, clinicName, reportUrl, loginUrl: patientLoginUrl, generatedAt, logoSrc: LOGO_URL }),
     });
 
+    try {
+      await sendPatientMail();
+    } catch (error) {
+      if (!usingClinicSmtp || !isAuthError(error)) throw error;
+      console.warn('Clinic SMTP auth failed for report email; falling back to default sender:', clinicSmtpEmail);
+      transporter = defaultTransporter;
+      fromEmail = EMAIL_FROM;
+      usingClinicSmtp = false;
+      await sendPatientMail();
+    }
+
     let clinicEmailSent = false;
     if (clinicEmail) {
       try {
         await transporter.sendMail({
           from: fromEmail,
           to: clinicEmail,
-          replyTo: process.env.EMAIL_REPLY_TO || clinicSmtpEmail || process.env.EMAIL_USER || FROM_ADDRESS,
+          replyTo: replyTo(),
           subject: `Neuro Performance Report - ${patientName || 'Patient'}`,
           text: `Hello ${clinicName || 'Clinic'},\n\nThe Neuro Performance Report for ${patientName || 'your patient'} is ready.\n\nDownload: ${reportUrl}\nLog in: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
           html: getReportEmailHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl: clinicLoginUrl, generatedAt, logoSrc: LOGO_URL }),

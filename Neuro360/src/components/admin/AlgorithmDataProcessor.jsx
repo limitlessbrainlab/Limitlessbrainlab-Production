@@ -1541,9 +1541,7 @@ const AlgorithmDataProcessor = () => {
     return {
       clinicId: cid,
       clinicEmail: clinicData?.email || '',
-      clinicName: clinicData?.name || 'Clinic',
-      clinicSmtpEmail: clinicData?.smtpEmail || clinicData?.smtp_email || '',
-      clinicSmtpPassword: clinicData?.smtpPassword || clinicData?.smtp_password || ''
+      clinicName: clinicData?.name || 'Clinic'
     };
   };
 
@@ -1666,7 +1664,7 @@ const AlgorithmDataProcessor = () => {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const baseUrl = apiUrl.replace(/\/api\/?$/, '');
 
-        const { clinicEmail, clinicName, clinicSmtpEmail, clinicSmtpPassword } = await resolveClinicForEmail({ patientId: selectedPatient?.id, clinicId: selectedPatient.clinicId || selectedPatient.clinic_id || selectedPatient.org_id });
+        const { clinicEmail, clinicName } = await resolveClinicForEmail({ patientId: selectedPatient?.id, clinicId: selectedPatient.clinicId || selectedPatient.clinic_id || selectedPatient.org_id });
 
         const token = await getFreshToken();
         const emailHeaders = { 'Content-Type': 'application/json' };
@@ -1682,8 +1680,6 @@ const AlgorithmDataProcessor = () => {
             patientEmail: selectedPatient.email,
             clinicName: clinicName,
             clinicEmail: clinicEmail,
-            clinicSmtpEmail,
-            clinicSmtpPassword,
             reportUrl: fullUrl,
             reportFileName: fileName,
             reportType: 'neurosense',
@@ -1826,7 +1822,7 @@ const AlgorithmDataProcessor = () => {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const baseUrl = apiUrl.replace(/\/api\/?$/, '');
 
-        const { clinicEmail, clinicName, clinicSmtpEmail, clinicSmtpPassword } = await resolveClinicForEmail({ patientId: selectedPatient?.id, clinicId: selectedPatient.clinicId || selectedPatient.clinic_id || selectedPatient.org_id });
+        const { clinicEmail, clinicName } = await resolveClinicForEmail({ patientId: selectedPatient?.id, clinicId: selectedPatient.clinicId || selectedPatient.clinic_id || selectedPatient.org_id });
 
         const token = await getFreshToken();
         const emailHeaders = { 'Content-Type': 'application/json' };
@@ -1842,8 +1838,6 @@ const AlgorithmDataProcessor = () => {
             patientEmail: selectedPatient.email,
             clinicName: clinicName,
             clinicEmail: clinicEmail,
-            clinicSmtpEmail,
-            clinicSmtpPassword,
             reportUrl: fullUrl,
             reportFileName: fileName,
             reportType: 'claude',

@@ -6302,8 +6302,6 @@ app.post('/api/send-report-email', async (req, res) => {
       patientEmail,
       clinicName,
       clinicEmail,
-      clinicSmtpEmail,
-      clinicSmtpPassword,
       reportUrl,
       generatedAt
     } = req.body;
@@ -6334,27 +6332,8 @@ app.post('/api/send-report-email', async (req, res) => {
       });
     }
 
-    let transporter = emailTransporter;
-    let fromEmail = EMAIL_FROM;
-    if (clinicSmtpEmail && clinicSmtpPassword) {
-      try {
-        transporter = patchSendMail(nodemailer.createTransport({
-          host: 'smtp.gmail.com',
-          port: 465,
-          secure: true,
-          auth: { user: clinicSmtpEmail, pass: clinicSmtpPassword },
-          connectionTimeout: 30000,
-          greetingTimeout: 30000,
-          socketTimeout: 30000,
-          tls: { rejectUnauthorized: false, minVersion: 'TLSv1.2' }
-        }));
-        fromEmail = `"${clinicName || 'Limitless Brain Lab'}" <${clinicSmtpEmail}>`;
-      } catch (smtpError) {
-        console.error('❌ Clinic SMTP setup failed for report email, falling back to default:', smtpError.message);
-        transporter = emailTransporter;
-        fromEmail = EMAIL_FROM;
-      }
-    }
+    const transporter = emailTransporter;
+    const fromEmail = EMAIL_FROM;
 
     const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
     const patientLoginUrl = `${FRONTEND_URL}/patient/login`;
@@ -6366,9 +6345,9 @@ app.post('/api/send-report-email', async (req, res) => {
     const patientMailOptions = {
       from: fromEmail,
       to: patientEmail,
-      replyTo: process.env.EMAIL_REPLY_TO || clinicSmtpEmail || process.env.EMAIL_USER || EMAIL_FROM,
+      replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || EMAIL_FROM,
       headers: {
-        'List-Unsubscribe': `<mailto:${process.env.EMAIL_REPLY_TO || clinicSmtpEmail || process.env.EMAIL_USER || 'noreply@limitlessbrainlab.com'}?subject=unsubscribe>`,
+        'List-Unsubscribe': `<mailto:${process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || 'noreply@limitlessbrainlab.com'}?subject=unsubscribe>`,
         'X-Mailer': 'Limitless Brain Lab Mailer'
       },
       subject: `Your Neuro Performance Report is Ready`,

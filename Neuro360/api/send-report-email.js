@@ -8,8 +8,6 @@ const EMAIL_FROM = `"Limitless Brain Lab" <${FROM_ADDRESS}>`;
 const LOGO_URL = `${FRONTEND_URL}/IBW%20Logo.png`;
 const { getReportEmailHtml } = reportEmailTemplate;
 
-const isAuthError = (error) => error?.code === 'EAUTH' || /Invalid login|Username and Password not accepted/i.test(error?.message || '');
-
 function getBody(req) {
   if (!req.body) return {};
   if (typeof req.body === 'string') {
@@ -47,7 +45,7 @@ export default async function handler(req, res) {
       return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
-    const { patientName, patientEmail, clinicName, clinicEmail, clinicSmtpEmail, clinicSmtpPassword, reportUrl, generatedAt } = getBody(req);
+    const { patientName, patientEmail, clinicName, clinicEmail, reportUrl, generatedAt } = getBody(req);
 
     if (!patientEmail || !reportUrl) {
       return res.status(400).json({ success: false, message: 'Patient email and report URL are required' });
@@ -56,7 +54,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ success: false, message: 'Email service not configured' });
     }
 
-    const defaultTransporter = nodemailer.createTransport({
+    const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 465,
       secure: true,
@@ -65,29 +63,13 @@ export default async function handler(req, res) {
       greetingTimeout: 30000,
       socketTimeout: 30000,
     });
-    let transporter = defaultTransporter;
-    let fromEmail = EMAIL_FROM;
-    let usingClinicSmtp = false;
-
-    if (clinicSmtpEmail && clinicSmtpPassword) {
-      transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: { user: clinicSmtpEmail, pass: clinicSmtpPassword },
-        connectionTimeout: 30000,
-        greetingTimeout: 30000,
-        socketTimeout: 30000,
-      });
-      fromEmail = `"${clinicName || 'Limitless Brain Lab'}" <${clinicSmtpEmail}>`;
-      usingClinicSmtp = true;
-    }
+    const fromEmail = EMAIL_FROM;
 
     const patientLoginUrl = `${FRONTEND_URL}/patient/login`;
     const clinicLoginUrl = `${FRONTEND_URL}/clinic/login`;
-    const replyTo = () => process.env.EMAIL_REPLY_TO || (usingClinicSmtp ? clinicSmtpEmail : process.env.EMAIL_USER) || FROM_ADDRESS;
+    const replyTo = () => process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || FROM_ADDRESS;
 
-    const sendPatientMail = () => transporter.sendMail({
+    await transporter.sendMail({
       from: fromEmail,
       to: patientEmail,
       replyTo: replyTo(),
@@ -99,17 +81,6 @@ export default async function handler(req, res) {
       text: `Hi ${patientName || 'there'},\n\nYour Neuro Performance Report is ready.\n\nDownload your report: ${reportUrl}\nLog in: ${patientLoginUrl}\n\nThe Limitless Brain Lab Team`,
       html: getReportEmailHtml({ isClinic: false, patientName, clinicName, reportUrl, loginUrl: patientLoginUrl, generatedAt, logoSrc: LOGO_URL }),
     });
-
-    try {
-      await sendPatientMail();
-    } catch (error) {
-      if (!usingClinicSmtp || !isAuthError(error)) throw error;
-      console.warn('Clinic SMTP auth failed for report email; falling back to default sender:', clinicSmtpEmail);
-      transporter = defaultTransporter;
-      fromEmail = EMAIL_FROM;
-      usingClinicSmtp = false;
-      await sendPatientMail();
-    }
 
     let clinicEmailSent = false;
     if (clinicEmail) {

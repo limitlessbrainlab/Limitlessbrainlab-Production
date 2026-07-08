@@ -216,7 +216,7 @@ const docDefinition = {
       'Auto-deployment on push to main branch',
       'Build: npm run build (Vite)',
       'Environment variables: Set in Vercel dashboard',
-      'URL: https://neurosense.vercel.app'
+      'URL: https://limitlessbrainlab-eight.vercel.app'
     ], margin: [0, 8, 0, 12] },
     
     { text: 'BACKEND (Render.com)', style: 'subheader' },

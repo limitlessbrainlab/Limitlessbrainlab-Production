@@ -344,10 +344,7 @@ const PatientDashboard = () => {
   const [profileImageUrl, setProfileImageUrl] = useState(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [algorithmResults, setAlgorithmResults] = useState(null);
-  // Score data that drives the Customized Care Program. Unlike algorithmResults (which excludes
-  // super-admin-only Claude/Performance-mode rows from the report list), this includes the latest
-  // scan REGARDLESS of report_mode, so a patient whose scan was processed in Performance mode still
-  // gets a care program. It carries only the 7 scores, not the Claude report itself.
+  // Score fallback for the care program; algorithmResults also carries Performance-mode scores now.
   const [careProgramScores, setCareProgramScores] = useState(null);
   const [scanCount, setScanCount] = useState(0);
   const [showClinicalReportForm, setShowClinicalReportForm] = useState(false);
@@ -1270,9 +1267,8 @@ const PatientDashboard = () => {
         return matchById || ((matchByEmail || matchByName) && clinicOk);
       };
 
-      // allMatched includes Claude/Performance-mode rows; patientResults excludes them (report list
-      // stays super-admin-only). The care program derives its scores from allMatched so a
-      // Performance-mode scan still populates it.
+      // allMatched includes Claude/Performance-mode rows. Patient report downloads stay controlled
+      // by the reports table; algorithmResults is only the score source for dashboard parameters.
       let allMatched = [];
       try {
         const byId = await DatabaseService.findBy('algorithmResults', 'patient_id', patientDbId);
@@ -1291,29 +1287,30 @@ const PatientDashboard = () => {
       const patientResults = allMatched.filter(notClaude);
 
 
-      // Set the scan count (total visible algorithm results for this patient)
-      setScanCount(patientResults.length);
-
       const latestOf = (rows) => (rows || []).slice().sort((a, b) =>
         new Date(b.processed_at || b.createdAt || b.created_at || 0) -
         new Date(a.processed_at || a.createdAt || a.created_at || 0)
       )[0] || null;
       const scoresOf = (r) => r && (r.results || r.outputData || r.output_data);
+      const latestVisible = latestOf(patientResults);
+      const latestAny = latestOf(allMatched);
 
-      if (patientResults.length > 0) {
-        const latestResult = latestOf(patientResults);
+      setScanCount(allMatched.length);
+
+      if (latestAny) {
+        const isPerformanceMode = (latestAny.report_mode || latestAny.reportMode) === 'claude';
         setAlgorithmResults({
-          data: scoresOf(latestResult),
-          pdfUrl: latestResult.pdfUrl || latestResult.pdf_url,
-          processedAt: latestResult.processed_at || latestResult.createdAt || latestResult.created_at,
-          patientName: latestResult.patient_name || latestResult.patientName
+          data: scoresOf(latestAny),
+          // ponytail: performance rows should update scores, not expose the hidden source NeuroSense PDF.
+          pdfUrl: isPerformanceMode ? null : (latestVisible?.pdfUrl || latestVisible?.pdf_url || latestAny.pdfUrl || latestAny.pdf_url),
+          processedAt: latestAny.processed_at || latestAny.createdAt || latestAny.created_at,
+          patientName: latestAny.patient_name || latestAny.patientName
         });
       } else {
         setAlgorithmResults(null);
       }
 
-      // Care program scores: latest scan regardless of report_mode (includes Performance-mode rows).
-      const latestAny = latestOf(allMatched);
+      // Care program scores: latest scan regardless of report_mode.
       setCareProgramScores(latestAny ? scoresOf(latestAny) : null);
     } catch (error) {
       console.error('ERROR: Failed to fetch algorithm results:', error);

@@ -1380,13 +1380,13 @@ const PatientDashboard = () => {
           const userEmailLower = user.email.trim().toLowerCase();
           let byEmail = [];
           try { byEmail = await DatabaseService.findBy('patients', 'email', user.email.trim()); } catch (e) { byEmail = []; }
-          patientRecord = (byEmail && byEmail[0]) || null;
+          patientRecord = (byEmail || []).slice().sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a))[0] || null;
           if (!patientRecord) {
             const allPatients = await DatabaseService.get('patients');
-            patientRecord = allPatients.find(p => {
+            patientRecord = allPatients.filter(p => {
               if (!p.email) return false;
               return p.email.trim().toLowerCase() === userEmailLower;
-            });
+            }).sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a))[0] || null;
           }
 
         }
@@ -1481,7 +1481,10 @@ const PatientDashboard = () => {
           if (user.email) {
             try {
               const patients = await DatabaseService.get('patients');
-              const patientByEmail = patients.find(p => p.email === user.email);
+              const userEmailLower = user.email.trim().toLowerCase();
+              const patientByEmail = patients
+                .filter(p => p.email?.trim().toLowerCase() === userEmailLower)
+                .sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a))[0];
               if (patientByEmail) {
 
                 // Store patient UID - generate if not exists
@@ -9976,10 +9979,11 @@ const PatientDashboard = () => {
         }
         if (!fName) fName = 'NeuroSense_Report.pdf';
 
-        let downloadUrl = directFileUrl || null;
-        if (!downloadUrl && filePath && !filePath.startsWith('/uploads')) {
+        let downloadUrl = null;
+        if (filePath && !filePath.startsWith('/uploads')) {
           try { downloadUrl = await StorageService.getSignedUrl(filePath, 300); } catch (err) { console.log('Signed URL failed:', err.message); }
         }
+        if (!downloadUrl) downloadUrl = directFileUrl || null;
 
         if (downloadUrl) {
           const response = await fetch(downloadUrl);

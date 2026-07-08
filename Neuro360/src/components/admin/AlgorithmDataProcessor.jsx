@@ -1644,6 +1644,9 @@ const AlgorithmDataProcessor = () => {
           fileUrl: fullUrl, // Full URL for direct download
           filePath: filePath, // Also store in reportData for redundancy
           patientName: patientName,
+          patientEmail: selectedPatient.email,
+          patientId: selectedPatient.id,
+          clinicId: clinicId,
           processedAt: new Date().toISOString(),
           dataType: dataType || 'zscore',
           parameterNotes: parameterNotes || '',
@@ -1802,6 +1805,9 @@ const AlgorithmDataProcessor = () => {
           fileUrl: fullUrl,
           filePath: filePath,
           patientName: patientName,
+          patientEmail: selectedPatient.email,
+          patientId: selectedPatient.id,
+          clinicId: clinicId,
           processedAt: new Date().toISOString(),
           dataType: dataType || 'zscore',
           parameterNotes: parameterNotes || '',

@@ -480,7 +480,8 @@ const ClinicManagement = ({ onUpdate }) => {
         toast.success(`Clinic "${data.name}" created successfully! Login credentials sent to ${normalizedEmail}.`, { duration: 5000 });
       } catch (emailError) {
         console.warn('Credentials email failed:', emailError);
-        toast.success(`Clinic "${data.name}" created successfully! But failed to send credentials email. Please share credentials manually.`, { duration: 6000 });
+        const reason = emailError?.message || 'Unknown error';
+        toast.error(`Clinic created, but the credentials email was NOT sent. Reason: ${reason}. Share credentials manually or fix the email service.`, { duration: 8000 });
       }
 
       // Reload clinics list (don't await to avoid blocking UI)

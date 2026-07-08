@@ -55,9 +55,26 @@ if (process.env.STRIPE_SECRET_KEY) {
   stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 }
 
-// Email transporter — Gmail only.
+// Email transporter — Brevo relay preferred (Render free tier blocks SMTP 25/465/587,
+// but NOT 2525). Gmail is kept as a local-dev fallback.
+const brevoConfigured = !!(process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_KEY);
 const gmailConfigured = !!(process.env.EMAIL_USER && process.env.EMAIL_PASS);
 const activeTransporter = (() => {
+  if (brevoConfigured) {
+    return nodemailer.createTransport({
+      host: 'smtp-relay.brevo.com',
+      port: Number(process.env.BREVO_SMTP_PORT) || 2525,
+      secure: false,
+      requireTLS: true,
+      auth: {
+        user: process.env.BREVO_SMTP_USER,
+        pass: process.env.BREVO_SMTP_KEY
+      },
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000
+    });
+  }
   if (gmailConfigured) {
     return nodemailer.createTransport({
       host: 'smtp.gmail.com',
@@ -77,7 +94,8 @@ const activeTransporter = (() => {
 })();
 
 const emailTransporter = activeTransporter;
-const mailerConfigured = gmailConfigured;
+const mailerConfigured = brevoConfigured || gmailConfigured;
+const ACTIVE_MAIL_PROVIDER = brevoConfigured ? 'brevo' : (gmailConfigured ? 'gmail' : 'none');
 
 // Deliverability: HTML-only mail scores worse with spam filters, so derive a
 // plain-text alternative for every outbound mail, and set Reply-To so replies
@@ -178,15 +196,19 @@ if (emailTransporter) {
   emailTransporter.verify((error, success) => {
     if (error) {
       console.error('EMAIL TRANSPORTER ERROR:', error.message);
+      console.error('Active provider:', ACTIVE_MAIL_PROVIDER);
+      if (ACTIVE_MAIL_PROVIDER === 'gmail') {
+        console.error('NOTE: Render free tier BLOCKS SMTP ports 25/465/587. Set BREVO_SMTP_USER + BREVO_SMTP_KEY to use the port-2525 relay.');
+      }
       console.error('EMAIL_USER:', process.env.EMAIL_USER);
       console.error('EMAIL_PASS length:', (process.env.EMAIL_PASS || '').length);
       console.error('EMAIL_PASS has spaces:', (process.env.EMAIL_PASS || '').includes(' '));
     } else {
-      console.log('Email transporter ready - connected via gmail');
+      console.log(`Email transporter ready - connected via ${ACTIVE_MAIL_PROVIDER}`);
     }
   });
 } else {
-  console.warn('Email transporter not configured. Set EMAIL_USER/EMAIL_PASS.');
+  console.warn('Email transporter not configured. Set BREVO_SMTP_USER/BREVO_SMTP_KEY (Render-safe) or EMAIL_USER/EMAIL_PASS (local).');
 }
 
 const app = express();
@@ -4472,6 +4494,15 @@ app.post('/api/clinic-credentials', async (req, res) => {
       `,
       attachments: getLogoAttachment()
     };
+
+    if (!emailTransporter) {
+      console.error('clinic-credentials: email transporter is null. EMAIL_USER=%s, EMAIL_PASS set=%s',
+        process.env.EMAIL_USER || '(empty)', Boolean(process.env.EMAIL_PASS));
+      return res.status(503).json({
+        success: false,
+        message: 'Email service is not configured on the server. Set EMAIL_USER and EMAIL_PASS (Gmail App Password) in the Render environment, then redeploy.'
+      });
+    }
 
     const info = await emailTransporter.sendMail(mailOptions);
     if (Array.isArray(info.rejected) && info.rejected.length > 0) {

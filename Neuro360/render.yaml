@@ -43,6 +43,8 @@ services:
       - key: FRONTEND_URL
         value: https://limitlessbrainlab-eight.vercel.app
       # Gmail SMTP only. Outbound mail is sent directly via EMAIL_USER/EMAIL_PASS.
+      # NOTE: Render free tier BLOCKS SMTP ports 25/465/587. Gmail below only works locally.
+      # The Brevo relay on port 2525 is what actually delivers mail on Render.
       - key: EMAIL_USER
         value: info@limitlessbrainlab.com
       - key: EMAIL_PASS
@@ -51,6 +53,13 @@ services:
         value: info@limitlessbrainlab.com
       - key: EMAIL_TO
         sync: false
+      # Brevo SMTP relay — Render-safe (port 2525 not blocked). Preferred over Gmail.
+      - key: BREVO_SMTP_USER
+        value: b06de4001@smtp-brevo.com
+      - key: BREVO_SMTP_KEY
+        sync: false
+      - key: BREVO_SMTP_PORT
+        value: "2525"
       - key: SHARED_SSO_SECRET
         sync: false
       - key: STRIPE_SECRET_KEY

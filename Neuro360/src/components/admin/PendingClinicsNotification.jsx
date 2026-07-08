@@ -103,6 +103,8 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
       await DatabaseService.update('clinics', clinic.id, updatedClinic);
 
       // Send approval email with credentials
+      let emailSent = false;
+      let emailFailReason = '';
       try {
         const emailResponse = await fetch(`${API_BASE_URL}/clinic-credentials`, {
           method: 'POST',
@@ -116,14 +118,22 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
           })
         });
         const emailResult = await emailResponse.json();
-        if (!emailResult.success) {
-          console.error('Email API returned failure:', emailResult.message);
+        if (emailResult.success) {
+          emailSent = true;
+        } else {
+          emailFailReason = emailResult.message || `HTTP ${emailResponse.status}`;
+          console.error('Email API returned failure:', emailFailReason);
         }
       } catch (emailError) {
+        emailFailReason = emailError?.message || String(emailError);
         console.error('Email sending failed:', emailError);
       }
 
-      toast.success(`${clinic.name} approved successfully! Credentials sent via email.`);
+      if (emailSent) {
+        toast.success(`${clinic.name} approved successfully! Credentials sent via email.`);
+      } else {
+        toast.error(`${clinic.name} approved, but credentials email FAILED. Reason: ${emailFailReason}. Share credentials manually.`, { duration: 8000 });
+      }
 
       // Create admin notification
       NotificationService.notifyClinicApproved({

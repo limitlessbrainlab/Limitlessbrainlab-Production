@@ -361,6 +361,76 @@ const PatientDashboard = () => {
   const lockedPopupRef = useRef(null);
   // Marks that the clinical history form was just saved, so onClose doesn't re-open the popup
   const justSavedClinicalRef = useRef(false);
+  const [patientData, setPatientData] = useState({
+    profile: {
+      name: 'Loading...',
+      email: 'Loading...',
+      phone: 'Loading...',
+      dateOfBirth: 'Loading...',
+      address: 'Loading...',
+      emergencyContact: 'Loading...',
+      gender: '',
+      handedness: '',
+      occupation: '',
+      referral_reason: ''
+    },
+    clinic: {
+      name: 'Loading...',
+      address: 'Loading...',
+      phone: 'Loading...',
+      email: 'Loading...',
+      doctorName: 'Loading...'
+    },
+    reports: [
+      {
+        id: 1,
+        type: 'NeuroSense QEEG Report',
+        date: '2024-09-15',
+        status: 'Available',
+        summary: 'Comprehensive brain activity analysis showing improved focus patterns'
+      },
+      {
+        id: 2,
+        type: 'Progress Assessment',
+        date: '2024-08-20',
+        status: 'Available',
+        summary: 'Quarterly progress review with recommendations'
+      }
+    ],
+    carePlans: [
+      {
+        id: 1,
+        title: 'Focus Enhancement Program',
+        progress: 75,
+        nextSession: '2024-09-25',
+        goals: ['Improve attention span', 'Reduce mental fatigue', 'Enhance cognitive flexibility']
+      }
+    ],
+    resources: [
+      {
+        id: 1,
+        title: 'Mindfulness Meditation Guide',
+        type: 'video',
+        duration: '15 min',
+        unlocked: true
+      },
+      {
+        id: 2,
+        title: 'Brain Training Exercises',
+        type: 'interactive',
+        duration: '20 min',
+        unlocked: true
+      },
+      {
+        id: 3,
+        title: 'Cognitive Health Assessment',
+        type: 'assessment',
+        duration: '30 min',
+        unlocked: false
+      }
+    ],
+    // appointments now loaded dynamically from booking service
+  });
 
   // Tabs that require a completed NeuroSense report to access
   const lockedTabIds = [
@@ -1663,76 +1733,6 @@ const PatientDashboard = () => {
       alert(getFriendlyErrorMessage(error, 'The appointment could not be booked. Please try again.'));
     }
   };
-  const [patientData, setPatientData] = useState({
-    profile: {
-      name: 'Loading...',
-      email: 'Loading...',
-      phone: 'Loading...',
-      dateOfBirth: 'Loading...',
-      address: 'Loading...',
-      emergencyContact: 'Loading...',
-      gender: '',
-      handedness: '',
-      occupation: '',
-      referral_reason: ''
-    },
-    clinic: {
-      name: 'Loading...',
-      address: 'Loading...',
-      phone: 'Loading...',
-      email: 'Loading...',
-      doctorName: 'Loading...'
-    },
-    reports: [
-      {
-        id: 1,
-        type: 'NeuroSense QEEG Report',
-        date: '2024-09-15',
-        status: 'Available',
-        summary: 'Comprehensive brain activity analysis showing improved focus patterns'
-      },
-      {
-        id: 2,
-        type: 'Progress Assessment',
-        date: '2024-08-20',
-        status: 'Available',
-        summary: 'Quarterly progress review with recommendations'
-      }
-    ],
-    carePlans: [
-      {
-        id: 1,
-        title: 'Focus Enhancement Program',
-        progress: 75,
-        nextSession: '2024-09-25',
-        goals: ['Improve attention span', 'Reduce mental fatigue', 'Enhance cognitive flexibility']
-      }
-    ],
-    resources: [
-      {
-        id: 1,
-        title: 'Mindfulness Meditation Guide',
-        type: 'video',
-        duration: '15 min',
-        unlocked: true
-      },
-      {
-        id: 2,
-        title: 'Brain Training Exercises',
-        type: 'interactive',
-        duration: '20 min',
-        unlocked: true
-      },
-      {
-        id: 3,
-        title: 'Cognitive Health Assessment',
-        type: 'assessment',
-        duration: '30 min',
-        unlocked: false
-      }
-    ],
-    // appointments now loaded dynamically from booking service
-  });
   const patientProfile = patientData?.profile || {};
   const patientClinic = patientData?.clinic || {};
   const patientCarePlans = Array.isArray(patientData?.carePlans) ? patientData.carePlans : [];
@@ -3962,7 +3962,7 @@ const PatientDashboard = () => {
               {showReportDetail && (
                 <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 sm:p-6 space-y-3 sm:space-y-4">
                   {/* Map through all 7 brain parameters */}
-                  {brainParameterList.map((parameter) => (
+                  {brainParameters.map((parameter) => (
                     <div key={parameter.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 sm:p-5 space-y-3 sm:space-y-4"
                       style={{
                         borderLeftWidth: '4px',
@@ -4262,7 +4262,7 @@ const PatientDashboard = () => {
               {expandedReportId === report.id && (
                 <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 sm:p-6 space-y-3 sm:space-y-4">
                   {/* Map through all 7 brain parameters */}
-                  {brainParameterList.map((parameter) => (
+                  {brainParameters.map((parameter) => (
                     <div key={parameter.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 sm:p-5 space-y-3 sm:space-y-4"
                       style={{
                         borderLeftWidth: '4px',

@@ -860,15 +860,15 @@ const PatientDashboard = () => {
   // Also check clinicalReport for fields like handedness, occupation, referral_reason
   const handleEditProfile = () => {
     setProfileFormData({
-      name: patientData.profile.name || clinicalReport?.full_name || '',
-      phone: patientData.profile.phone || '',
-      dateOfBirth: patientData.profile.dateOfBirth || clinicalReport?.date_of_birth || '',
-      address: patientData.profile.address || '',
-      emergencyContact: patientData.profile.emergencyContact || '',
-      gender: patientData.profile.gender || clinicalReport?.gender || '',
-      handedness: patientData.profile.handedness || clinicalReport?.handedness || '',
-      occupation: patientData.profile.occupation || clinicalReport?.occupation || '',
-      referral_reason: patientData.profile.referral_reason || clinicalReport?.referral_reason || ''
+      name: patientProfile.name || clinicalReport?.full_name || '',
+      phone: patientProfile.phone || '',
+      dateOfBirth: patientProfile.dateOfBirth || clinicalReport?.date_of_birth || '',
+      address: patientProfile.address || '',
+      emergencyContact: patientProfile.emergencyContact || '',
+      gender: patientProfile.gender || clinicalReport?.gender || '',
+      handedness: patientProfile.handedness || clinicalReport?.handedness || '',
+      occupation: patientProfile.occupation || clinicalReport?.occupation || '',
+      referral_reason: patientProfile.referral_reason || clinicalReport?.referral_reason || ''
     });
     setIsEditingProfile(true);
   };
@@ -1733,6 +1733,8 @@ const PatientDashboard = () => {
     ],
     // appointments now loaded dynamically from booking service
   });
+  const patientProfile = patientData?.profile || {};
+  const patientClinic = patientData?.clinic || {};
 
   // Icon mapping for dynamic brain parameters
   const iconMap = {
@@ -3071,7 +3073,7 @@ const PatientDashboard = () => {
               <User className="h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 text-white" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-base sm:text-lg font-bold text-white truncate">{patientData.profile.name}</h2>
+              <h2 className="text-base sm:text-lg font-bold text-white truncate">{patientProfile.name}</h2>
               <p className="text-blue-200 text-xs sm:text-sm mt-0.5">Patient Profile</p>
               <div className="flex items-center gap-2 mt-1.5">
                 <span className="px-2.5 py-0.5 bg-white/20 rounded-full text-[11px] sm:text-sm text-white font-medium">
@@ -3155,7 +3157,7 @@ const PatientDashboard = () => {
                 />
               ) : (
                 <div className="bg-gray-50 dark:bg-gray-700/50 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-gray-100 dark:border-gray-600">
-                  <p className="font-semibold text-gray-900 dark:text-white">{patientData.profile.name || 'Not provided'}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{patientProfile.name || 'Not provided'}</p>
                 </div>
               )}
             </div>
@@ -3167,7 +3169,7 @@ const PatientDashboard = () => {
                 Email Address
               </label>
               <div className="bg-gray-100 dark:bg-gray-700/30 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-gray-100 dark:border-gray-600">
-                <p className="font-medium text-gray-600 dark:text-gray-300">{patientData.profile.email}</p>
+                <p className="font-medium text-gray-600 dark:text-gray-300">{patientProfile.email}</p>
               </div>
             </div>
 
@@ -3188,7 +3190,7 @@ const PatientDashboard = () => {
                 />
               ) : (
                 <div className="bg-gray-50 dark:bg-gray-700/50 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-gray-100 dark:border-gray-600">
-                  <p className="font-semibold text-gray-900 dark:text-white">{patientData.profile.phone || 'Not provided'}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{patientProfile.phone || 'Not provided'}</p>
                 </div>
               )}
             </div>
@@ -3209,7 +3211,7 @@ const PatientDashboard = () => {
                 />
               ) : (
                 <div className="bg-gray-50 dark:bg-gray-700/50 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-gray-100 dark:border-gray-600">
-                  <p className="font-semibold text-gray-900 dark:text-white">{patientData.profile.dateOfBirth || 'Not provided'}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{patientProfile.dateOfBirth || 'Not provided'}</p>
                 </div>
               )}
             </div>
@@ -3234,7 +3236,7 @@ const PatientDashboard = () => {
                 </select>
               ) : (
                 <div className="bg-gray-50 dark:bg-gray-700/50 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-gray-100 dark:border-gray-600">
-                  <p className="font-semibold text-gray-900 dark:text-white">{patientData.profile.gender || 'Not provided'}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{patientProfile.gender || 'Not provided'}</p>
                 </div>
               )}
             </div>
@@ -3259,7 +3261,7 @@ const PatientDashboard = () => {
                 </select>
               ) : (
                 <div className="bg-gray-50 dark:bg-gray-700/50 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-gray-100 dark:border-gray-600">
-                  <p className="font-semibold text-gray-900 dark:text-white">{patientData.profile.handedness || clinicalReport?.handedness || 'Not provided'}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{patientProfile.handedness || clinicalReport?.handedness || 'Not provided'}</p>
                 </div>
               )}
             </div>
@@ -3301,7 +3303,7 @@ const PatientDashboard = () => {
                 />
               ) : (
                 <div className="bg-gray-50 dark:bg-gray-700/50 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-gray-100 dark:border-gray-600">
-                  <p className="font-semibold text-gray-900 dark:text-white">{patientData.profile.occupation || clinicalReport?.occupation || 'Not provided'}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{patientProfile.occupation || clinicalReport?.occupation || 'Not provided'}</p>
                 </div>
               )}
             </div>
@@ -3323,7 +3325,7 @@ const PatientDashboard = () => {
                 />
               ) : (
                 <div className="bg-gray-50 dark:bg-gray-700/50 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-gray-100 dark:border-gray-600">
-                  <p className="font-semibold text-gray-900 dark:text-white">{patientData.profile.address || 'Not provided'}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{patientProfile.address || 'Not provided'}</p>
                 </div>
               )}
             </div>
@@ -3345,7 +3347,7 @@ const PatientDashboard = () => {
                 />
               ) : (
                 <div className="bg-red-50 dark:bg-red-900/10 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-red-100 dark:border-red-900/30">
-                  <p className="font-semibold text-gray-900 dark:text-white">{patientData.profile.emergencyContact || 'Not provided'}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{patientProfile.emergencyContact || 'Not provided'}</p>
                 </div>
               )}
             </div>
@@ -3367,7 +3369,7 @@ const PatientDashboard = () => {
                 />
               ) : (
                 <div className="bg-gray-50 dark:bg-gray-700/50 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-gray-100 dark:border-gray-600">
-                  <p className="font-semibold text-gray-900 dark:text-white">{patientData.profile.referral_reason || clinicalReport?.referral_reason || 'Not provided'}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{patientProfile.referral_reason || clinicalReport?.referral_reason || 'Not provided'}</p>
                 </div>
               )}
             </div>
@@ -3399,7 +3401,7 @@ const PatientDashboard = () => {
                 Clinic Name
               </label>
               <div className="bg-purple-50 dark:bg-purple-900/10 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-purple-100 dark:border-purple-900/30">
-                <p className="font-bold text-purple-900 dark:text-purple-100">{patientData.clinic.name}</p>
+                <p className="font-bold text-purple-900 dark:text-purple-100">{patientClinic.name}</p>
               </div>
             </div>
 
@@ -3410,7 +3412,7 @@ const PatientDashboard = () => {
                 Primary Doctor
               </label>
               <div className="bg-gray-50 dark:bg-gray-700/50 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-gray-100 dark:border-gray-600">
-                <p className="font-semibold text-gray-900 dark:text-white">{patientData.clinic.doctorName}</p>
+                <p className="font-semibold text-gray-900 dark:text-white">{patientClinic.doctorName}</p>
               </div>
             </div>
 
@@ -3421,8 +3423,8 @@ const PatientDashboard = () => {
                 Clinic Phone
               </label>
               <div className="bg-gray-50 dark:bg-gray-700/50 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-gray-100 dark:border-gray-600 hover:border-purple-300 transition-colors">
-                <a href={`tel:${patientData.clinic.phone}`} className="font-semibold text-purple-700 dark:text-purple-400 hover:underline">
-                  {patientData.clinic.phone}
+                <a href={`tel:${patientClinic.phone}`} className="font-semibold text-purple-700 dark:text-purple-400 hover:underline">
+                  {patientClinic.phone}
                 </a>
               </div>
             </div>
@@ -3434,8 +3436,8 @@ const PatientDashboard = () => {
                 Clinic Email
               </label>
               <div className="bg-gray-50 dark:bg-gray-700/50 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-gray-100 dark:border-gray-600 hover:border-purple-300 transition-colors">
-                <a href={`mailto:${patientData.clinic.email}`} className="font-semibold text-purple-700 dark:text-purple-400 hover:underline truncate block">
-                  {patientData.clinic.email}
+                <a href={`mailto:${patientClinic.email}`} className="font-semibold text-purple-700 dark:text-purple-400 hover:underline truncate block">
+                  {patientClinic.email}
                 </a>
               </div>
             </div>
@@ -3447,7 +3449,7 @@ const PatientDashboard = () => {
                 Clinic Address
               </label>
               <div className="bg-gray-50 dark:bg-gray-700/50 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-gray-100 dark:border-gray-600">
-                <p className="font-semibold text-gray-900 dark:text-white">{patientData.clinic.address}</p>
+                <p className="font-semibold text-gray-900 dark:text-white">{patientClinic.address}</p>
               </div>
             </div>
           </div>

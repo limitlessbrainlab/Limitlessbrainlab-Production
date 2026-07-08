@@ -1085,20 +1085,22 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
   };
 
   // Filter reports - exclude response reports from main list (they show as a column)
-  const allResponseReports = (reports || []).filter(report => {
-    return report.reportData?.isResponseReport ||
-           report.report_data?.isResponseReport ||
-           report.reportData?.report_type === 'Response Report' ||
-           report.fileName?.startsWith('response_');
-  });
+  const isResponseReport = (report) =>
+    (report.reportData?.isResponseReport ||
+     report.report_data?.isResponseReport ||
+     report.reportData?.report_type === 'Response Report' ||
+     report.reportData?.reportType === 'Response Report' ||
+     report.fileName?.startsWith('response_')) &&
+    !report.reportData?.title?.includes('QEEG Report') &&
+    !report.report_data?.title?.includes('QEEG Report') &&
+    report.reportData?.reportType !== 'Claude Report' &&
+    report.report_data?.reportType !== 'Claude Report' &&
+    report.reportType !== 'Claude Report';
+
+  const allResponseReports = (reports || []).filter(isResponseReport);
 
   const filteredReports = (reports || []).filter(report => {
-    const isResponseReport = report.reportData?.isResponseReport ||
-                             report.report_data?.isResponseReport ||
-                             report.reportData?.report_type === 'Response Report' ||
-                             report.fileName?.startsWith('response_');
-
-    if (isResponseReport) {
+    if (isResponseReport(report)) {
       return false;
     }
 

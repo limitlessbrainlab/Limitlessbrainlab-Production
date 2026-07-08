@@ -1630,16 +1630,16 @@ const AlgorithmDataProcessor = () => {
       }
 
 
-      // Create report entry matching the format used by Response Report upload
-      // This format is compatible with PatientDashboard download functionality
+      // Create the regular NeuroSense report row shared with the clinic/patient dashboards.
       const reportData = {
         clinicId: clinicId,
         patientId: selectedPatient.id,
         fileName: fileName,
         filePath: filePath, // Storage path for signed URL
+        reportType: 'NeuroSense Report',
         reportData: {
           title: `Limitless Brain Lab QEEG Report - ${patientName}`,
-          reportType: 'Response Report', // Mark as Response Report so it shows in patient dashboard
+          reportType: 'NeuroSense Report',
           description: `Algorithm processing results for ${patientName}`,
           fileUrl: fullUrl, // Full URL for direct download
           filePath: filePath, // Also store in reportData for redundancy
@@ -1650,7 +1650,6 @@ const AlgorithmDataProcessor = () => {
           processedAt: new Date().toISOString(),
           dataType: dataType || 'zscore',
           parameterNotes: parameterNotes || '',
-          isResponseReport: true, // Important: This flag makes it visible in patient dashboard
           uploadedBy: 'Super Admin',
           uploadStatus: 'completed',
           storedInCloud: pdfUrl.includes('supabase') // Only true for Supabase URLs
@@ -1811,7 +1810,6 @@ const AlgorithmDataProcessor = () => {
           processedAt: new Date().toISOString(),
           dataType: dataType || 'zscore',
           parameterNotes: parameterNotes || '',
-          isResponseReport: true,
           uploadedBy: 'Super Admin',
           uploadStatus: 'completed',
           storedInCloud: claudeReportUrl.includes('supabase')
@@ -1909,7 +1907,6 @@ const AlgorithmDataProcessor = () => {
           filePath: url,
           patientName: patientName,
           processedAt: new Date().toISOString(),
-          isResponseReport: true,
           uploadedBy: 'Super Admin',
           uploadStatus: 'completed',
           storedInCloud: url.includes('supabase')

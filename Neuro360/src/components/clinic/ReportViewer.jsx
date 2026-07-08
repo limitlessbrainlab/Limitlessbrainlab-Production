@@ -230,11 +230,16 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
     };
 
     const isResponseReport = (report) =>
-      report.reportData?.isResponseReport ||
-      report.report_data?.isResponseReport ||
-      report.reportData?.report_type === 'Response Report' ||
-      report.reportData?.reportType === 'Response Report' ||
-      report.fileName?.toLowerCase().includes('response');
+      (report.reportData?.isResponseReport ||
+       report.report_data?.isResponseReport ||
+       report.reportData?.report_type === 'Response Report' ||
+       report.reportData?.reportType === 'Response Report' ||
+       report.fileName?.toLowerCase().includes('response')) &&
+      !report.reportData?.title?.includes('QEEG Report') &&
+      !report.report_data?.title?.includes('QEEG Report') &&
+      report.reportData?.reportType !== 'Claude Report' &&
+      report.report_data?.reportType !== 'Claude Report' &&
+      report.reportType !== 'Claude Report';
 
     const isOtherDoc = (report) =>
       report.reportData?.report_type === 'other_document' ||

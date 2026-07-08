@@ -13,29 +13,35 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    // Log the error details
-    console.error('ALERT: React Error Boundary caught an error:', error, errorInfo);
-    console.error('ALERT: Error stack:', error.stack);
-    console.error('ALERT: Component stack:', errorInfo.componentStack);
+    // Log the error details in one place so production console captures the real crash.
+    const details = {
+      message: error?.message || String(error),
+      stack: error?.stack || null,
+      componentStack: errorInfo?.componentStack || null,
+    };
+    window.__NEURO_LAST_ERROR__ = details;
+    console.groupCollapsed('ALERT: React Error Boundary caught an error');
+    console.error(details);
+    console.groupEnd();
     
     // Try to identify the specific component that crashed
-    if (errorInfo.componentStack.includes('UploadReportModal')) {
+    if (errorInfo?.componentStack?.includes('UploadReportModal')) {
       console.error('ALERT: Upload modal crashed!');
     }
     
-    if (errorInfo.componentStack.includes('ClinicManagement')) {
+    if (errorInfo?.componentStack?.includes('ClinicManagement')) {
       console.error('ALERT: Clinic Management component crashed!');
     }
     
-    if (errorInfo.componentStack.includes('SuperAdminPanel')) {
+    if (errorInfo?.componentStack?.includes('SuperAdminPanel')) {
       console.error('ALERT: Super Admin Panel crashed!');
     }
     
     // Add navigation error detection
-    if (error.message.includes('Cannot read properties') || 
-        error.message.includes('TypeError') ||
-        errorInfo.componentStack.includes('Router') ||
-        errorInfo.componentStack.includes('Navigate')) {
+    if ((error?.message || '').includes('Cannot read properties') || 
+        (error?.message || '').includes('TypeError') ||
+        (errorInfo?.componentStack || '').includes('Router') ||
+        (errorInfo?.componentStack || '').includes('Navigate')) {
       console.error('ALERT: Navigation/Routing error detected');
     }
     

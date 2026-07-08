@@ -1735,6 +1735,8 @@ const PatientDashboard = () => {
   });
   const patientProfile = patientData?.profile || {};
   const patientClinic = patientData?.clinic || {};
+  const patientCarePlans = Array.isArray(patientData?.carePlans) ? patientData.carePlans : [];
+  const patientResources = Array.isArray(patientData?.resources) ? patientData.resources : [];
 
   // Icon mapping for dynamic brain parameters
   const iconMap = {
@@ -2689,6 +2691,7 @@ const PatientDashboard = () => {
 
     const currentParameter = activeParameter ? brainParameters[activeParameter] : null;
     const displayParameter = hoveredParameter ? brainParameters[hoveredParameter] : currentParameter;
+    const brainParameterList = Object.values(brainParameters);
 
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -3959,7 +3962,7 @@ const PatientDashboard = () => {
               {showReportDetail && (
                 <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 sm:p-6 space-y-3 sm:space-y-4">
                   {/* Map through all 7 brain parameters */}
-                  {brainParameters.map((parameter) => (
+                  {brainParameterList.map((parameter) => (
                     <div key={parameter.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 sm:p-5 space-y-3 sm:space-y-4"
                       style={{
                         borderLeftWidth: '4px',
@@ -4259,7 +4262,7 @@ const PatientDashboard = () => {
               {expandedReportId === report.id && (
                 <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 sm:p-6 space-y-3 sm:space-y-4">
                   {/* Map through all 7 brain parameters */}
-                  {brainParameters.map((parameter) => (
+                  {brainParameterList.map((parameter) => (
                     <div key={parameter.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 sm:p-5 space-y-3 sm:space-y-4"
                       style={{
                         borderLeftWidth: '4px',
@@ -4443,7 +4446,7 @@ const PatientDashboard = () => {
         </div>
 
         <div className="space-y-3 sm:space-y-4">
-          {patientData.carePlans && Array.isArray(patientData.carePlans) && patientData.carePlans.map((plan) => (
+          {patientCarePlans.map((plan) => (
             <div key={plan.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-5">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-0 mb-3 sm:mb-4">
                 <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white">{plan.title}</h3>
@@ -4574,7 +4577,7 @@ const PatientDashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {patientData.resources && Array.isArray(patientData.resources) && patientData.resources.map((resource) => (
+          {patientResources.map((resource) => (
             <div key={resource.id} className={`border rounded-lg p-3 sm:p-4 ${resource.unlocked ? 'border-gray-200 dark:border-gray-700 hover:shadow-md dark:hover:shadow-xl dark:hover:shadow-gray-900/20' : 'border-gray-100 dark:border-gray-800 opacity-60'} transition-shadow`}>
               <div className="flex items-center space-x-2 sm:space-x-3 mb-2 sm:mb-3">
                 <div className={`p-1.5 sm:p-2 rounded-lg ${resource.unlocked ? 'bg-[#E4EFFF] dark:bg-blue-900/30' : 'bg-gray-50 dark:bg-gray-700'}`}>
@@ -9565,7 +9568,7 @@ const PatientDashboard = () => {
               </div>
               <div className="min-w-0">
                 <h1 className="text-sm sm:text-lg font-bold mb-1 sm:mb-2 leading-tight">
-                  {patientData?.profile?.name ? `${patientData.profile.name.split(' ')[0]}'s ` : 'Your '}Customized Care Program
+                  {patientProfile.name ? `${String(patientProfile.name).split(' ')[0]}'s ` : 'Your '}Customized Care Program
                 </h1>
                 <p className="text-blue-200 text-[11px] sm:text-sm">8 Week MOVERS Program</p>
                 <p className="text-blue-100 text-[11px] sm:text-sm mt-1 sm:mt-2 leading-relaxed">

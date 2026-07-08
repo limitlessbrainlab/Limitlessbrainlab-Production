@@ -433,6 +433,7 @@ const ClinicManagement = ({ onUpdate }) => {
         toast.error(`A clinic/partner with email "${data.email}" already exists. Please use a different email.`);
         return;
       }
+      const password = data.password.trim();
 
       const clinicData = {
         ...data,
@@ -458,7 +459,7 @@ const ClinicManagement = ({ onUpdate }) => {
         registrationMethod: 'super_admin_created', // Track how this was created
         // contract_agreed not saved — column not yet in DB
         // Use single password field for authentication
-        password: await hashPassword(data.password), // Encrypted password for login
+        password: await hashPassword(password), // Encrypted password for login
         // Remove confirmPassword from stored data
         confirmPassword: undefined
       };
@@ -473,7 +474,7 @@ const ClinicManagement = ({ onUpdate }) => {
       try {
         await sendCredentialsEmail(
           { name: data.name, email: normalizedEmail, contactPerson: data.contactPerson || data.name },
-          data.password,
+          password,
           null
         );
         toast.success(`Clinic "${data.name}" created successfully! Login credentials sent to ${normalizedEmail}.`, { duration: 5000 });
@@ -519,7 +520,8 @@ const ClinicManagement = ({ onUpdate }) => {
         return;
       }
 
-      const hashedPassword = data.editPassword ? await hashPassword(data.editPassword) : undefined;
+      const editPassword = data.editPassword?.trim();
+      const hashedPassword = editPassword ? await hashPassword(editPassword) : undefined;
       const normalizedEmail = data.email.trim().toLowerCase();
 
       // Check if email has changed
@@ -560,7 +562,7 @@ const ClinicManagement = ({ onUpdate }) => {
         try {
           await sendCredentialsEmail(
             { name: data.name, email: normalizedEmail, contactPerson: data.contactPerson || data.name },
-            data.editPassword,
+            editPassword,
             null
           );
           toast.success('Clinic updated! New credentials sent to ' + normalizedEmail, { duration: 5000 });
@@ -907,7 +909,8 @@ const ClinicManagement = ({ onUpdate }) => {
         toast.error('No clinic selected for password reset');
         return;
       }
-      const hashedPassword = await hashPassword(newPassword);
+      const password = newPassword.trim();
+      const hashedPassword = await hashPassword(password);
       await DatabaseService.update('clinics', selectedClinic.id, {
         password: hashedPassword,
         passwordResetAt: new Date().toISOString(),
@@ -921,11 +924,11 @@ const ClinicManagement = ({ onUpdate }) => {
           clinic: selectedClinic?.name || 'Unknown Clinic',
           email: selectedClinic?.email || 'Unknown Email',
           username: selectedClinic?.email || 'Unknown Email',
-          password: newPassword,
+          password,
           otp: otpCode
         });
         
-        await sendCredentialsEmail(selectedClinic, newPassword, otpCode);
+        await sendCredentialsEmail(selectedClinic, password, otpCode);
         toast.success('SUCCESS: Password set successfully! Credentials and activation OTP sent to clinic email.', {
           duration: 5000
         });

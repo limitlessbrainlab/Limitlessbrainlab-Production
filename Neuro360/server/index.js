@@ -4325,8 +4325,9 @@ app.get('/api/test-gemini', async (req, res) => {
 // Clinic Credentials Email API endpoint
 app.post('/api/clinic-credentials', async (req, res) => {
   try {
-    const { clinicName, contactPerson, password, otp } = req.body;
+    const { clinicName, contactPerson, otp } = req.body;
     const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '').trim();
 
     if (!email || !password) {
       return res.status(400).json({
@@ -4472,11 +4473,24 @@ app.post('/api/clinic-credentials', async (req, res) => {
       attachments: getLogoAttachment()
     };
 
-    await emailTransporter.sendMail(mailOptions);
+    const info = await emailTransporter.sendMail(mailOptions);
+    if (Array.isArray(info.rejected) && info.rejected.length > 0) {
+      return res.status(502).json({
+        success: false,
+        message: `Credentials email rejected for: ${info.rejected.join(', ')}`
+      });
+    }
+    if (Array.isArray(info.accepted) && info.accepted.length === 0) {
+      return res.status(502).json({
+        success: false,
+        message: 'Credentials email was not accepted by the mail provider'
+      });
+    }
 
     res.json({
       success: true,
-      message: 'Clinic credentials email sent successfully'
+      message: 'Clinic credentials email sent successfully',
+      accepted: info.accepted || []
     });
 
   } catch (error) {

@@ -9,7 +9,7 @@ const SALT_ROUNDS = 10;
  */
 export const hashPassword = async (password) => {
   const salt = await bcrypt.genSalt(SALT_ROUNDS);
-  return bcrypt.hash(password, salt);
+  return bcrypt.hash(String(password || '').trim(), salt);
 };
 
 /**
@@ -21,14 +21,15 @@ export const hashPassword = async (password) => {
  */
 export const comparePassword = async (plainPassword, storedPassword) => {
   if (!plainPassword || !storedPassword) return false;
+  const password = String(plainPassword).trim();
 
   // Check if stored password is a bcrypt hash (starts with $2a$ or $2b$)
   if (storedPassword.startsWith('$2a$') || storedPassword.startsWith('$2b$')) {
-    return bcrypt.compare(plainPassword, storedPassword);
+    return bcrypt.compare(password, storedPassword);
   }
 
   // Legacy plain-text comparison (for passwords not yet migrated)
-  return plainPassword === storedPassword;
+  return password === String(storedPassword).trim();
 };
 
 /**

@@ -5,7 +5,7 @@ const crypto = require('crypto');
 // No Supabase, no expiry. The frontend sends CLAUDE_REPORT_TOKEN as a Bearer
 // token; the backend compares it (timing-safe) against the same value in env,
 // then forwards the PDF to the VPS gateway using the server-side master key.
-const EXPECTED = process.env.CLAUDE_REPORT_TOKEN || '';
+const EXPECTED = (process.env.CLAUDE_REPORT_TOKEN || '').trim();
 
 function timingSafeEqualStr(a, b) {
   const ab = Buffer.from(String(a));

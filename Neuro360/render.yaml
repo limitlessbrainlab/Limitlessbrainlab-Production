@@ -54,6 +54,9 @@ services:
       - key: EMAIL_TO
         sync: false
       # Brevo SMTP relay — Render-safe (port 2525 not blocked). Preferred over Gmail.
+      # Brevo HTTP API key — preferred path (proven delivery, no SMTP needed).
+      - key: BREVO_API_KEY
+        sync: false
       - key: BREVO_SMTP_USER
         value: b06de4001@smtp-brevo.com
       - key: BREVO_SMTP_KEY

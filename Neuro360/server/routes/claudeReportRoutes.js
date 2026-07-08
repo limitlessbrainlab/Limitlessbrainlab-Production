@@ -107,7 +107,10 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
     let text;
     try {
       const parsed = await pdfParse(fs.readFileSync(tempPath));
-      text = (parsed.text || '').trim();
+      // Strip NUL bytes and other C0 control chars (except newline/tab) — pdf-parse
+      // can emit \0 from certain PDFs, and those terminate the Claude CLI's C-string
+      // input on the VPS, causing a 500 during the extract stage.
+      text = (parsed.text || '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim();
     } catch (e) {
       throw new Error(`Failed to read the PDF: ${e.message}`);
     }

@@ -1220,7 +1220,10 @@ const PatientDashboard = () => {
       const nameKey = normalizeName(patientName);
       const emailKey = normalizeEmail(patientEmail);
       const signatureReports = (allReports || []).filter((r) => {
-        const rd = r.reportData || r.report_data || {};
+        let rd = r.reportData || r.report_data || {};
+        if (typeof rd === 'string') {
+          try { rd = JSON.parse(rd); } catch { rd = {}; }
+        }
         const rn = normalizeName(rd.patientName || rd.patient_name || rd.patient || '');
         const remail = normalizeEmail(rd.patientEmail || rd.patient_email || '');
         const rcid = r.clinicId || r.clinic_id || rd.clinicId || rd.clinic_id || r.orgId || r.org_id;
@@ -1229,7 +1232,7 @@ const PatientDashboard = () => {
         const nameOk = !!nameKey && !!rn && rn === nameKey;
         const emailOk = !!emailKey && !!remail && remail === emailKey;
         const idOk = !!patientId && rid === patientId;
-        return clinicOk && (idOk || nameOk || emailOk);
+        return emailOk || (clinicOk && (idOk || nameOk));
       });
 
       const reports = dedupeRecords([...(directReports || []), ...signatureReports]);

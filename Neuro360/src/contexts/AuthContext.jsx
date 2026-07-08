@@ -25,12 +25,12 @@ const BACKEND_API_URL = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace(/\/$/, '')
   : (typeof window !== 'undefined' ? window.location.origin : '');
 
+// Bulletproof: strip any trailing /api, then add exactly one. Prevents the
+// /api/api/app-version double-prefix that silently broke deploy detection.
 const getBackendAppVersionUrl = () => {
-  if (!BACKEND_API_URL) return '/api/app-version';
-  if (BACKEND_API_URL.endsWith('/api')) {
-    return `${BACKEND_API_URL}/app-version`;
-  }
-  return `${BACKEND_API_URL}/api/app-version`;
+  const base = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+  const root = base.replace(/\/api$/, '');
+  return `${root}/api/app-version`;
 };
 
 // START: DEVELOPMENT MODE: Bypass authentication

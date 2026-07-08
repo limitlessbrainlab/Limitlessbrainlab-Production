@@ -1,13 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
-import { clearAppDataCachesKeepSession } from '../../utils/sessionCleanup';
+import { clearAllAndSignOut, clearAppDataCachesKeepSession } from '../../utils/sessionCleanup';
 
 const LoginForm = ({ userType: userTypeProp } = {}) => {
   const [showPassword, setShowPassword] = useState(false);
+
+  // FULL WIPE on every login page visit: clear localStorage, sessionStorage,
+  // cookies, cache storage, service workers, and Supabase session. Guarantees
+  // no stale data from a previous deploy/session survives into a new login.
+  useEffect(() => {
+    clearAllAndSignOut();
+  }, []);
 
   // Safety check for AuthContext
   let login, loading;

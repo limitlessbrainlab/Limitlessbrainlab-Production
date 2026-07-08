@@ -41,7 +41,7 @@ services:
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: FRONTEND_URL
-        sync: false
+        value: https://limitlessbrainlab-eight.vercel.app
       # Gmail SMTP only. Outbound mail is sent directly via EMAIL_USER/EMAIL_PASS.
       - key: EMAIL_USER
         value: info@limitlessbrainlab.com

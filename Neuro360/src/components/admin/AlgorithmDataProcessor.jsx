@@ -1650,6 +1650,7 @@ const AlgorithmDataProcessor = () => {
           processedAt: new Date().toISOString(),
           dataType: dataType || 'zscore',
           parameterNotes: parameterNotes || '',
+          brainParameters: results || [],
           uploadedBy: 'Super Admin',
           uploadStatus: 'completed',
           storedInCloud: pdfUrl.includes('supabase') // Only true for Supabase URLs
@@ -1810,6 +1811,7 @@ const AlgorithmDataProcessor = () => {
           processedAt: new Date().toISOString(),
           dataType: dataType || 'zscore',
           parameterNotes: parameterNotes || '',
+          brainParameters: results || [],
           uploadedBy: 'Super Admin',
           uploadStatus: 'completed',
           storedInCloud: claudeReportUrl.includes('supabase')
@@ -1892,6 +1894,7 @@ const AlgorithmDataProcessor = () => {
 
       // Standard NPR-<ReportID>-<YYYYMMDD>.pdf name (matches the download buttons).
       const nprName = buildNprFilename(record.claude_report_id || claudeReportId, record.processed_at || record.created_at || selectedPatient?.lastProcessed);
+      const savedResults = parseResultsData(record.outputData || record.output_data || record.results);
 
       const reportData = {
         clinicId: clinicId,
@@ -1907,6 +1910,7 @@ const AlgorithmDataProcessor = () => {
           filePath: url,
           patientName: patientName,
           processedAt: new Date().toISOString(),
+          brainParameters: savedResults || [],
           uploadedBy: 'Super Admin',
           uploadStatus: 'completed',
           storedInCloud: url.includes('supabase')

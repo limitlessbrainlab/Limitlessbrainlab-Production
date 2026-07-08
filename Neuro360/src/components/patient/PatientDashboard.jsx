@@ -1136,9 +1136,14 @@ const PatientDashboard = () => {
   const normalizeName = (value) => String(value || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ');
   const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
   const getRecordTimestamp = (item) => new Date(item?.processed_at || item?.updated_at || item?.created_at || item?.createdAt || 0).getTime() || 0;
-  const getReportBrainParameters = (report) => {
-    const reportData = report?.reportData || report?.report_data || {};
-    return reportData.brainParameters || reportData.brain_parameters || null;
+  const getReportData = (report) => {
+    const data = report?.reportData || report?.report_data || {};
+    if (typeof data !== 'string') return data;
+    try { return JSON.parse(data); } catch { return {}; }
+  };
+  const getSharedReportBrainParameters = (report) => {
+    const reportData = getReportData(report);
+    return reportData.brainParameters || reportData.brain_parameters || reportData.results || reportData.outputData || reportData.output_data || null;
   };
   const getBrainParameterEntries = (brainParams) => {
     if (!brainParams) return [];
@@ -1179,8 +1184,8 @@ const PatientDashboard = () => {
     return null;
   };
   const getLatestCareProgramSource = () => {
-    const latestReportWithBrainParams = (patientReports || []).find((report) => getReportBrainParameters(report));
-    const latestBrainParams = latestReportWithBrainParams ? getReportBrainParameters(latestReportWithBrainParams) : null;
+    const latestReportWithBrainParams = (patientReports || []).find((report) => getSharedReportBrainParameters(report));
+    const latestBrainParams = latestReportWithBrainParams ? getSharedReportBrainParameters(latestReportWithBrainParams) : null;
 
     if (latestBrainParams) {
       const reportRows = getBrainParameterEntries(latestBrainParams)
@@ -3599,14 +3604,10 @@ const PatientDashboard = () => {
     // Get brain parameters from algorithm results or uploaded reports
     const getReportBrainParameters = () => {
       // Priority 1: Latest shared patient report brain parameters
-      const latestReportWithBrainParams = filteredReports.find(report => {
-        const reportData = report.reportData || report.report_data;
-        return reportData?.brainParameters || reportData?.brain_parameters;
-      });
+      const latestReportWithBrainParams = filteredReports.find(report => getSharedReportBrainParameters(report));
 
       if (latestReportWithBrainParams) {
-        const reportData = latestReportWithBrainParams.reportData || latestReportWithBrainParams.report_data;
-        return reportData?.brainParameters || reportData?.brain_parameters;
+        return getSharedReportBrainParameters(latestReportWithBrainParams);
       }
 
       // Priority 2: Algorithm results from Algorithm Data Processor
@@ -6735,8 +6736,8 @@ const PatientDashboard = () => {
         return null;
       };
 
-      const latestPatientReportWithBrainParams = (patientReports || []).find((report) => getReportBrainParameters(report));
-      const latestPatientBrainParams = latestPatientReportWithBrainParams ? getReportBrainParameters(latestPatientReportWithBrainParams) : null;
+      const latestPatientReportWithBrainParams = (patientReports || []).find((report) => getSharedReportBrainParameters(report));
+      const latestPatientBrainParams = latestPatientReportWithBrainParams ? getSharedReportBrainParameters(latestPatientReportWithBrainParams) : null;
 
       // Source 1: Latest patient/shared report brain parameters
       if (latestPatientBrainParams) {

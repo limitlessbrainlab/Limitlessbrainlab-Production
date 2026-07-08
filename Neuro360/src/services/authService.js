@@ -187,7 +187,19 @@ export const authService = {
       const superAdminProfile = superAdmins.find(a => a.email === normalizedEmail && a.role === 'super_admin');
 
       if (superAdminProfile) {
-        const adminPasswordMatch = await comparePassword(password, superAdminProfile.password);
+        let adminPasswordMatch = false;
+
+        if (superAdminProfile.password) {
+          adminPasswordMatch = await comparePassword(password, superAdminProfile.password);
+        } else if (supabase) {
+          // ponytail: production super-admins live in Supabase Auth; keep legacy profile-password support only as fallback.
+          const { error } = await supabase.auth.signInWithPassword({
+            email: normalizedEmail,
+            password
+          });
+          adminPasswordMatch = !error;
+        }
+
         if (!adminPasswordMatch) {
           throw new Error('Invalid email or password');
         }

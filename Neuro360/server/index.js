@@ -311,7 +311,7 @@ const DEPLOY_SIGNATURE = process.env.DEPLOY_SIGNATURE ||
 const SERVER_VERSION = DEPLOY_SIGNATURE;
 
 // Outbound email "From" address (all emails to users/patients/clinics)
-const EMAIL_FROM = `"Limitless Brain Lab" <${process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@limitlessbrainlab.com'}>`;
+const EMAIL_FROM = `"Limitless Brain Lab" <${process.env.EMAIL_FROM || 'info@limitlessbrainlab.com'}>`;
 
 // Consistent "date + time" formatter for email templates → e.g. "22 June 2026, 02:51 PM" (IST).
 const fmtDateTime = (d = new Date()) => {

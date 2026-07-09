@@ -505,7 +505,9 @@ const ClinicDashboard = () => {
   // Helper function to get clinic ID from user
   const getClinicId = (user) => {
     if (!user) return null;
-    if (user.role === 'clinic_admin') {
+    // Both 'clinic' and 'clinic_admin' are clinic roles; for either, the clinic
+    // record id may live on user.clinicId or (from clinic login) on user.id.
+    if (user.role === 'clinic_admin' || user.role === 'clinic') {
       return user.clinicId || user.id;
     }
     return user.clinicId;

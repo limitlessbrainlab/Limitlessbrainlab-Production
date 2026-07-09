@@ -36,6 +36,22 @@ const getBackendAppVersionUrl = () => {
 // START: DEVELOPMENT MODE: Bypass authentication
 const BYPASS_AUTH = import.meta.env.VITE_BYPASS_AUTH === 'true' || false; // Set to false to enable authentication
 
+// A return from Stripe (payment=success on a /dashboard route) must NOT trigger the
+// deploy gate or the new-build force-logout. Both wipe the session, which drops the
+// user on the landing/login page instead of returning them to the page they bought
+// from (e.g. Frequencies) with the purchase applied. The payment query is short-lived
+// (the target page clears it on mount), so this only suppresses a wipe during the
+// brief return window; the next normal load re-gates as usual.
+const isPaymentReturn = () => {
+  try {
+    const s = window.location.search || '';
+    const p = window.location.pathname || '';
+    return (s.includes('payment=success') || s.includes('meditation_payment=success')) && p.includes('/dashboard');
+  } catch (e) {
+    return false;
+  }
+};
+
 const AuthContext = createContext();
 
 export const useAuth = () => {
@@ -127,7 +143,10 @@ export const AuthProvider = ({ children }) => {
         if (back != null && backendBaseline == null) backendBaseline = back;
         const frontChanged = front && frontendBaseline != null && front !== frontendBaseline; // Vercel redeployed
         const backChanged = back != null && backendBaseline != null && back !== backendBaseline; // Render redeployed
-        if (frontChanged || backChanged) await wipeAndReload();
+        // Defer the wipe while returning from Stripe — otherwise the purchase page is
+        // reloaded into a logged-out state. The payment query clears on mount, so the
+        // next 60s/visibility check will still pick up the new build.
+        if ((frontChanged || backChanged) && !isPaymentReturn()) await wipeAndReload();
       } catch (e) { /* offline/transient → ignore */ }
     };
 
@@ -150,7 +169,11 @@ export const AuthProvider = ({ children }) => {
       // a new deployment is live → wipe everything and hard-refresh into a clean build.
       if (!BYPASS_AUTH) {
         const storedBuildId = localStorage.getItem('app_build_id');
-        if (storedBuildId !== APP_BUILD_ID) {
+        if (storedBuildId !== APP_BUILD_ID && isPaymentReturn()) {
+          // New build loaded on the way back from Stripe: sync the build id but keep
+          // the session so the user lands back on their purchase page, not login.
+          localStorage.setItem('app_build_id', APP_BUILD_ID);
+        } else if (storedBuildId !== APP_BUILD_ID) {
           let hadSession = !!(localStorage.getItem('authToken') || localStorage.getItem('user'));
           if (!hadSession && supabase) {
             try {

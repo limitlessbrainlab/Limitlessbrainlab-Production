@@ -808,10 +808,13 @@ const allowedOrigins = [
   'http://localhost:3001',      // Local dev - Vite alternate
   'http://localhost:3002',      // Local dev - Vite alternate
   'http://localhost:5173',      // Local dev - Vite default
-  'https://neurosense360.site', // Production
-  'https://www.neurosense360.site', // Production with www
-  'http://neurosense360.site',  // Production HTTP
-  'http://www.neurosense360.site', // Production HTTP with www
+  'https://limitlessbrainlab.com', // Production custom domain
+  'https://www.limitlessbrainlab.com', // Production with www
+  'https://limitlessbrainlab-production.vercel.app', // Production Vercel domain
+  'https://neurosense360.site', // Legacy
+  'https://www.neurosense360.site', // Legacy with www
+  'http://neurosense360.site',  // Legacy HTTP
+  'http://www.neurosense360.site', // Legacy HTTP with www
   'https://limitlessbrainlab-eight.vercel.app', // Staging
 ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ];
@@ -2483,7 +2486,7 @@ app.post('/api/create-coaching-checkout', async (req, res) => {
     }
     const FRONTEND_URL = (requestOrigin && allowedOrigins.includes(requestOrigin))
       ? requestOrigin
-      : 'https://neurosense360.site';
+      : (process.env.FRONTEND_URL || 'https://limitlessbrainlab.com');
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({

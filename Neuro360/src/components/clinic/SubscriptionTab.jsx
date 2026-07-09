@@ -123,28 +123,34 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
   const loadUsageStats = async () => {
     try {
       if (user?.clinicId) {
-        // Try organizations table first, fallback to clinics table.
+        // Read usage from the `clinics` table — the authoritative source of truth.
+        // reports_used is incremented ONLY on `clinics` (on report generation), and
+        // the report-generation gate reads it from `clinics` too. The `organizations`
+        // table's reports_used is never kept in sync, so reading it first made
+        // "Reports Used" / "Reports Remaining" stale/wrong after a refill (only
+        // reports_allowed was mirrored to organizations, not reports_used). Fall back
+        // to organizations only when there is no clinics row.
         // NOTE: there is no total_spent column on either table — total spend is
         // derived from the payments table below.
         let clinic = null;
-        const { data: orgData, error: orgError } = await supabase
-          .from('organizations')
+        const { data: clinicData, error: clinicError } = await supabase
+          .from('clinics')
           .select('reports_used, reports_allowed, clinic_type')
           .eq('id', user.clinicId)
           .single();
 
-        if (!orgError && orgData) {
-          clinic = orgData;
+        if (!clinicError && clinicData) {
+          clinic = clinicData;
         } else {
-          // Fallback: read from clinics table
-          const { data: clinicData, error: clinicError } = await supabase
-            .from('clinics')
+          // Fallback: read from organizations table
+          const { data: orgData, error: orgError } = await supabase
+            .from('organizations')
             .select('reports_used, reports_allowed, clinic_type')
             .eq('id', user.clinicId)
             .single();
 
-          if (!clinicError && clinicData) {
-            clinic = clinicData;
+          if (!orgError && orgData) {
+            clinic = orgData;
           }
         }
 

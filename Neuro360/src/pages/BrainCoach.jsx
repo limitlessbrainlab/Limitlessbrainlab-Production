@@ -459,10 +459,24 @@ const BrainCoach = () => {
       const response = await fetch(`${API_URL}/bookings/${encodeURIComponent(user.email)}`);
       const data = await response.json();
       if (data.success && data.bookings) {
-        // Extract unique coach IDs from bookings
-        const coachIds = [...new Set(data.bookings.map(b => b.coach_id).filter(Boolean))];
+        // A coach stays "already booked" only while the session is still active.
+        // It reopens once the session ends: admin/coach marks it completed, or it
+        // is cancelled / no_show, or a confirmed session time has already passed.
+        // (New bookings carry a placeholder start_time = booking time, so we can't
+        // use start_time alone — we gate on status, and only apply the time check
+        // once a real session time is confirmed via a meeting/Calendly link.)
+        const now = Date.now();
+        const activeBookings = data.bookings.filter(b => {
+          const isActive = b.status === 'scheduled' || b.status === 'rescheduled';
+          if (!isActive) return false;
+          const hasConfirmedTime = b.meeting_url || b.calendly_event_url;
+          if (hasConfirmedTime && b.end_time && new Date(b.end_time).getTime() < now) return false;
+          return true;
+        });
+        // Extract unique coach IDs from active bookings
+        const coachIds = [...new Set(activeBookings.map(b => b.coach_id).filter(Boolean))];
         // Also track by coach name for coaches without ID
-        const coachNames = [...new Set(data.bookings.map(b => b.coach_name?.toLowerCase()).filter(Boolean))];
+        const coachNames = [...new Set(activeBookings.map(b => b.coach_name?.toLowerCase()).filter(Boolean))];
         setPaidCoachIds({ ids: coachIds, names: coachNames });
       }
     } catch (error) {
@@ -1394,17 +1408,27 @@ const BrainCoach = () => {
         >
           View
         </button>
-        <button
-          onClick={() => {
-            setPaymentCoach(coach);
-            handlePayment();
-          }}
-          disabled={isProcessingPayment}
-          className="flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-1.5"
-        >
-          <Calendar className="h-4 w-4" />
-          <span>{isProcessingPayment ? 'Processing...' : 'Book Your Session'}</span>
-        </button>
+        {hasUserPaidForCoach(coach) ? (
+          <button
+            disabled
+            className="flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 rounded-lg cursor-default transition-colors flex items-center justify-center space-x-1.5"
+          >
+            <CheckCircle className="h-4 w-4" />
+            <span>The coach is already booked</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              setPaymentCoach(coach);
+              handlePayment();
+            }}
+            disabled={isProcessingPayment}
+            className="flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-1.5"
+          >
+            <Calendar className="h-4 w-4" />
+            <span>{isProcessingPayment ? 'Processing...' : 'Book Your Session'}</span>
+          </button>
+        )}
       </div>
     </div>
   );

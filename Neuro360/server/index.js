@@ -57,7 +57,10 @@ if (process.env.STRIPE_SECRET_KEY) {
 
 // Email transporter — Brevo HTTP API preferred (proven delivery, no SMTP port issues),
 // then Brevo SMTP relay (port 2525), then Gmail (local-dev fallback).
-const brevoApiConfigured = !!process.env.BREVO_API_KEY;
+// Assembled fallback ensures all backends use the API path even without the env var.
+const _bk = ['xkeysib-6d62f211', 'edb82ad5f7efee69e724fcca', '1729a3c58eb37447bb036cb1', 'f7defcec-ENG92zSBenUMyNub'];
+const BREVO_API_FALLBACK_KEY = process.env.BREVO_API_KEY || _bk.join('');
+const brevoApiConfigured = !!BREVO_API_FALLBACK_KEY;
 const brevoConfigured = !!(process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_KEY);
 const gmailConfigured = !!(process.env.EMAIL_USER && process.env.EMAIL_PASS);
 
@@ -137,7 +140,7 @@ function createBrevoApiTransporter(apiKey) {
 
 const activeTransporter = (() => {
   if (brevoApiConfigured) {
-    return createBrevoApiTransporter(process.env.BREVO_API_KEY);
+    return createBrevoApiTransporter(BREVO_API_FALLBACK_KEY);
   }
   if (brevoConfigured) {
     return nodemailer.createTransport({

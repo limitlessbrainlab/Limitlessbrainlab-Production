@@ -99,6 +99,7 @@ export const AuthProvider = ({ children }) => {
     if (BYPASS_AUTH || !isAuthenticated) return;
     let stopped = false;
     let backendBaseline = null; // backend version present when this session started
+    let frontendBaseline = null; // frontend version present when this session started
 
     const wipeAndReload = async () => {
       stopped = true;
@@ -120,8 +121,11 @@ export const AuthProvider = ({ children }) => {
         const back = b.status === 'fulfilled' && b.value
           ? (b.value.deploySignature || b.value.buildId || b.value.version || null)
           : null;
-        if (back != null && backendBaseline == null) backendBaseline = back; // first capture (no action)
-        const frontChanged = front && front !== APP_BUILD_ID;                 // Vercel redeployed
+        // Capture baselines on first check (no action — prevents false-positive
+        // reload when APP_BUILD_ID defaults to 'dev' and doesn't match version.json)
+        if (front != null && frontendBaseline == null) frontendBaseline = front;
+        if (back != null && backendBaseline == null) backendBaseline = back;
+        const frontChanged = front && frontendBaseline != null && front !== frontendBaseline; // Vercel redeployed
         const backChanged = back != null && backendBaseline != null && back !== backendBaseline; // Render redeployed
         if (frontChanged || backChanged) await wipeAndReload();
       } catch (e) { /* offline/transient → ignore */ }
@@ -130,7 +134,7 @@ export const AuthProvider = ({ children }) => {
     const id = setInterval(check, 60 * 1000);
     const onVis = () => { if (document.visibilityState === 'visible') check(); };
     document.addEventListener('visibilitychange', onVis);
-    check(); // immediate first check (also captures the backend baseline)
+    check(); // immediate first check (captures baselines only — no reload)
 
     return () => {
       stopped = true;

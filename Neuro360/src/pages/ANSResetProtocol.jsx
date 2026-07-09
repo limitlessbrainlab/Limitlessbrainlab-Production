@@ -2253,13 +2253,6 @@ const ANSResetProtocol = () => {
                             loading="lazy"
                             onError={(e) => { e.target.style.display = 'none'; }}
                           />
-                          {/* Play button overlay — small, semi-transparent, so the
-                              thumbnail stays visible behind it. */}
-                          <div className="absolute inset-0 w-full h-full flex items-center justify-center">
-                            <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center">
-                              <Play className="h-7 w-7 text-white ml-1" />
-                            </div>
-                          </div>
                         </div>
                       )}
                     </div>

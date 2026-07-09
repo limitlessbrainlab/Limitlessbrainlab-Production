@@ -122,11 +122,13 @@ function positiveStatus(s) {
   if (s === 2) return 'Moderate';
   return 'Needs Attention';
 }
+// Stress & Burnout show the LEVEL (matching the NeuroSense report), so the status
+// word is the level too: 0 red = Low (best) ... 3 red = Severe (worst).
 function stressRegStatus(red) {
-  return ['Excellent', 'Good', 'Moderate', 'Low'][Math.min(red, 3)];
+  return ['Low', 'Mild', 'Moderate', 'Severe'][Math.min(red, 3)];
 }
 function burnoutResistStatus(red) {
-  return ['Strong', 'Mild Load', 'Moderate Load', 'High Load'][Math.min(red, 3)];
+  return ['Low', 'Mild', 'Moderate', 'Severe'][Math.min(red, 3)];
 }
 // Bucket -> gauge % used by the NeuroSense report: Low=20%, Medium/Mild/Moderate=55%,
 // High/Severe=90%. Positive params use the direct bucket. Stress & Burnout scores are
@@ -146,17 +148,13 @@ function stressClass(score) {
   return 'Severe';
 }
 function gaugePercent(param, isStress = false) {
+  // Bucket the parameter's own classification, identical to the NeuroSense gauge
+  // (geminiPdfGenerator.js:1656-1668) — the raw LEVEL, no inversion. For Stress &
+  // Burnout the classification is Low/Mild/Moderate/Severe (0=low stress). The
+  // colour is inverted at render time (brainReport12Page.js) so low stress shows
+  // green, matching the NeuroSense report.
   const score = param?.score || 0;
-  const maxScore = param?.maxScore || 3;
-  if (isStress) {
-    // Invert the RED count to a health score (0 red -> 3 healthy) and bucket that.
-    const health = maxScore - score;
-    const bucket = positiveClass(health).toLowerCase();
-    if (bucket === 'low') return 20;
-    if (bucket === 'medium') return 55;
-    return 90;
-  }
-  const bucket = String(param?.classification || positiveClass(score)).toLowerCase();
+  const bucket = String(param?.classification || (isStress ? stressClass(score) : positiveClass(score))).toLowerCase();
   if (bucket === 'low') return 20;
   if (bucket === 'mild' || bucket === 'moderate' || bucket === 'medium') return 55;
   if (bucket === 'high' || bucket === 'severe') return 90;
@@ -206,22 +204,19 @@ function buildReportData(qeegData, algoResults, patient = {}) {
   const emotionalPct = gaugePercent(paramByName('Emotional Regulation'));
   const creativityPct = gaugePercent(paramByName('Creativity'));
   const bars = [
-    { key: 'stress', label: 'Stress Regulation', percent: stressPct, status: stressRegStatus(stressRed), icon: '⚡' },
+    { key: 'stress', label: 'Stress', percent: stressPct, status: stressRegStatus(stressRed), icon: '⚡' },
     { key: 'cognition', label: 'Cognition', percent: cognitionPct, status: positiveStatus(cognition), icon: '🧠' },
     { key: 'focus', label: 'Focus & Attention', percent: focusPct, status: positiveStatus(focus), icon: '🎯' },
     { key: 'learning', label: 'Learning', percent: learningPct, status: positiveStatus(learning), icon: '📚' },
-    { key: 'burnout', label: 'Burnout Resistance', percent: burnoutPct, status: burnoutResistStatus(burnoutRed), icon: '🔋' },
+    { key: 'burnout', label: 'Burnout & Fatigue', percent: burnoutPct, status: burnoutResistStatus(burnoutRed), icon: '🔋' },
     { key: 'emotional', label: 'Emotional Regulation', percent: emotionalPct, status: positiveStatus(emotional), icon: '💗' },
     { key: 'creativity', label: 'Creativity', percent: creativityPct, status: positiveStatus(creativity), icon: '🎨' },
   ];
 
-  // Match the NeuroSense report's overall exactly: sum of raw 0-3 scores
-  // (Stress & Burnout already inverted in algoResults.overallScore) over the
-  // max (params × 3), ×100 — identical to geminiPdfGenerator.js:523-525.
-  const maxTotal = (params.length || 7) * 3;
-  const overall = (algoResults && typeof algoResults.overallScore === 'number')
-    ? Math.round((algoResults.overallScore / maxTotal) * 100)
-    : Math.round(bars.reduce((s, b) => s + b.percent, 0) / bars.length);
+  // Overall = average of the 7 parameter percentages (bars), including the
+  // inverted Stress & Burnout bars (computed from their health / highest score).
+  // Performance report only — the NeuroSense report keeps its overallScore/21 basis.
+  const overall = Math.round(bars.reduce((s, b) => s + b.percent, 0) / bars.length);
 
   // Deep-dive metric VALUES (deterministic, from the algorithm sub-metrics).
   const alphaPeak = metricValue(params, 'Alpha Peak');
@@ -498,9 +493,9 @@ if (require.main === module) {
   // Positive params: direct bucket (Low=20, Medium=55, High=90).
   // Stress & Burnout: inverted to health (red count -> maxScore-score) then bucketed.
   assert.equal(bar('cognition'), 55); // Medium
-  assert.equal(bar('stress'), 90);    // 0 red -> health 3 -> High
-  assert.equal(bar('burnout'), 20);   // 3 red -> health 0 -> Low
-  assert.equal(report.overall, 57);   // round(overallScore 12 / (7*3) * 100)
+  assert.equal(bar('stress'), 20);    // 0 red -> Low (matches NeuroSense level)
+  assert.equal(bar('burnout'), 90);   // 3 red -> Severe (matches NeuroSense level)
+  assert.equal(report.overall, 55);   // avg(20,55,55,55,90,55,55) = 385/7
   console.log('claudeReportData self-check ok');
 }
 

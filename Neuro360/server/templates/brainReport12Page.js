@@ -68,6 +68,16 @@ function pctBadge(text, p) {
   return `<span class="badge" style="background:${pctTint(p)};color:${pctFg(p)}">${esc(String(text).toUpperCase())}</span>`;
 }
 
+// Stress & Burnout are inverted parameters: the displayed number is the LEVEL
+// (low stress = 20%), but low = good. So their COLOUR is driven by the inverted
+// value, matching the NeuroSense report (geminiPdfGenerator getBucketColor) where
+// low stress = green. Positive parameters colour directly by percent.
+const INVERTED_KEYS = new Set(['stress', 'burnout']);
+function colorPct(b) {
+  const p = Number(b && b.percent) || 0;
+  return (b && INVERTED_KEYS.has(b.key)) ? (100 - p) : p;
+}
+
 // White brain glyph used inside the blue logo badge ({S} = pixel size).
 const BRAIN_SVG =
   '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="#fff" ' +
@@ -87,7 +97,7 @@ function badge(text, kind) {
 
 // Snapshot marker row — each in its own bordered card with a value and a bar.
 function snapCard(b) {
-  const c = pctColor(b.percent);
+  const c = pctColor(colorPct(b));
   return `<div class="scard">
     <div class="scard-top"><span class="scard-lbl">${esc(b.icon)} ${esc(b.label)}</span><span class="scard-pct" style="color:${c}">${Number(b.percent) || 0}%</span></div>
     <div class="ptrack"><div class="pfill" style="width:${Math.max(2, Math.min(100, Number(b.percent) || 0))}%;background:${c}"></div></div>
@@ -214,21 +224,21 @@ function renderReportHtml(reportData, narrative = {}) {
     burnout: 'Mental fuel · Stamina',
   };
   const perfCard = (b, sub, body) => {
-    const c = pctColor(b.percent);
+    const c = pctColor(colorPct(b));
     return `<div class="card perf2">
       <div class="perf2-top"><div><div class="perf2-title">${esc(b.label)}</div><div class="perf2-sub">${esc(sub)}</div></div><div class="perf2-pct" style="color:${c}">${Number(b.percent) || 0}%</div></div>
-      ${pctBadge(b.status, b.percent)}
+      ${pctBadge(b.status, colorPct(b))}
       <p class="perf2-body">${esc(body || '')}</p>
     </div>`;
   };
 
   // Inner-bandwidth cards (page 9).
   const innerCard = (label, b, body) => {
-    const c = pctColor(b.percent);
+    const c = pctColor(colorPct(b));
     return `<div class="card">
       <div class="perf2-title">${esc(label)}</div>
       <div class="inner-pct" style="color:${c}">${Number(b.percent) || 0}%</div>
-      ${pctBadge(b.status, b.percent)}
+      ${pctBadge(b.status, colorPct(b))}
       <p class="perf2-body" style="margin-top:6px;">${esc(body || '')}</p>
     </div>`;
   };

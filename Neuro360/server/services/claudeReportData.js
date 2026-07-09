@@ -128,26 +128,13 @@ function stressRegStatus(red) {
 function burnoutResistStatus(red) {
   return ['Strong', 'Mild Load', 'Moderate Load', 'High Load'][Math.min(red, 3)];
 }
-function positiveClass(score) {
-  if (score <= 1) return 'Low';
-  if (score === 2) return 'Medium';
-  return 'High';
-}
-function stressClass(score) {
-  if (score === 0) return 'Low';
-  if (score === 1) return 'Mild';
-  if (score === 2) return 'Moderate';
-  return 'Severe';
-}
-function gaugePercent(param, isStress = false) {
-  const bucket = String(param?.classification || (isStress ? stressClass(param?.score || 0) : positiveClass(param?.score || 0))).toLowerCase();
-  if (bucket === 'low') return 20;
-  if (bucket === 'mild' || bucket === 'moderate' || bucket === 'medium') return 55;
-  if (bucket === 'high' || bucket === 'severe') return 90;
-  if ((param?.score || 0) === 0) return 10;
-  if ((param?.score || 0) === 1) return 25;
-  if ((param?.score || 0) === 2) return 55;
-  return 90;
+function scorePercent(param, invert = false) {
+  const scoreValue = Number(param?.score);
+  const maxValue = Number(param?.maxScore) || 3;
+  if (!Number.isFinite(scoreValue) || !Number.isFinite(maxValue) || maxValue <= 0) return 0;
+  const scoreClamped = Math.max(0, Math.min(maxValue, scoreValue));
+  const healthScore = invert ? maxValue - scoreClamped : scoreClamped;
+  return Math.round((healthScore / maxValue) * 100);
 }
 
 function focusScoreStatus(value) {
@@ -179,14 +166,16 @@ function buildReportData(qeegData, algoResults, patient = {}) {
   const creativity = score(params, 'Creativity');
   const paramByName = (name) => params.find((p) => p.name === name) || { score: 0, maxScore: 3 };
 
-  // Match the NeuroSense PDF gauge mapping: Low=20%, Medium/Mild/Moderate=55%, High/Severe=90%.
-  const stressPct = gaugePercent(paramByName('Stress'), true);
-  const cognitionPct = gaugePercent(paramByName('Cognition'));
-  const focusPct = gaugePercent(paramByName('Focus & Attention'));
-  const learningPct = gaugePercent(paramByName('Learning'));
-  const burnoutPct = gaugePercent(paramByName('Burnout & Fatigue'), true);
-  const emotionalPct = gaugePercent(paramByName('Emotional Regulation'));
-  const creativityPct = gaugePercent(paramByName('Creativity'));
+  // Use the saved NeuroSense score basis so the performance report matches the
+  // admin/result rows. Stress and burnout are red-count scores, so invert them
+  // for the positive labels used here: Regulation and Resistance.
+  const stressPct = scorePercent(paramByName('Stress'), true);
+  const cognitionPct = scorePercent(paramByName('Cognition'));
+  const focusPct = scorePercent(paramByName('Focus & Attention'));
+  const learningPct = scorePercent(paramByName('Learning'));
+  const burnoutPct = scorePercent(paramByName('Burnout & Fatigue'), true);
+  const emotionalPct = scorePercent(paramByName('Emotional Regulation'));
+  const creativityPct = scorePercent(paramByName('Creativity'));
   const bars = [
     { key: 'stress', label: 'Stress Regulation', percent: stressPct, status: stressRegStatus(stressRed), icon: '⚡' },
     { key: 'cognition', label: 'Cognition', percent: cognitionPct, status: positiveStatus(cognition), icon: '🧠' },
@@ -456,6 +445,26 @@ function buildReportDataFromSource(source, patient = {}, algorithmResults = null
   }
 
   return rd;
+}
+
+if (require.main === module) {
+  const assert = require('assert');
+  const params = [
+    { name: 'Cognition', score: 2, maxScore: 3, classification: 'Medium', metrics: [] },
+    { name: 'Stress', score: 0, maxScore: 3, classification: 'Low', metrics: [] },
+    { name: 'Focus & Attention', score: 2, maxScore: 3, classification: 'Medium', metrics: [] },
+    { name: 'Learning', score: 2, maxScore: 3, classification: 'Medium', metrics: [] },
+    { name: 'Burnout & Fatigue', score: 3, maxScore: 3, classification: 'Severe', metrics: [] },
+    { name: 'Emotional Regulation', score: 2, maxScore: 3, classification: 'Medium', metrics: [] },
+    { name: 'Creativity', score: 2, maxScore: 3, classification: 'Medium', metrics: [] },
+  ];
+  const report = buildReportData({}, { parameters: params, overallScore: 12 }, { name: 'Self Check', id: 'self', processedAt: '2026-07-09T00:00:00Z' });
+  const bar = (key) => report.bars.find((b) => b.key === key).percent;
+  assert.equal(bar('cognition'), 67);
+  assert.equal(bar('stress'), 100);
+  assert.equal(bar('burnout'), 0);
+  assert.equal(report.overall, 62);
+  console.log('claudeReportData self-check ok');
 }
 
 module.exports = { buildReportData, buildReportDataFromSource };

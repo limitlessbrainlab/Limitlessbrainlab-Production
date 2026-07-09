@@ -96,11 +96,11 @@ class PaymentGatewayService {
   async processSubscriptionPayment(tierData, userInfo, callbacks = {}) {
 
     try {
-      // Validate Stripe is available
-      if (!StripeService.isAvailable()) {
-        throw new Error('Payment system is not configured. Please contact support.');
-      }
-
+      // Do NOT gate on the frontend publishable key here. Checkout is created
+      // by the backend (which holds the secret key) and returns a redirect URL,
+      // exactly like the frequency/meditation flows. Gating on the frontend key
+      // caused subscription purchases to fall back to the inquiry form whenever
+      // VITE_STRIPE_PUBLISHABLE_KEY was absent in the deployed build.
       callbacks.onProcessing?.();
 
       // Create checkout session and redirect

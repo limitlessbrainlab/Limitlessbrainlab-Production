@@ -161,10 +161,11 @@ class StripeService {
   // Create Stripe Checkout Session via backend
   async createCheckoutSession(tierData, userInfo, successUrl, cancelUrl) {
     try {
-      if (!this.hasRealKeys) {
-        throw new Error('Payment system not configured. Please contact support.');
-      }
-
+      // The backend holds the Stripe secret key and creates the Checkout
+      // Session, returning a redirect URL. We deliberately do NOT require the
+      // frontend publishable key (hasRealKeys) here — requiring it made
+      // subscription checkout fail (and fall back to the inquiry form) when the
+      // key was missing from the deployed frontend build.
 
       // If we have pre-configured Stripe Price IDs, use them
       if (tierData.stripePriceId) {

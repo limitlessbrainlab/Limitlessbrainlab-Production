@@ -173,17 +173,9 @@ const PatientSubscription = () => {
       }
     } catch (error) {
       console.error('Payment error:', error);
-
-      // Check if it's a configuration error
-      if (error.message?.includes('not configured')) {
-        toast.error('Payment system is being set up. Please contact support to complete your upgrade.', {
-          duration: 5000
-        });
-        // Open contact form for support
-        setShowContactForm(true);
-      } else {
-        toast.error(getFriendlyErrorMessage(error, 'The payment could not be completed. Please try again.'));
-      }
+      // Never divert subscription upgrades to the inquiry/contact form. Surface
+      // a real error and let the user retry the payment.
+      toast.error(getFriendlyErrorMessage(error, 'The payment could not be completed. Please try again.'));
     } finally {
       setProcessingPayment(false);
       setSelectedTier(null);

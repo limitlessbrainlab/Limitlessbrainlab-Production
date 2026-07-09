@@ -166,6 +166,19 @@ function gaugePercent(param, isStress = false) {
   return 90;
 }
 
+// Performance report overall = average of the 7 parameter percentages, with
+// Stress & Burnout INVERTED (100 - percent) so that a low stress/burnout level
+// counts as high health in the average (e.g. Stress 70% -> 30%).
+const OVERALL_INVERTED_KEYS = new Set(['stress', 'burnout']);
+function overallFromBars(bars) {
+  if (!bars || !bars.length) return 0;
+  const sum = bars.reduce((s, b) => {
+    const p = Number(b.percent) || 0;
+    return s + (OVERALL_INVERTED_KEYS.has(b.key) ? (100 - p) : p);
+  }, 0);
+  return Math.round(sum / bars.length);
+}
+
 function focusScoreStatus(value) {
   if (value == null || value === 'Indeterminate') return 'N/A';
   return typeof value === 'number' && value < 1.5 ? 'Good' : 'Above Target';
@@ -214,10 +227,9 @@ function buildReportData(qeegData, algoResults, patient = {}) {
     { key: 'creativity', label: 'Creativity', percent: creativityPct, status: positiveStatus(creativity), icon: '🎨' },
   ];
 
-  // Overall = average of the 7 parameter percentages (bars), including the
-  // inverted Stress & Burnout bars (computed from their health / highest score).
-  // Performance report only — the NeuroSense report keeps its overallScore/21 basis.
-  const overall = Math.round(bars.reduce((s, b) => s + b.percent, 0) / bars.length);
+  // Overall = average of the 7 parameter percentages, with Stress & Burnout
+  // inverted (100 - percent). Performance report only.
+  const overall = overallFromBars(bars);
 
   // Deep-dive metric VALUES (deterministic, from the algorithm sub-metrics).
   const alphaPeak = metricValue(params, 'Alpha Peak');
@@ -516,14 +528,6 @@ function buildReportDataFromNeuroSenseMd(mdText, patient = {}, algorithmResults 
 
   const assessmentDate = formatDate(parsed.patient.assessmentDate || patient.processedAt);
 
-  // Overall: copied verbatim from the NeuroSense MD. Fallback only when absent.
-  let overall = parsed.overall.percentage;
-  if (overall == null || !isFinite(overall)) {
-    overall = parsed.overall.score != null && isFinite(parsed.overall.score)
-      ? Math.round((parsed.overall.score / 21) * 100)
-      : 0;
-  }
-
   // Bars: percent + status straight from the NeuroSense report — no re-bucketing.
   const bars = parsed.parameters.map((p) => ({
     key: p.key,
@@ -532,6 +536,10 @@ function buildReportDataFromNeuroSenseMd(mdText, patient = {}, algorithmResults 
     status: p.status || 'N/A',
     icon: p.icon,
   }));
+
+  // Overall = average of the 7 parameter percentages, with Stress & Burnout
+  // inverted (100 - percent) so low stress/burnout counts as high health.
+  const overall = overallFromBars(bars);
   const findBar = (key) => bars.find((b) => b.key === key)
     || { key, label: key, percent: 0, status: 'N/A', icon: '' };
 
@@ -612,7 +620,8 @@ if (require.main === module) {
   assert.equal(bar('cognition'), 55); // Medium
   assert.equal(bar('stress'), 20);    // 0 red -> Low (matches NeuroSense level)
   assert.equal(bar('burnout'), 90);   // 3 red -> Severe (matches NeuroSense level)
-  assert.equal(report.overall, 55);   // avg(20,55,55,55,90,55,55) = 385/7
+  // Overall inverts Stress (20->80) & Burnout (90->10): avg(80,55,55,55,10,55,55)=365/7
+  assert.equal(report.overall, 52);
   console.log('claudeReportData self-check ok');
 }
 

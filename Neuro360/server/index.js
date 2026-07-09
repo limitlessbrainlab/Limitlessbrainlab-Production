@@ -880,6 +880,15 @@ app.get('/uploads/:filename', (req, res) => {
 
 // ===== PUBLIC ROUTES (No Auth Required) =====
 
+// Fix double-/api prefix from stale frontend builds: /api/api/send-report-email → /api/send-report-email
+// Handles ALL routes so users with cached old JS don't get 404s after a deploy.
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/api/')) {
+    req.url = req.url.replace('/api/api/', '/api/');
+  }
+  next();
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({

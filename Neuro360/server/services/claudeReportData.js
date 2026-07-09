@@ -7,6 +7,7 @@
  */
 
 const { classifyBrainType5 } = require('./brainType5Classifier');
+const { parseNeuroSenseMarkdown } = require('./neurosenseMarkdown');
 
 const POSTERIOR_CHANNELS = ['Pz', 'P3', 'P4', 'O1', 'O2', 'Oz'];
 
@@ -477,6 +478,122 @@ function buildReportDataFromSource(source, patient = {}, algorithmResults = null
   return rd;
 }
 
+/**
+ * Build reportData from a NeuroSense-values Markdown document (produced by
+ * neurosenseMarkdown.buildNeuroSenseMarkdown). Every displayed number — the
+ * seven parameter percentages, the overall score, every status label, the
+ * deep-dive values, and the brainwave profile — is COPIED VERBATIM from the MD.
+ * No gaugePercent bucketing, no overall averaging, no status derivation, no
+ * score inversion happens here. The performance report shows exactly what the
+ * NeuroSense report printed.
+ *
+ * The only non-transcribed step is the 5-type brain object reconstruction: the
+ * template's brain-type pages need the full framework object (strengths,
+ * watch-zones, tagline), so we re-run classifyBrainType5 on the original
+ * algorithmResults (a static framework lookup, not a patient-value calculation)
+ * and fall back to the TYPES table by id when algorithmResults is unavailable.
+ *
+ * @param {string} mdText          NeuroSense-values Markdown.
+ * @param {object} patient         { id, name, clinicName, processedAt } fallbacks.
+ * @param {object} algorithmResults original deterministic results (for brain-type object only).
+ * @returns {object} reportData (same shape as buildReportData).
+ */
+function buildReportDataFromNeuroSenseMd(mdText, patient = {}, algorithmResults = null) {
+  const parsed = parseNeuroSenseMarkdown(mdText);
+
+  // Brain-type framework object (template needs primary/secondary/strengths/watchZones).
+  let brainType;
+  try {
+    brainType = classifyBrainType5(algorithmResults);
+  } catch (_) {
+    brainType = null;
+  }
+  if (!brainType || !brainType.primary) {
+    const { TYPES } = require('./brainType5Classifier');
+    const fallbackId = parsed.brainTypeId || 1;
+    brainType = { primary: TYPES[fallbackId] || TYPES[1], secondary: null, fitScores: {}, signals: {} };
+  }
+
+  const assessmentDate = formatDate(parsed.patient.assessmentDate || patient.processedAt);
+
+  // Overall: copied verbatim from the NeuroSense MD. Fallback only when absent.
+  let overall = parsed.overall.percentage;
+  if (overall == null || !isFinite(overall)) {
+    overall = parsed.overall.score != null && isFinite(parsed.overall.score)
+      ? Math.round((parsed.overall.score / 21) * 100)
+      : 0;
+  }
+
+  // Bars: percent + status straight from the NeuroSense report — no re-bucketing.
+  const bars = parsed.parameters.map((p) => ({
+    key: p.key,
+    label: p.label,
+    percent: p.percent != null ? p.percent : 0,
+    status: p.status || 'N/A',
+    icon: p.icon,
+  }));
+  const findBar = (key) => bars.find((b) => b.key === key)
+    || { key, label: key, percent: 0, status: 'N/A', icon: '' };
+
+  // Deep dive: values + statuses copied verbatim from the MD.
+  const ddIn = parsed.deepDive || {};
+  const ddEntry = (key) => {
+    const e = ddIn[key];
+    if (!e) return { label: '', value: null, unit: '', optimal: '', status: 'N/A' };
+    return { label: e.label, value: e.value, unit: e.unit, optimal: e.optimal, status: e.status };
+  };
+  const deepDive = {
+    alphaPeak: ddEntry('alphaPeak'),
+    arousal: ddEntry('arousal'),
+    relaxation: ddEntry('relaxation'),
+    regeneration: ddEntry('regeneration'),
+    frontalAsymmetry: ddEntry('frontalAsymmetry'),
+    daytimeDelta: ddEntry('daytimeDelta'),
+    focusScore: ddEntry('focusScore'),
+    alphaTheta: ddEntry('alphaTheta'),
+  };
+
+  // Brainwave profile: copied verbatim from the MD.
+  const bw = parsed.brainwave || {};
+  const profile = {
+    delta: bw.delta != null ? bw.delta : 0,
+    theta: bw.theta != null ? bw.theta : 0,
+    alpha: bw.alpha != null ? bw.alpha : 0,
+    beta: bw.beta != null ? bw.beta : 0,
+    hiBeta: bw.hiBeta != null ? bw.hiBeta : 0,
+    alphaPeakHz: bw.alphaPeakHz != null ? bw.alphaPeakHz : null,
+  };
+
+  const name = parsed.patient.name || patient.name || 'Patient';
+
+  return {
+    patient: {
+      name,
+      reportId: makeReportId(patient.id, assessmentDate),
+      assessmentDate,
+      clinicName: patient.clinicName || 'Limitless Brain Lab',
+      firstName: name.split(/\s+/)[0],
+    },
+    overall,
+    bars,
+    performance: {
+      cognition: findBar('cognition'),
+      stress: findBar('stress'),
+      focus: findBar('focus'),
+      burnout: findBar('burnout'),
+    },
+    innerBandwidth: {
+      emotional: findBar('emotional'),
+      learning: findBar('learning'),
+      creativity: findBar('creativity'),
+    },
+    deepDive,
+    profile,
+    brainType,
+    overallScore21: parsed.overall.score != null ? parsed.overall.score : null,
+  };
+}
+
 if (require.main === module) {
   const assert = require('assert');
   const params = [
@@ -499,4 +616,4 @@ if (require.main === module) {
   console.log('claudeReportData self-check ok');
 }
 
-module.exports = { buildReportData, buildReportDataFromSource };
+module.exports = { buildReportData, buildReportDataFromSource, buildReportDataFromNeuroSenseMd };

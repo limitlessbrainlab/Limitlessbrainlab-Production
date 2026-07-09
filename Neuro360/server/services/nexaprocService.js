@@ -283,6 +283,7 @@ Return ONE pure JSON object (no markdown, no code fences, no prose):
 
 {
   "patient": { "name": "<patient name or null>", "assessmentDate": "<date string or null>" },
+  "overall": { "score": "<Overall Brain Health Score numerator 0-21 or null>", "percentage": "<overall percentage 0-100 or null>" },
   "markers": {
     "stressRegulation": <0-100 or null>,
     "cognition": <0-100 or null>,
@@ -304,6 +305,9 @@ Return ONE pure JSON object (no markdown, no code fences, no prose):
 }
 
 Rules:
+- "overall" is the Overall Brain Health Score printed on the report (e.g.
+  "Overall Brain Health Score: 14/21 (67%)"). Copy the numerator into "score"
+  and the percentage into "percentage" exactly as printed. If absent, use null.
 - "markers" are the seven performance percentages exactly as shown on the report's
   snapshot/markers pages (e.g. "Stress Regulation 100%", "Cognition 67%", "Burnout
   Resistance 67%", "Emotional Regulation 33%"). Copy the number shown — do NOT invert

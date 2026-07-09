@@ -6,7 +6,8 @@ const pdfParse = require('pdf-parse');
 const axios = require('axios');
 const { sidecarAuth } = require('../middleware/sidecarAuth');
 const { extractReportSource, postLesson, GATEWAY_URL } = require('../services/nexaprocService');
-const { buildReportDataFromSource } = require('../services/claudeReportData');
+const { buildReportDataFromSource, buildReportDataFromNeuroSenseMd } = require('../services/claudeReportData');
+const { buildNeuroSenseMarkdown } = require('../services/neurosenseMarkdown');
 const { generateBrainReportPdf } = require('../services/claudeReportGenerator');
 const SupabaseStorage = require('../services/supabaseStorage');
 
@@ -128,12 +129,27 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
       try { algorithmResults = JSON.parse(req.body.algorithmResults); } catch (_) { algorithmResults = null; }
     }
 
-    // Deterministic build (derives %s, statuses, 5-type classification, profile).
-    progress('build');
-    const reportData = buildReportDataFromSource(source, {
+    const patientMeta = {
       name: (req.body && req.body.patientName) || undefined,
       clinicName: (req.body && req.body.clinicName) || undefined,
-    }, algorithmResults);
+    };
+
+    // Deterministic build. The performance report imports EVERY value verbatim
+    // from the NeuroSense report: the transcribed numbers are written into a
+    // NeuroSense-values Markdown document, then buildReportDataFromNeuroSenseMd
+    // copies them out as-is — no re-bucketing of gauge percentages, no overall
+    // averaging, no status re-derivation. (buildReportDataFromSource is kept as
+    // a fallback only if the MD path ever throws.)
+    progress('build');
+    let reportData;
+    try {
+      const neurosenseMd = buildNeuroSenseMarkdown(source, algorithmResults, patientMeta);
+      console.log('[Claude Report] NeuroSense values Markdown:\n' + neurosenseMd);
+      reportData = buildReportDataFromNeuroSenseMd(neurosenseMd, patientMeta, algorithmResults);
+    } catch (mdErr) {
+      console.warn('[Claude Report] NeuroSense MD path failed, falling back to source build:', mdErr.message);
+      reportData = buildReportDataFromSource(source, patientMeta, algorithmResults);
+    }
 
     // Call 2 (inside): fetch the doctor-readable narrative, then render to PDF.
     // onProgress fires 'narrative' then 'render' from inside the generator.

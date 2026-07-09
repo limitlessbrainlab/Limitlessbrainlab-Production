@@ -2,26 +2,12 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
-import Cookies from 'js-cookie';
 import { useAuth } from '../../contexts/AuthContext';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import { clearAppDataCachesKeepSession } from '../../utils/sessionCleanup';
 
 const LoginForm = ({ userType: userTypeProp } = {}) => {
   const [showPassword, setShowPassword] = useState(false);
-
-  // SYNCHRONOUS clear of stale session data on login page visit (runs before
-  // user can submit, no race condition). Wipes localStorage, sessionStorage,
-  // and cookies instantly. Does NOT call supabase.auth.signOut() (async) which
-  // raced with the login flow and wiped freshly-set sessions.
-  try {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    localStorage.removeItem('clinics');
-    sessionStorage.clear();
-    Cookies.remove('authToken');
-    Cookies.remove('authToken', { path: '/' });
-  } catch (e) { /* ignore */ }
 
   // Safety check for AuthContext
   let login, loading;

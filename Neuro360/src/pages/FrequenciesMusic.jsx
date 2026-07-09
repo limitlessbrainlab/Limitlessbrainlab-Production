@@ -291,14 +291,14 @@ const FrequenciesMusic = () => {
             else console.log('SUCCESS: Frequency payment saved to patient_payments');
           });
 
-          // Save to frequency_purchases
+          // Save to frequency_purchases (columns must match the live table:
+          // patient_email, frequency_id, pack_id, purchased_at). Sending extra
+          // columns like amount_paid/currency made every insert fail silently,
+          // so purchases were never recorded and the pack reverted to "Buy Now".
           await supabase.from('frequency_purchases').insert({
             patient_email: user.email.toLowerCase(),
             pack_id: pId,
-            stripe_session_id: sId || null,
-            amount_paid: amt,
-            currency: 'USD',
-            payment_status: 'completed',
+            frequency_id: pId,
             purchased_at: new Date().toISOString()
           }).catch(err => console.warn('frequency_purchases save:', err.message));
 

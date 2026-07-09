@@ -2241,6 +2241,11 @@ const ANSResetProtocol = () => {
                         />
                       ) : (
                         <div className="relative w-full h-full">
+                          {/* Fallback background — sits BEHIND the thumbnail so it
+                              only shows if the image 404s (onError hides the img).
+                              Previously this opaque gradient was rendered on top of
+                              the img and covered the real thumbnail. */}
+                          <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-gray-900 to-green-900" />
                           <img
                             src={getYouTubeThumbnail(video.url)}
                             alt={video.name}
@@ -2248,7 +2253,9 @@ const ANSResetProtocol = () => {
                             loading="lazy"
                             onError={(e) => { e.target.style.display = 'none'; }}
                           />
-                          <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-gray-900 to-green-900 flex items-center justify-center">
+                          {/* Play button overlay — small, semi-transparent, so the
+                              thumbnail stays visible behind it. */}
+                          <div className="absolute inset-0 w-full h-full flex items-center justify-center">
                             <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center">
                               <Play className="h-7 w-7 text-white ml-1" />
                             </div>

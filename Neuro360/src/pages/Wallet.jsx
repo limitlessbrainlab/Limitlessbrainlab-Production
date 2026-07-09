@@ -1207,7 +1207,7 @@ const Wallet = () => {
                     </div>
                     <div className="flex items-center space-x-2 self-end lg:self-auto">
                       <button
-                        onClick={() => navigate('/subscription')}
+                        onClick={() => navigate('/dashboard/subscription')}
                         className="px-2.5 sm:px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-xs sm:text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                       >
                         Change Plan
@@ -1255,7 +1255,7 @@ const Wallet = () => {
                   <p className="text-amber-100 text-xs sm:text-sm mt-2">Use credits for any purchase on Neuro360</p>
                 </div>
                 <button
-                  onClick={() => navigate('/subscription')}
+                  onClick={() => navigate('/dashboard/subscription')}
                   className="px-4 sm:px-6 py-2.5 sm:py-3 bg-white text-amber-600 font-semibold rounded-lg sm:rounded-xl hover:bg-amber-50 transition-colors text-sm sm:text-base"
                 >
                   Upgrade Plan

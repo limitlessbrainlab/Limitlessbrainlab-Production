@@ -3173,7 +3173,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         const supabase = createClient(supabaseUrl, supabaseKey);
 
         // Helper: save to patient_payments table (per-clinic patient payment tracking)
-        const savePatientPayment = async (email, type, itemName, amount, currency) => {
+        const savePatientPayment = async (email, type, itemName, amount, currency, assessmentId = null) => {
           try {
             // Find patient's clinic_id
             let clinicId = session.metadata?.clinic_id || null;
@@ -3195,6 +3195,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
               status: 'completed',
               type: type,
               item_name: itemName,
+              assessment_id: assessmentId,
               stripe_session_id: session.id,
               stripe_payment_intent: session.payment_intent,
               source: type === 'assessment' ? 'About the Brain' : type === 'frequency' ? 'Frequencies' : type === 'meditation' ? 'Meditations' : 'Webhook',
@@ -3772,18 +3773,16 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
               created_at: new Date().toISOString()
             }).catch(err => console.warn('payments insert skipped:', err.message));
             // Save to patient_payments (per-clinic tracking)
-            await savePatientPayment(session.customer_email, 'meditation', session.metadata.pack_id?.replace(/_/g, ' ') || 'Meditation Pack', session.amount_total / 100, session.currency?.toUpperCase());
+            await savePatientPayment(session.customer_email, 'meditation', session.metadata.pack_id?.replace(/_/g, ' ') || 'Meditation Pack', session.amount_total / 100, session.currency?.toUpperCase(), session.metadata.pack_id || null);
           } else {
-            // Save to frequency_purchases table
+            // Save to frequency_purchases table. Columns must match the live
+            // table (patient_email, frequency_id, pack_id, purchased_at) or the
+            // insert fails and the purchase is never recorded -> pack shows
+            // "Buy Now" after payment.
             const frequencyPurchaseData = {
-              user_id: session.metadata?.user_id || null,
               patient_email: session.customer_email.toLowerCase(),
               pack_id: session.metadata.pack_id,
-              is_bundle: session.metadata.is_bundle === 'true',
-              stripe_session_id: session.id,
-              stripe_payment_intent: session.payment_intent,
-              amount_paid: session.amount_total / 100,
-              currency: session.currency.toUpperCase(),
+              frequency_id: session.metadata.pack_id,
               purchased_at: new Date().toISOString()
             };
 
@@ -3810,7 +3809,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
               created_at: new Date().toISOString()
             }).catch(err => console.warn('payments insert skipped:', err.message));
             // Save to patient_payments (per-clinic tracking)
-            await savePatientPayment(session.customer_email, 'frequency', session.metadata.pack_id?.replace(/_/g, ' ') || 'Frequency Pack', session.amount_total / 100, session.currency?.toUpperCase());
+            await savePatientPayment(session.customer_email, 'frequency', session.metadata.pack_id?.replace(/_/g, ' ') || 'Frequency Pack', session.amount_total / 100, session.currency?.toUpperCase(), session.metadata.pack_id || null);
           }
 
           // Send confirmation email

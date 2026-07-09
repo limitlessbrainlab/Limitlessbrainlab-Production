@@ -525,67 +525,30 @@ const ClinicDashboard = () => {
         try {
           const purchasedReports = parseInt(reports, 10);
 
-          // Get current reports_allowed
-          const { data: clinicData } = await supabase
-            .from('clinics')
-            .select('reports_allowed')
-            .eq('id', user.clinicId)
-            .single();
-
-          const currentAllowed = clinicData?.reports_allowed || 0;
-          const newAllowed = currentAllowed + purchasedReports;
-
-          // Update clinics table - reset reports_used on renewal
-          await supabase.from('clinics').update({
-            reports_allowed: newAllowed,
-            reports_used: 0,
-            subscription_status: 'active',
-            is_active: true,
-            updated_at: new Date().toISOString()
-          }).eq('id', user.clinicId);
-
-          // Update organizations table (best-effort — table/columns may not exist).
-          // NOTE: do not use .catch() on the query builder; it is a thenable, not a
-          // Promise, so .catch is not a function and would throw. Destructure error.
+          // Apply credits via the authoritative, idempotent backend endpoint
+          // (same path used by the Subscription tab and the credits popup). It
+          // ADDS the purchased credits to reports_allowed WITHOUT resetting
+          // reports_used, and records the payment — so Reports Remaining stays
+          // "last remaining + newly purchased" (prior usage is preserved, never
+          // forgiven). Doing the credit write directly here previously reset
+          // reports_used to 0 and double-credited against this endpoint, which
+          // made Reports Remaining calculate incorrectly on refill.
           try {
-            const { error: orgUpdateError } = await supabase.from('organizations').update({
-              reports_allowed: newAllowed,
-              reports_used: 0,
-              subscription_status: 'active',
-              updated_at: new Date().toISOString()
-            }).eq('id', user.clinicId);
-            if (orgUpdateError) {
-              console.warn('organizations update skipped:', orgUpdateError.message);
-            }
-          } catch (orgErr) {
-            console.warn('organizations update failed:', orgErr?.message);
-          }
-
-          // Save payment record
-          const pendingPayment = JSON.parse(localStorage.getItem('pending_payment') || '{}');
-          localStorage.removeItem('pending_payment');
-
-          const { data: existing } = await supabase.from('payments').select('id').eq('stripe_session_id', sessionId).limit(1);
-          if (!existing || existing.length === 0) {
-            await supabase.from('payments').insert({
-              clinic_id: user.clinicId,
-              amount: pendingPayment.amount || 0,
-              currency: pendingPayment.currency || 'INR',
-              status: 'completed',
-              type: 'subscription',
-              package_name: pendingPayment.packageName || `${purchasedReports} EEG Reports`,
-              reports_allowed: purchasedReports,
-              payment_method: 'stripe',
-              payment_id: sessionId || `session_${Date.now()}`,
-              stripe_payment_id: sessionId || null,
-              stripe_session_id: sessionId || null,
-              created_at: new Date().toISOString()
+            await fetch(`${API_URL}/confirm-report-credits`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sessionId })
             });
+          } catch (e) {
+            console.error('confirm-report-credits failed:', e);
           }
+          localStorage.removeItem('pending_payment');
 
           toast.success(`Successfully purchased ${purchasedReports} report credits!`);
 
-          // Force reload clinic data with updated values
+          // Force reload clinic data so every tab (overview summary, Usage
+          // Tracking, Subscription) recomputes Reports Available AND Reports
+          // Remaining from the refreshed clinic record.
           setShowCreditsExhausted(false);
           setDataLoaded(false);
         } catch (err) {

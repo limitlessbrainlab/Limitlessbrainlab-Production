@@ -2471,7 +2471,19 @@ app.post('/api/create-coaching-checkout', async (req, res) => {
     const multiplier = currency.toLowerCase() === 'inr' ? 100 : 100;
     const amountInSmallestUnit = Math.round(price * multiplier);
 
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
+    // Send the patient back to the exact site they paid from (production,
+    // staging, or local) instead of a fixed env URL. Otherwise a production
+    // patient is bounced to staging after paying and the booking / "already
+    // booked" state is recorded on the wrong environment. Validate the origin
+    // against allowedOrigins to avoid an open redirect, and never fall back to
+    // staging — default to production.
+    let requestOrigin = req.get('origin');
+    if (!requestOrigin && req.get('referer')) {
+      try { requestOrigin = new URL(req.get('referer')).origin; } catch (e) { requestOrigin = null; }
+    }
+    const FRONTEND_URL = (requestOrigin && allowedOrigins.includes(requestOrigin))
+      ? requestOrigin
+      : 'https://neurosense360.site';
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({

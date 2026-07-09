@@ -203,14 +203,14 @@ function App() {
                   <Route path="/admin/settings" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
                   <Route path="/admin/patient-subscriptions" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
 
-                  {/* Clinic Routes */}
-                  <Route path="/clinic" element={<ProtectedRoute requiredRole="clinic_admin"><ClinicDashboard /></ProtectedRoute>} />
-                  <Route path="/clinic/patients" element={<ProtectedRoute requiredRole="clinic_admin"><ClinicDashboard /></ProtectedRoute>} />
-                  <Route path="/clinic/reports" element={<ProtectedRoute requiredRole="clinic_admin"><ClinicDashboard /></ProtectedRoute>} />
-                  <Route path="/clinic/subscription" element={<ProtectedRoute requiredRole="clinic_admin"><ClinicDashboard /></ProtectedRoute>} />
-                  <Route path="/clinic/usage" element={<ProtectedRoute requiredRole="clinic_admin"><ClinicDashboard /></ProtectedRoute>} />
-                  <Route path="/clinic/admin" element={<ProtectedRoute requiredRole="clinic_admin"><ClinicDashboard /></ProtectedRoute>} />
-                  <Route path="/clinic/settings" element={<ProtectedRoute requiredRole="clinic_admin"><ClinicDashboard /></ProtectedRoute>} />
+                  {/* Clinic Routes — accept both 'clinic' and 'clinic_admin' roles */}
+                  <Route path="/clinic" element={<ProtectedRoute requiredRole={['clinic', 'clinic_admin']}><ClinicDashboard /></ProtectedRoute>} />
+                  <Route path="/clinic/patients" element={<ProtectedRoute requiredRole={['clinic', 'clinic_admin']}><ClinicDashboard /></ProtectedRoute>} />
+                  <Route path="/clinic/reports" element={<ProtectedRoute requiredRole={['clinic', 'clinic_admin']}><ClinicDashboard /></ProtectedRoute>} />
+                  <Route path="/clinic/subscription" element={<ProtectedRoute requiredRole={['clinic', 'clinic_admin']}><ClinicDashboard /></ProtectedRoute>} />
+                  <Route path="/clinic/usage" element={<ProtectedRoute requiredRole={['clinic', 'clinic_admin']}><ClinicDashboard /></ProtectedRoute>} />
+                  <Route path="/clinic/admin" element={<ProtectedRoute requiredRole={['clinic', 'clinic_admin']}><ClinicDashboard /></ProtectedRoute>} />
+                  <Route path="/clinic/settings" element={<ProtectedRoute requiredRole={['clinic', 'clinic_admin']}><ClinicDashboard /></ProtectedRoute>} />
 
                   {/* Patient Routes */}
                   <Route path="/patient" element={<ProtectedRoute requiredRole="patient"><PatientDashboard /></ProtectedRoute>} />

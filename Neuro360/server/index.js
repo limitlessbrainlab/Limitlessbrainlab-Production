@@ -2467,12 +2467,16 @@ async function applySubscriptionPurchase(session) {
 
   // 2. Payment rows — idempotent via upsert on the unique stripe_session_id.
   await supabase.from('payment_history').upsert({
+    // payment_id is NOT NULL on this table (legacy Razorpay design) — omitting
+    // it made every subscription insert fail silently, leaving the table empty.
+    payment_id: session.payment_intent || session.id,
     patient_email: email,
     payment_type: 'subscription',
     tier: tier,
     amount,
     currency,
     payment_provider: 'stripe',
+    provider: 'stripe',
     stripe_session_id: session.id,
     stripe_payment_intent: session.payment_intent,
     status: 'completed',

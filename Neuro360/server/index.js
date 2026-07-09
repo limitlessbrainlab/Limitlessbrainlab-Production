@@ -2158,22 +2158,12 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
 
             if (error) console.error('DB save error (assessment):', error.message);
           } else if (paymentType === 'subscription') {
-            const { error } = await supabase
-              .from('payment_history')
-              .upsert({
-                patient_email: customerEmail?.toLowerCase(),
-                payment_type: 'subscription',
-                tier: session.metadata?.tier,
-                amount: session.amount_total / 100,
-                currency: session.currency?.toUpperCase(),
-                payment_provider: 'stripe',
-                stripe_session_id: sessionId,
-                stripe_payment_intent: session.payment_intent,
-                status: 'completed',
-                created_at: new Date().toISOString()
-              }, { onConflict: 'stripe_session_id' });
-
-            if (error) console.error('DB save error (subscription):', error.message);
+            // Full grant (patients tier/status/dashboard_access) + all payment
+            // rows + welcome/admin emails — idempotent, shared with the webhook.
+            // Previously this branch only logged payment_history, so a paid
+            // subscription confirmed via this path granted no plan access.
+            const subResult = await applySubscriptionPurchase(session);
+            if (!subResult.ok) console.error('verify-session applySubscriptionPurchase failed:', subResult.message);
           } else {
             // Frequency or meditation
             const tableName = (session.metadata?.pack_id?.startsWith('solfeggio_') || session.metadata?.pack_id?.includes('meditation'))
@@ -2201,8 +2191,11 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
         }
       }
 
-      // Send confirmation email to user after successful payment
-      if (mailerConfigured && customerEmail) {
+      // Send confirmation email to user after successful payment.
+      // Subscriptions are excluded: applySubscriptionPurchase already sends the
+      // welcome + admin emails exactly once (claimNotificationOnce), so the
+      // generic confirmation here would duplicate them on every verify call.
+      if (mailerConfigured && customerEmail && paymentType !== 'subscription') {
         let emailSubject = '';
         let assessmentLink = '';
         let productName = '';
@@ -2435,6 +2428,172 @@ async function applyReportCredits(sessionId) {
 
   console.log(`SUCCESS: applyReportCredits clinic ${clinicId} reports_allowed -> ${newAllowed} (+${reports})`);
   return { ok: true, reportsAllowed: newAllowed, added: reports };
+}
+
+// Authoritative, idempotent recording of a PATIENT subscription purchase.
+// Called by the Stripe webhook AND by /api/stripe/verify-session (the frontend
+// confirm path on return from checkout) — previously this logic lived only in
+// the webhook, so when the webhook was unreachable/unconfigured a paid
+// subscription granted nothing and sent no emails. Grant + payment rows are
+// idempotent (update-to-same-values / upsert on stripe_session_id); the
+// one-shot side effects (patient_payments, admin notification, emails) are
+// guarded by claimNotificationOnce so they fire exactly once across callers.
+async function applySubscriptionPurchase(session) {
+  if (!supabase) return { ok: false, status: 500, message: 'Database not configured' };
+  if (!session || session.payment_status !== 'paid' || session.metadata?.type !== 'subscription') {
+    return { ok: false, status: 400, message: 'Session is not a paid subscription purchase' };
+  }
+  const tier = session.metadata?.tier;
+  const email = (session.customer_email || session.customer_details?.email || '').toLowerCase();
+  if (!tier || !email) {
+    return { ok: false, status: 400, message: 'Session missing tier/email metadata' };
+  }
+  const amount = session.amount_total / 100;
+  const currency = session.currency?.toUpperCase() || 'USD';
+
+  // 1. Grant the plan on the patient row (safe to re-run — same values).
+  const { error: updateError } = await supabase
+    .from('patients')
+    .update({
+      subscription_tier: tier.toLowerCase(),
+      subscription_status: 'active',
+      dashboard_access: true,
+      updated_at: new Date().toISOString()
+    })
+    .eq('email', email);
+  if (updateError) {
+    console.error('applySubscriptionPurchase patients update error:', updateError.message);
+  }
+
+  // 2. Payment rows — idempotent via upsert on the unique stripe_session_id.
+  await supabase.from('payment_history').upsert({
+    patient_email: email,
+    payment_type: 'subscription',
+    tier: tier,
+    amount,
+    currency,
+    payment_provider: 'stripe',
+    stripe_session_id: session.id,
+    stripe_payment_intent: session.payment_intent,
+    status: 'completed',
+    created_at: new Date().toISOString()
+  }, { onConflict: 'stripe_session_id', ignoreDuplicates: true })
+    .then(({ error: e }) => { if (e) console.error('applySubscriptionPurchase payment_history error:', e.message); });
+
+  await supabase.from('payments').upsert({
+    clinic_id: null,
+    patient_email: email,
+    amount,
+    currency,
+    status: 'completed',
+    type: 'patient_subscription',
+    package_name: `${tier} Subscription`,
+    payment_method: 'stripe',
+    payment_id: session.payment_intent || session.id,
+    stripe_payment_id: session.payment_intent || session.id,
+    stripe_session_id: session.id,
+    created_at: new Date().toISOString()
+  }, { onConflict: 'stripe_session_id', ignoreDuplicates: true })
+    .then(({ error: e }) => { if (e) console.warn('applySubscriptionPurchase payments insert skipped:', e.message); });
+
+  // 3. One-shot side effects: only the first caller for this session runs them.
+  const firstTime = await claimNotificationOnce(`subscription:${session.id}:granted`);
+  if (!firstTime) {
+    return { ok: true, tier, alreadyApplied: true };
+  }
+
+  // patient_payments (per-clinic tracking)
+  try {
+    let clinicId = session.metadata?.clinic_id || null;
+    if (!clinicId) {
+      const { data: patient } = await supabase
+        .from('patients')
+        .select('clinic_id')
+        .eq('email', email)
+        .limit(1)
+        .single();
+      clinicId = patient?.clinic_id || null;
+    }
+    await supabase.from('patient_payments').insert({
+      clinic_id: clinicId,
+      patient_email: email,
+      patient_name: session.metadata?.customer_name || '',
+      amount,
+      currency,
+      status: 'completed',
+      type: 'subscription',
+      item_name: `${tier} Subscription`,
+      stripe_session_id: session.id,
+      stripe_payment_intent: session.payment_intent,
+      source: 'Subscription',
+      created_at: new Date().toISOString()
+    });
+  } catch (err) {
+    console.warn('applySubscriptionPurchase patient_payments insert skipped:', err.message);
+  }
+
+  // Admin dashboard notification
+  await supabase.from('admin_notifications').insert({
+    type: 'success',
+    category: 'payment',
+    title: 'Subscription Payment Received',
+    message: `${email} subscribed to ${tier} plan ($${amount.toFixed(2)} ${currency}).`,
+    patient_name: email,
+    action: 'view_payment',
+    action_data: { tier, amount, email },
+    is_read: false
+  }).then(({ error: ne }) => { if (ne) console.error('applySubscriptionPurchase notification error:', ne.message); });
+
+  // Emails: patient welcome + admin notification
+  if (mailerConfigured) {
+    const welcomeMail = {
+      from: EMAIL_FROM,
+      to: email,
+      subject: `Welcome to Limitless Brain Lab ${tier}!`,
+      attachments: getLogoAttachment(),
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+            <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;" />
+            <h1 style="color: #ffffff; margin: 10px 0 0;">Welcome to Limitless Brain Lab ${tier}!</h1>
+          </div>
+          <p>Thank you for upgrading your subscription.</p>
+          <p><strong>Amount Paid:</strong> ${currency} ${amount.toFixed(2)}</p>
+          <p>You now have access to all ${tier} features including:</p>
+          <ul>
+            ${tier === 'PREMIUM' ? '<li>Brain Coach Access</li><li>Home Neurofeedback</li><li>All Assessments</li>' : ''}
+            ${tier === 'PRO' || tier === 'PREMIUM' ? '<li>Frequencies Library</li><li>Meditations</li><li>Supplements Guide</li>' : ''}
+            ${tier === 'BASIC' || tier === 'PRO' || tier === 'PREMIUM' ? '<li>ANS Reset Protocol</li><li>MOVERS Exercises</li><li>Five Pillars</li>' : ''}
+          </ul>
+          <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab.com'}/dashboard" style="display: inline-block; background: #323956; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">Go to Dashboard</a>
+        </div>
+      `
+    };
+    emailTransporter.sendMail(welcomeMail, (err) => {
+      if (err) console.error('Error sending subscription email:', err);
+    });
+
+    const adminSubMailOptions = {
+      from: EMAIL_FROM,
+      to: process.env.EMAIL_TO || process.env.EMAIL_USER,
+      subject: `New Subscription Purchase: ${tier}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 500px;">
+          <h2 style="color: #323956;">New Subscription Purchase</h2>
+          <p><strong>Customer:</strong> ${email}</p>
+          <p><strong>Tier:</strong> ${tier}</p>
+          <p><strong>Amount:</strong> ${currency} ${amount.toFixed(2)}</p>
+          <p><strong>Session ID:</strong> ${session.id}</p>
+          <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+        </div>
+      `
+    };
+    emailTransporter.sendMail(adminSubMailOptions)
+      .catch(err => console.error('Admin subscription email failed:', err.message));
+  }
+
+  console.log(`SUCCESS: applySubscriptionPurchase ${email} -> ${tier} (session ${session.id})`);
+  return { ok: true, tier, alreadyApplied: false };
 }
 
 app.post('/api/confirm-report-credits', async (req, res) => {
@@ -3222,128 +3381,14 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           }
         };
 
-        // Handle subscription payments
+        // Handle subscription payments — full grant + payment rows + emails via
+        // the shared idempotent helper (also called by /api/stripe/verify-session,
+        // the frontend confirm path, so purchases record even when only one of
+        // the two paths fires).
         if (paymentType === 'subscription') {
-          const tier = session.metadata?.tier;
-
-          // Update patient subscription
-          const { error: updateError } = await supabase
-            .from('patients')
-            .update({
-              subscription_tier: tier?.toLowerCase(),
-              subscription_status: 'active',
-              dashboard_access: true,
-              updated_at: new Date().toISOString()
-            })
-            .eq('email', session.customer_email.toLowerCase());
-
-          if (updateError) {
-            console.error('Error updating subscription:', updateError);
-          } else {
-          }
-
-          // Log the payment
-          const { error: paymentError } = await supabase
-            .from('payment_history')
-            .insert({
-              patient_email: session.customer_email.toLowerCase(),
-              payment_type: 'subscription',
-              tier: tier,
-              amount: session.amount_total / 100,
-              currency: session.currency?.toUpperCase(),
-              payment_provider: 'stripe',
-              stripe_session_id: session.id,
-              stripe_payment_intent: session.payment_intent,
-              status: 'completed',
-              created_at: new Date().toISOString()
-            });
-
-          if (paymentError) {
-            console.error('Error logging payment:', paymentError);
-          }
-
-          // Log admin notification for payment
-          await supabase.from('admin_notifications').insert({
-            type: 'success',
-            category: 'payment',
-            title: 'Subscription Payment Received',
-            message: `${session.customer_email} subscribed to ${tier} plan ($${(session.amount_total / 100).toFixed(2)} ${session.currency?.toUpperCase() || 'USD'}).`,
-            patient_name: session.customer_email,
-            action: 'view_payment',
-            action_data: { tier, amount: session.amount_total / 100, email: session.customer_email },
-            is_read: false
-          }).then(({ error: ne }) => { if (ne) console.error('Notification insert error:', ne); });
-
-          // Also save to payments table for SuperAdmin dashboard
-          await supabase.from('payments').insert({
-            clinic_id: null,
-            patient_email: session.customer_email.toLowerCase(),
-            amount: session.amount_total / 100,
-            currency: session.currency?.toUpperCase() || 'USD',
-            status: 'completed',
-            type: 'patient_subscription',
-            package_name: `${tier} Subscription`,
-            payment_method: 'stripe',
-            payment_id: session.payment_intent || session.id,
-            stripe_payment_id: session.payment_intent || session.id,
-            stripe_session_id: session.id,
-            created_at: new Date().toISOString()
-          }).catch(err => console.warn('payments table insert skipped:', err.message));
-
-          // Save to patient_payments (per-clinic tracking)
-          await savePatientPayment(session.customer_email, 'subscription', `${tier} Subscription`, session.amount_total / 100, session.currency?.toUpperCase());
-
-          // Send confirmation email
-          if (mailerConfigured) {
-            const mailOptions = {
-              from: EMAIL_FROM,
-              to: session.customer_email,
-              subject: `Welcome to Limitless Brain Lab ${tier}!`,
-              attachments: getLogoAttachment(),
-              html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                  <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
-                    <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;" />
-                    <h1 style="color: #ffffff; margin: 10px 0 0;">Welcome to Limitless Brain Lab ${tier}!</h1>
-                  </div>
-                  <p>Thank you for upgrading your subscription.</p>
-                  <p>You now have access to all ${tier} features including:</p>
-                  <ul>
-                    ${tier === 'PREMIUM' ? '<li>Brain Coach Access</li><li>Home Neurofeedback</li><li>All Assessments</li>' : ''}
-                    ${tier === 'PRO' || tier === 'PREMIUM' ? '<li>Frequencies Library</li><li>Meditations</li><li>Supplements Guide</li>' : ''}
-                    ${tier === 'BASIC' || tier === 'PRO' || tier === 'PREMIUM' ? '<li>ANS Reset Protocol</li><li>MOVERS Exercises</li><li>Five Pillars</li>' : ''}
-                  </ul>
-                  <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard" style="display: inline-block; background: #323956; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">Go to Dashboard</a>
-                </div>
-              `
-            };
-
-            emailTransporter.sendMail(mailOptions, (err, info) => {
-              if (err) {
-                console.error('Error sending subscription email:', err);
-              } else {
-              }
-            });
-
-            // Notify admin (Limitless Brain Lab) about the subscription purchase
-            const adminSubMailOptions = {
-              from: EMAIL_FROM,
-              to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-              subject: `New Subscription Purchase: ${tier}`,
-              html: `
-                <div style="font-family: Arial, sans-serif; max-width: 500px;">
-                  <h2 style="color: #323956;">New Subscription Purchase</h2>
-                  <p><strong>Customer:</strong> ${session.customer_email}</p>
-                  <p><strong>Tier:</strong> ${tier}</p>
-                  <p><strong>Amount:</strong> ${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</p>
-                  <p><strong>Session ID:</strong> ${session.id}</p>
-                  <p><strong>Date:</strong> ${new Date().toISOString()}</p>
-                </div>
-              `
-            };
-
-            emailTransporter.sendMail(adminSubMailOptions)
-              .catch(err => console.error('Admin subscription email failed:', err.message));
+          const subResult = await applySubscriptionPurchase(session);
+          if (!subResult.ok) {
+            console.error('Webhook applySubscriptionPurchase failed:', subResult.message);
           }
 
         } else if (paymentType === 'assessment') {

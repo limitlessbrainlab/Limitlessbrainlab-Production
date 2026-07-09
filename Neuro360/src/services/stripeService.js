@@ -185,7 +185,11 @@ class StripeService {
           currency: tierData.currency || 'USD',
           customerEmail: userInfo.email,
           customerName: userInfo.name,
-          successUrl: successUrl || `${window.location.origin}/dashboard?payment=success&tier=${tierData.id}`,
+          // Land on /dashboard/subscription (where handlePaymentCallback lives)
+          // WITH the session id, so the return can verify + record the purchase.
+          // The old /dashboard target had no handler for tier returns and no
+          // session_id, so paid subscriptions were never confirmed client-side.
+          successUrl: successUrl || `${window.location.origin}/dashboard/subscription?payment=success&tier=${tierData.id}&session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: cancelUrl || `${window.location.origin}/dashboard/subscription?payment=cancelled`,
           metadata: {
             tier: tierData.id,
@@ -220,7 +224,11 @@ class StripeService {
           priceId: tierData.stripePriceId,
           customerEmail: userInfo.email,
           customerName: userInfo.name,
-          successUrl: successUrl || `${window.location.origin}/dashboard?payment=success&tier=${tierData.id}`,
+          // Land on /dashboard/subscription (where handlePaymentCallback lives)
+          // WITH the session id, so the return can verify + record the purchase.
+          // The old /dashboard target had no handler for tier returns and no
+          // session_id, so paid subscriptions were never confirmed client-side.
+          successUrl: successUrl || `${window.location.origin}/dashboard/subscription?payment=success&tier=${tierData.id}&session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: cancelUrl || `${window.location.origin}/dashboard/subscription?payment=cancelled`,
           metadata: {
             tier: tierData.id,

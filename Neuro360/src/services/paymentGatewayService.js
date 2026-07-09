@@ -128,13 +128,13 @@ class PaymentGatewayService {
       // Verify and update subscription
       if (session_id) {
         try {
+          // verify-session performs the FULL authoritative grant server-side
+          // (patients tier/status/dashboard_access + payment rows + emails,
+          // idempotent on session id). Don't also write payment_history from
+          // the client here — that inserted a second row without the session
+          // id, duplicating the payment in admin Payment History.
           const verification = await StripeService.verifyPaymentSuccess(session_id);
           if (verification.success) {
-            await StripeService.updateSubscriptionAfterPayment(userEmail, tier, {
-              sessionId: session_id,
-              amount: verification.amount,
-              currency: verification.currency
-            });
             return { success: true, tier, gateway: 'stripe' };
           }
         } catch (error) {

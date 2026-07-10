@@ -24,6 +24,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { generatePatientUID } from '../../utils/patientUidGenerator';
 import { hashPassword } from '../../utils/passwordUtils';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
+import { getOriginUrl } from '../../utils/environment';
 import { supabase } from '../../lib/supabaseClient';
 
 const AddPatientForm = () => {
@@ -127,22 +128,20 @@ const AddPatientForm = () => {
 
     emailCheckTimeout.current = setTimeout(async () => {
       try {
-        // Check patients table
+        // Check patients table — scoped to THIS clinic (emails are unique per clinic,
+        // not globally; the same person may be a patient at other clinics).
         const { data: existingPatient } = await supabase
           .from('patients')
-          .select('id, clinic_id, org_id')
+          .select('id')
           .eq('email', email.toLowerCase().trim())
+          .or(`clinic_id.eq.${clinicId},org_id.eq.${clinicId}`)
           .limit(1);
 
         if (existingPatient && existingPatient.length > 0) {
-          const ex = existingPatient[0];
-          const sameClinic = ex.clinic_id === clinicId || ex.org_id === clinicId;
           setEmailStatus({
             checking: false,
             exists: true,
-            message: sameClinic
-              ? '❌ A patient with this email already exists in your clinic'
-              : '❌ This email is already registered to another patient — please use a different email'
+            message: '❌ A patient with this email already exists in your clinic'
           });
           return;
         }
@@ -192,19 +191,17 @@ const AddPatientForm = () => {
       // ✅ EMAIL VALIDATION - Check if email already exists
       const normalizedEmail = data.email.toLowerCase().trim();
 
-      // Check in patients table
+      // Check in patients table — scoped to THIS clinic (emails are unique per clinic,
+      // not globally; the same person may be a patient at other clinics).
       const { data: existingPatient, error: patientError } = await supabase
         .from('patients')
-        .select('id, clinic_id, org_id')
+        .select('id')
         .eq('email', normalizedEmail)
+        .or(`clinic_id.eq.${clinicId},org_id.eq.${clinicId}`)
         .limit(1);
 
       if (existingPatient && existingPatient.length > 0) {
-        const ex = existingPatient[0];
-        const sameClinic = ex.clinic_id === clinicId || ex.org_id === clinicId;
-        toast.error(sameClinic
-          ? 'A patient with this email already exists in your clinic.'
-          : 'This email is already registered to another patient on Limitless Brain Lab. Patient emails must be unique — please use a different email.');
+        toast.error('A patient with this email already exists in your clinic.');
         setIsSubmitting(false);
         return;
       }
@@ -288,6 +285,7 @@ const AddPatientForm = () => {
         address: data.address ? data.address.toUpperCase() : data.address,
         medical_history: data.notes ? { notes: data.notes } : {},
         date_of_birth: data.dateOfBirth || null,
+        origin_url: getOriginUrl(), // Environment (prod/staging) this patient was created from — login is scoped to it
         created_at: new Date().toISOString()
       };
 

@@ -324,6 +324,25 @@ const EMAIL_FROM = `"Limitless Brain Lab" <${process.env.EMAIL_FROM || 'info@lim
 // (Stripe success_url/cancel_url still use FRONTEND_URL — that is intentional.)
 const APP_URL = 'https://limitlessbrainlab.com';
 
+// Allowed login origins for credential-email links. A clinic/patient created on a given
+// environment is emailed the login link for THAT environment (see origin_url / the
+// frontend loginUrl). Anything not on this allowlist falls back to production, so we never
+// email an untrusted/arbitrary URL.
+const ALLOWED_LOGIN_ORIGINS = [
+  'https://limitlessbrainlab.com',
+  'https://www.limitlessbrainlab.com',
+  'https://limitlessbrainlab-production.vercel.app',
+  'https://limitlessbrainlab-eight.vercel.app',
+];
+const resolveLoginBase = (url) => {
+  try {
+    const o = new URL(String(url)).origin;
+    return ALLOWED_LOGIN_ORIGINS.includes(o) ? o : APP_URL;
+  } catch {
+    return APP_URL;
+  }
+};
+
 // Escape user-supplied values before interpolating into email HTML. Without this,
 // a typed password containing < > & or " renders corrupted in the mail client
 // (e.g. "Br@in<Lab>2026" shows as "Br@in2026"), so the recipient copies the wrong
@@ -4614,6 +4633,8 @@ app.post('/api/clinic-credentials', async (req, res) => {
     const { clinicName, contactPerson, otp } = req.body;
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '').trim();
+    // Login link points to the environment the clinic was created on (allowlisted).
+    const loginBase = resolveLoginBase(req.body.loginUrl);
 
     if (!email || !password) {
       return res.status(400).json({
@@ -4721,7 +4742,7 @@ app.post('/api/clinic-credentials', async (req, res) => {
                   <!-- Login Button -->
                   <tr>
                     <td style="padding: 0 32px 24px;" align="center">
-                      <a href="${APP_URL}/clinic/login" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                      <a href="${loginBase}/clinic/login" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                         Login to Your Clinic Portal
                       </a>
                     </td>
@@ -7412,7 +7433,7 @@ app.post('/api/send-credit-alert', async (req, res) => {
 
 app.post('/api/check-email-exists', async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, clinicId } = req.body;
 
     if (!email) {
       return res.status(400).json({ success: false, message: 'Email is required' });
@@ -7420,12 +7441,17 @@ app.post('/api/check-email-exists', async (req, res) => {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Check in patients table
-    const { data: patientData, error: patientError } = await supabase
+    // Check in patients table. Patient emails are unique per-clinic, not globally, so
+    // when a clinicId is provided scope the lookup to that clinic — a match under a
+    // different clinic must not count as "already registered" here.
+    let patientQuery = supabase
       .from('patients')
-      .select('id, email, patient_name')
-      .eq('email', normalizedEmail)
-      .limit(1);
+      .select('id, email, full_name')
+      .eq('email', normalizedEmail);
+    if (clinicId) {
+      patientQuery = patientQuery.or(`clinic_id.eq.${clinicId},org_id.eq.${clinicId}`);
+    }
+    const { data: patientData, error: patientError } = await patientQuery.limit(1);
 
     if (patientError) console.error('Patient query error:', patientError);
 
@@ -7498,17 +7524,21 @@ app.post('/api/clinic/add-patient', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid clinic' });
     }
 
-    // Check if email already exists in patients table
+    // Check if email already exists in patients table — scoped to THIS clinic.
+    // Patient emails are unique per-clinic, not globally (no global unique constraint;
+    // the same person may be a patient at multiple clinics), so a match under another
+    // clinic must not block creation here.
     const { data: existingPatient, error: patientCheckError } = await supabase
       .from('patients')
       .select('id')
       .eq('email', normalizedEmail)
+      .or(`clinic_id.eq.${clinicId},org_id.eq.${clinicId}`)
       .limit(1);
 
     if (existingPatient && existingPatient.length > 0) {
       return res.status(400).json({
         success: false,
-        message: 'Email already exists'
+        message: 'A patient with this email already exists in your clinic'
       });
     }
 
@@ -7538,7 +7568,8 @@ app.post('/api/clinic/add-patient', async (req, res) => {
         gender,
         address,
         clinic_id: clinicId,
-        created_by: 'clinic_admin'
+        created_by: 'clinic_admin',
+        origin_url: req.body.origin_url || req.headers.origin || null // Environment the patient was created from
       })
       .select();
 
@@ -7578,17 +7609,21 @@ app.post('/api/partner/add-patient', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid partner' });
     }
 
-    // Check if email already exists in patients table
+    // Check if email already exists in patients table — scoped to THIS clinic.
+    // Patient emails are unique per-clinic, not globally (no global unique constraint;
+    // the same person may be a patient at multiple clinics), so a match under another
+    // clinic must not block creation here.
     const { data: existingPatient, error: patientCheckError } = await supabase
       .from('patients')
       .select('id')
       .eq('email', normalizedEmail)
+      .or(`clinic_id.eq.${clinicId},org_id.eq.${clinicId}`)
       .limit(1);
 
     if (existingPatient && existingPatient.length > 0) {
       return res.status(400).json({
         success: false,
-        message: 'Email already exists'
+        message: 'A patient with this email already exists in your clinic'
       });
     }
 
@@ -7618,7 +7653,8 @@ app.post('/api/partner/add-patient', async (req, res) => {
         gender,
         address,
         clinic_id: clinicId,
-        created_by: 'partner_admin'
+        created_by: 'partner_admin',
+        origin_url: req.body.origin_url || req.headers.origin || null // Environment the patient was created from
       })
       .select();
 

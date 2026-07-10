@@ -41,7 +41,7 @@ const AddPatientForm = ({ userType = 'clinic', clinicId, onSuccess }) => {
 
     emailCheckTimeout.current = setTimeout(async () => {
       try {
-        const response = await axios.post('/api/check-email-exists', { email });
+        const response = await axios.post('/api/check-email-exists', { email, clinicId });
         const { exists, message } = response.data;
 
         setEmailStatus({
@@ -106,7 +106,8 @@ const AddPatientForm = ({ userType = 'clinic', clinicId, onSuccess }) => {
         phone: formData.phone,
         dateOfBirth: formData.dateOfBirth,
         gender: formData.gender,
-        address: formData.address
+        address: formData.address,
+        origin_url: window.location.origin // Environment this patient was created from
       });
 
       if (response.data.success) {

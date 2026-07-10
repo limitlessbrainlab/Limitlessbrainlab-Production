@@ -3,6 +3,7 @@ import Cookies from 'js-cookie';
 import DatabaseService from './databaseService';
 import { generatePatientUID } from '../utils/patientUidGenerator';
 import { hashPassword, comparePassword } from '../utils/passwordUtils';
+import { getOriginUrl, resolveEnv, canonicalUrlForEnv, sameEnv } from '../utils/environment';
 
 // Import shared Supabase service to avoid multiple client instances
 import SupabaseService from './supabaseService';
@@ -117,6 +118,15 @@ export const authService = {
             throw new Error('Invalid email or password');
           }
 
+          // Environment scoping: an account created on one environment (production vs
+          // staging URL) can only log in on that same environment. Skipped when
+          // origin_url is absent (accounts created before this feature) so legacy
+          // clinics are never locked out.
+          if (!sameEnv(clinicByEmail.origin_url, getOriginUrl())) {
+            const target = canonicalUrlForEnv(resolveEnv(clinicByEmail.origin_url));
+            throw new Error(`This account was created on ${target}. Please log in there.`);
+          }
+
           return {
             success: true,
             token: `local_token_${Date.now()}`,
@@ -189,6 +199,14 @@ export const authService = {
           }
 
           if (patient) {
+            // Environment scoping (same rule as clinics): a patient created on one
+            // environment can only log in on that environment. Skipped when origin_url
+            // is absent so legacy patients are never locked out.
+            if (!sameEnv(patient.origin_url, getOriginUrl())) {
+              const target = canonicalUrlForEnv(resolveEnv(patient.origin_url));
+              throw new Error(`This account was created on ${target}. Please log in there.`);
+            }
+
             return {
               success: true,
               token: `patient_token_${Date.now()}`,

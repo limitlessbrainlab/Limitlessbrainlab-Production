@@ -33,6 +33,7 @@ import toast from 'react-hot-toast';
 import DatabaseService from '../../services/databaseService';
 import { supabase } from '../../lib/supabaseClient';
 import { hashPassword, isHashed } from '../../utils/passwordUtils';
+import { getOriginUrl, resolveEnv, canonicalUrlForEnv } from '../../utils/environment';
 import AdminAssignmentModal from './AdminAssignmentModal';
 import LocationService from '../../services/locationService';
 import PendingClinicsNotification from './PendingClinicsNotification';
@@ -461,6 +462,7 @@ const ClinicManagement = ({ onUpdate }) => {
         updated_at: new Date().toISOString(),
         createdAt: new Date().toISOString(), // Legacy field
         registrationMethod: 'super_admin_created', // Track how this was created
+        origin_url: getOriginUrl(), // Environment (prod/staging) this clinic was created from — login is scoped to it
         // contract_agreed not saved — column not yet in DB
         // Use single password field for authentication
         password: await hashPassword(password), // Encrypted password for login
@@ -881,7 +883,9 @@ const ClinicManagement = ({ onUpdate }) => {
           email,
           contactPerson: clinic.contactPerson || clinic.name,
           password: password,
-          otp: otp || null
+          otp: otp || null,
+          // Send the clinic back to the SAME environment it was created on.
+          loginUrl: canonicalUrlForEnv(resolveEnv(getOriginUrl()))
         })
       });
 

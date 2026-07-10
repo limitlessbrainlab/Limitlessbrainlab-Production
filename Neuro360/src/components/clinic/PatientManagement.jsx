@@ -32,6 +32,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { generatePatientUID } from '../../utils/patientUidGenerator';
 import { countryCodes as allCountryCodes } from '../../utils/countryCodes';
 import { hashPassword } from '../../utils/passwordUtils';
+import { getOriginUrl } from '../../utils/environment';
 
 const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted = false }) => {
   const { user } = useAuth();
@@ -259,23 +260,21 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
       // ✅ EMAIL VALIDATION - Check if email already exists FIRST
       const sanitizedEmail = data.email?.trim().toLowerCase();
 
-      // Check in patients table GLOBALLY (not just this clinic's loaded list).
-      // The patients.email column is globally unique, so an email registered under
-      // another clinic would otherwise slip past a local check and fail on insert
-      // with a confusing "record already exists" error.
+      // Patient emails are unique PER CLINIC, not globally: the same person can be a
+      // patient at more than one clinic (there is no global unique constraint on
+      // patients.email). So scope this lookup to the current clinic — a match under a
+      // different clinic must NOT block creation here, otherwise adding a patient whose
+      // email exists at another clinic wrongly fails with "email already exists".
       try {
         const { data: existingPatient } = await supabase
           .from('patients')
-          .select('id, clinic_id, org_id')
+          .select('id')
           .eq('email', sanitizedEmail)
+          .or(`clinic_id.eq.${clinicId},org_id.eq.${clinicId}`)
           .limit(1);
 
         if (existingPatient && existingPatient.length > 0) {
-          const ex = existingPatient[0];
-          const sameClinic = ex.clinic_id === clinicId || ex.org_id === clinicId;
-          toast.error(sameClinic
-            ? 'A patient with this email already exists in your clinic.'
-            : 'This email is already registered to another patient on Limitless Brain Lab. Patient emails must be unique — please use a different email.');
+          toast.error('A patient with this email already exists in your clinic.');
           return;
         }
       } catch (patientCheckError) {
@@ -380,6 +379,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
           ...(!data.dateOfBirth && data.age ? { age: parseInt(data.age) } : {})
         },
         date_of_birth: data.dateOfBirth || null,
+        origin_url: getOriginUrl(), // Environment (prod/staging) this patient was created from — login is scoped to it
         created_at: new Date().toISOString()
       };
 

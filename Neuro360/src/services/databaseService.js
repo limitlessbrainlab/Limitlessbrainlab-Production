@@ -94,6 +94,8 @@ class DatabaseService {
           subscriptionTier: clinic.subscription_tier,
           trialStartDate: clinic.trial_start_date,
           trialEndDate: clinic.trial_end_date,
+          originUrl: clinic.origin_url,
+          origin_url: clinic.origin_url, // Keep snake_case for login env check
           createdAt: clinic.created_at,
           updatedAt: clinic.updated_at
         }));
@@ -145,6 +147,8 @@ class DatabaseService {
             referred_by: patient.referred_by,
             occupation: patient.occupation,
             handedness: patient.handedness,
+            originUrl: patient.origin_url,
+            origin_url: patient.origin_url, // Keep snake_case for login env check
             createdAt: patient.created_at,
             updatedAt: patient.updated_at
           };
@@ -210,7 +214,8 @@ class DatabaseService {
         'reports_used', 'reports_allowed', 'subscription_status', 'subscription_tier',
         'trial_start_date', 'trial_end_date', 'created_at', 'updated_at',
         'password', // ONLY use password field for authentication
-        'smtp_email', 'smtp_password' // Clinic SMTP config for sending emails
+        'smtp_email', 'smtp_password', // Clinic SMTP config for sending emails
+        'origin_url' // Environment (production/staging URL) the clinic was created from
         // Note: avatar stored in logo_url field
         // Note: country_code field added for international phone numbers
         // Note: contract_agreed column not yet in DB — do not add here until migration is run
@@ -232,7 +237,8 @@ class DatabaseService {
         'gender', 'phone', 'country_code', 'email', 'password', 'address', 'medical_history', 'improvement_focus',
         'brain_fitness_score', 'is_active', 'created_at', 'updated_at',
         'avatar', 'profile_image', 'profileImage', 'avatar_url',
-        'occupation', 'handedness', 'referred_by'
+        'occupation', 'handedness', 'referred_by',
+        'origin_url' // Environment (production/staging URL) the patient was created from
       ],
       'reports': [
         // Actual schema from 004_simple_clinic_tables.sql:
@@ -550,7 +556,8 @@ class DatabaseService {
         trial_start_date: clinicData.trial_start_date || new Date().toISOString(),
         trial_end_date: clinicData.trial_end_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         created_at: clinicData.created_at || clinicData.createdAt || new Date().toISOString(),
-        updated_at: clinicData.updated_at || new Date().toISOString()
+        updated_at: clinicData.updated_at || new Date().toISOString(),
+        origin_url: clinicData.origin_url || clinicData.originUrl || null // Environment the clinic was created from
       };
 
       // IMPORTANT: Preserve the ID if provided (for existing clinic records)

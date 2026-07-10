@@ -11,6 +11,7 @@ const patientDocumentRoutes = require('./routes/patientDocumentRoutes');
 const ssoRoutes = require('./routes/ssoRoutes');
 const claudeRoutes = require('./routes/claudeRoutes');
 const { createClient } = require('@supabase/supabase-js');
+const bcrypt = require('bcryptjs');
 const { getReportEmailHtml } = require('../shared/reportEmailTemplate.cjs');
 
 // Import middleware
@@ -5945,8 +5946,12 @@ app.post('/api/verify-otp', async (req, res) => {
       });
     }
 
-    // OTP verified - remove from store
-    otpStore.delete(email.toLowerCase());
+    // OTP verified. Keep it in the store (until it expires or the reset completes)
+    // so POST /api/reset-password can re-validate the same code before writing the
+    // new password. The password write is server-authoritative — verifying here and
+    // then doing an unauthenticated client-side write would be both unreliable and
+    // insecure.
+    storedData.verified = true;
 
     res.json({
       success: true,
@@ -5959,6 +5964,121 @@ app.post('/api/verify-otp', async (req, res) => {
       success: false,
       message: 'Failed to verify OTP'
     });
+  }
+});
+
+// Reset a user's password after OTP verification. Server-authoritative and role-aware:
+// updates the credential store(s) for whichever role owns the email — clinics.password,
+// patients.password (+ Supabase Auth), or a super_admin profile (Supabase Auth +
+// profiles.password). Runs with the service-role client so it bypasses RLS reliably and
+// surfaces real errors instead of the old silent client-side anon write.
+app.post('/api/reset-password', async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Email, OTP, and new password are required' });
+    }
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Re-validate the OTP (same checks as verify-otp) so the write is gated server-side.
+    const storedData = otpStore.get(normalizedEmail);
+    if (!storedData) {
+      return res.status(400).json({ success: false, message: 'OTP expired or not found. Please request a new OTP.' });
+    }
+    if (Date.now() > storedData.expiresAt) {
+      otpStore.delete(normalizedEmail);
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new OTP.' });
+    }
+    if (storedData.otp !== otp) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP. Please try again.' });
+    }
+
+    if (!supabase) {
+      return res.status(500).json({ success: false, message: 'Server is not configured to reset passwords right now.' });
+    }
+
+    // Same bcrypt/trim semantics as the client hashPassword() so login's comparePassword matches.
+    const hashed = await bcrypt.hash(String(newPassword).trim(), 10);
+
+    // Best-effort Supabase Auth sync (patients + super admins authenticate there or fall back to it).
+    const syncSupabaseAuth = async () => {
+      try {
+        const { data: existingUsers } = await supabase.auth.admin.listUsers({ filter: normalizedEmail, perPage: 1 });
+        const authUser = existingUsers?.users?.find(u => (u.email || '').toLowerCase() === normalizedEmail) || existingUsers?.users?.[0];
+        if (authUser?.id) {
+          await supabase.auth.admin.updateUserById(authUser.id, { password: newPassword });
+        }
+      } catch (authErr) {
+        console.warn('reset-password: Supabase Auth sync skipped:', authErr?.message);
+      }
+    };
+
+    let role = null;
+
+    // 1) Clinic
+    const { data: clinicRows, error: clinicErr } = await supabase
+      .from('clinics').select('id').eq('email', normalizedEmail).limit(1);
+    if (clinicErr) throw clinicErr;
+    if (clinicRows && clinicRows.length > 0) {
+      const { error: updErr } = await supabase.from('clinics').update({ password: hashed }).eq('id', clinicRows[0].id);
+      if (updErr) throw updErr;
+      role = 'clinic';
+    }
+
+    // 2) Patient
+    if (!role) {
+      const { data: patientRows, error: patientErr } = await supabase
+        .from('patients').select('id').eq('email', normalizedEmail);
+      if (patientErr) throw patientErr;
+      if (patientRows && patientRows.length > 0) {
+        const { error: updErr } = await supabase.from('patients').update({ password: hashed }).eq('email', normalizedEmail);
+        if (updErr) throw updErr;
+        await syncSupabaseAuth();
+        role = 'patient';
+      }
+    }
+
+    // 3) Super admin (profiles row with role super_admin; profiles.id === auth user id)
+    if (!role) {
+      const { data: adminRows, error: adminErr } = await supabase
+        .from('profiles').select('id').eq('email', normalizedEmail).eq('role', 'super_admin').limit(1);
+      if (adminErr) throw adminErr;
+      if (adminRows && adminRows.length > 0) {
+        const adminId = adminRows[0].id;
+        // Supabase Auth is the authoritative credential for super admins.
+        try {
+          await supabase.auth.admin.updateUserById(adminId, { password: newPassword });
+        } catch (authErr) {
+          console.warn('reset-password: super_admin Auth update failed, will still try profile hash:', authErr?.message);
+          await syncSupabaseAuth();
+        }
+        // Keep the profiles.password login branch in sync (harmless if the column is absent).
+        try {
+          await supabase.from('profiles').update({ password: hashed }).eq('id', adminId);
+        } catch (profErr) {
+          console.warn('reset-password: profiles.password update skipped:', profErr?.message);
+        }
+        role = 'super_admin';
+      }
+    }
+
+    if (!role) {
+      return res.status(404).json({ success: false, message: 'No account found with this email address.' });
+    }
+
+    // Consume the OTP so it cannot be reused.
+    otpStore.delete(normalizedEmail);
+
+    res.json({ success: true, role, message: 'Password updated successfully' });
+
+  } catch (error) {
+    console.error('Error resetting password:', error?.message || error);
+    res.status(500).json({ success: false, message: 'Failed to reset password. Please try again.' });
   }
 });
 

@@ -4,7 +4,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, ArrowLeft, Loader2, CheckCircle, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import DatabaseService from '../../services/databaseService';
 import SupabaseService from '../../services/supabaseService';
-import { hashPassword } from '../../utils/passwordUtils';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import toast from 'react-hot-toast';
 
@@ -51,6 +50,22 @@ const ForgotPasswordForm = () => {
           if (!error && patients && patients.length > 0) {
             foundType = 'patient';
             foundAccount = patients[0];
+          }
+        }
+      }
+
+      // Check super admins (profiles with role super_admin)
+      if (!foundAccount) {
+        const supabase = SupabaseService.supabase;
+        if (supabase && SupabaseService.isAvailable()) {
+          const { data: admins, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('email', normalizedEmail)
+            .eq('role', 'super_admin');
+          if (!error && admins && admins.length > 0) {
+            foundType = 'super_admin';
+            foundAccount = admins[0];
           }
         }
       }
@@ -130,28 +145,20 @@ const ForgotPasswordForm = () => {
         return;
       }
 
-      // Update Supabase Auth password
-      const supabase = SupabaseService.supabase;
-      if (supabase && SupabaseService.isAvailable() && account?.password) {
-        try {
-          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-            email, password: account.password
-          });
-          if (!loginError && loginData?.session) {
-            await supabase.auth.updateUser({ password: data.newPassword });
-            await supabase.auth.signOut();
-          }
-        } catch (authErr) {
-          console.warn('Supabase Auth update skipped:', authErr.message);
-        }
-      }
-
-      // Hash and update in DB
-      const hashedPassword = await hashPassword(data.newPassword);
-      if (accountType === 'clinic') {
-        await DatabaseService.update('clinics', account.id, { password: hashedPassword });
-      } else if (accountType === 'patient') {
-        await DatabaseService.update('patients', account.id, { password: hashedPassword });
+      // Update the password server-side (authoritative, role-aware, OTP-gated). The
+      // server updates whichever credential store owns this email (clinic / patient /
+      // super_admin) plus Supabase Auth where relevant, so the new password reliably
+      // works at login instead of a silent client-side write.
+      const resetResponse = await fetch(`${API_URL}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp, newPassword: data.newPassword })
+      });
+      const resetResult = await resetResponse.json();
+      if (!resetResult.success) {
+        setError('root', { message: getFriendlyErrorMessage(resetResult.message, 'We could not change your password. Please try again.') });
+        setIsLoading(false);
+        return;
       }
 
       // Send new password to email

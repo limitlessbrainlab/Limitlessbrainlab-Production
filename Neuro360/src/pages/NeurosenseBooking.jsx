@@ -312,6 +312,7 @@ const NeurosenseBooking = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-7">
             {services.map((service, index) => {
               const isFreeWithLink = service.isFree && service.link;
+              const isBundle = service.title?.toLowerCase().includes('bundle');
               const CardWrapper = isFreeWithLink ? 'a' : 'div';
               const cardProps = isFreeWithLink ? { href: service.link, target: '_blank', rel: 'noopener noreferrer' } : {};
 
@@ -389,13 +390,16 @@ const NeurosenseBooking = () => {
                       )}
 
                       {/* Paid assessment - payment flow */}
-                      {!service.isFree && service.link && (
+                      {!service.isFree && (service.link || isBundle) && (
                         <div className="mt-3 sm:mt-4">
                           <button
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              setSelectedService(service);
+                              setSelectedService({
+                                ...service,
+                                link: service.link || services.map(s => s.link).filter(Boolean).join(','),
+                              });
                               setShowPaymentModal(true);
                             }}
                             className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 md:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-[#323956] to-[#4A6FA5] text-white text-xs sm:text-sm font-semibold rounded-lg sm:rounded-xl hover:shadow-lg hover:shadow-[#323956]/25 transition-all duration-300"
@@ -422,7 +426,7 @@ const NeurosenseBooking = () => {
                         </div>
                       )}
 
-                      {!service.link && !service.inquire && (
+                      {!service.link && !service.inquire && !isBundle && (
                         <div className="mt-3 sm:mt-4">
                           <span className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 md:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-[#323956] to-[#4A6FA5] text-white text-xs sm:text-sm font-semibold rounded-lg sm:rounded-xl group-hover:shadow-lg group-hover:shadow-[#323956]/25 transition-all duration-300">
                             Take Assessment

@@ -158,6 +158,36 @@ export const authService = {
             }
           }
 
+          // Fallback: the email exists as a patient but no row matched the local
+          // bcrypt/plaintext password. Clinic-created patients also have a Supabase
+          // Auth user (created server-side via /api/create-patient-auth) whose
+          // password is authoritative. This recovers logins for rows whose local
+          // password is missing/stale (e.g. a client-side hash failure or a bad
+          // de-dup merge). Verify against Supabase Auth; if the credentials are
+          // genuinely valid, accept the login and self-heal the local hash so
+          // subsequent logins take the fast bcrypt path. A wrong password (or a
+          // self-registered patient with no auth user) fails here and we fall
+          // through to "Invalid email or password" exactly as before.
+          if (!patient) {
+            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+              email: normalizedEmail,
+              password
+            });
+            if (!authError && authData?.user) {
+              patient = patients[0];
+              try {
+                await supabase
+                  .from('patients')
+                  .update({ password: await hashPassword(password) })
+                  .eq('id', patient.id);
+              } catch (healErr) {
+                console.warn('WARNING: could not self-heal patient password hash:', healErr?.message);
+              }
+              // Restore the anonymous role the rest of the login flow assumes.
+              try { await supabase.auth.signOut({ scope: 'local' }); } catch (e) { /* ignore */ }
+            }
+          }
+
           if (patient) {
             return {
               success: true,

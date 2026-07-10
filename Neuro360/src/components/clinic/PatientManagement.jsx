@@ -340,21 +340,26 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
         hashPassword(data.password)
       ]);
 
-      // Process auth result
-      let authCreated = false;
-      if (authResult.status === 'fulfilled') {
-        authCreated = true;
-      } else if (authResult.status === 'rejected') {
-        toast.error('Patient record will be created but login may not work. Please contact support.', {
-          duration: 5000,
-        });
+      // Process auth result. The Supabase Auth user is auxiliary — patient login
+      // authenticates against the bcrypt password on the patients row created below —
+      // so a failed or duplicate auth user does NOT prevent login. Just log it.
+      if (authResult.status === 'rejected') {
+        console.warn('WARNING: Supabase Auth user creation failed (patient can still log in via the patients table):', authResult.reason);
       }
 
       // Get UID (use fallback if generation failed)
       const uid = patientUID.status === 'fulfilled' ? patientUID.value : `PAT-${Date.now()}`;
 
-      // Get hashed password (use plain if hashing failed)
-      const pwd = hashedPassword.status === 'fulfilled' ? hashedPassword.value : data.password;
+      // Get the bcrypt password hash. If hashing failed, abort — never fall back to
+      // storing plaintext (or any other value), which would make the emailed
+      // credentials silently mismatch what login compares against and produce a
+      // bogus "Invalid email or password" for a freshly created patient.
+      if (hashedPassword.status !== 'fulfilled' || !hashedPassword.value) {
+        console.error('ERROR: Password hashing failed during patient creation:', hashedPassword.reason);
+        toast.error('Could not securely process the password. Please try again.');
+        return;
+      }
+      const pwd = hashedPassword.value;
 
       // Map fields to match database schema (without owner_user - it doesn't exist)
       const patientData = {
@@ -403,8 +408,12 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
         throw new Error('Could not generate a unique patient ID. Please try again.');
       }
 
-      // Send welcome email in background (don't block the UI)
-      if (authCreated) {
+      // Send welcome email in background (don't block the UI). Tied to verified
+      // persistence: we only reach here after the patients row was inserted with a
+      // bcrypt password (the insert loop above throws otherwise), so the emailed
+      // credentials always match what login will verify — regardless of whether the
+      // auxiliary Supabase Auth user was created.
+      {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const baseUrl = apiUrl.replace(/\/api\/?$/, '');
 
@@ -432,8 +441,6 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
           `Patient created successfully!\n\nLogin credentials will be sent to ${data.email}`,
           { duration: 6000 }
         );
-      } else {
-        toast.success('Patient record created successfully!');
       }
 
       loadPatients();

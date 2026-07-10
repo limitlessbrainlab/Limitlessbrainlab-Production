@@ -2384,6 +2384,12 @@ app.post('/api/create-report-checkout', async (req, res) => {
 
     const { packageId, packageName, reports, amount, currency, customerEmail, customerName, clinicId, clinicType } = req.body;
 
+    // Return the clinic to the SAME origin it came from after payment, so the
+    // per-origin auth session survives the round-trip (a cross-origin return drops
+    // the session and bounces the clinic to /login). Fall back to the canonical
+    // production domain — never the staging vercel.app URL.
+    const baseUrl = req.headers.origin || 'https://limitlessbrainlab.com';
+
     if (!customerEmail || !amount || !currency) {
       return res.status(400).json({
         success: false,
@@ -2416,7 +2422,7 @@ app.post('/api/create-report-checkout', async (req, res) => {
             product_data: {
               name: `${packageName} - ${reports} EEG Reports`,
               description: `Purchase ${reports} EEG brain reports for your clinic`,
-              images: [`${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/IBW%20Logo.png`],
+              images: [`${baseUrl}/IBW%20Logo.png`],
               metadata: {
                 package_id: packageId,
                 reports: reports.toString(),
@@ -2430,8 +2436,8 @@ app.post('/api/create-report-checkout', async (req, res) => {
       ],
       mode: 'payment',
       customer_email: customerEmail,
-      success_url: `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic/subscription?payment=success&reports=${reports}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic/subscription?payment=cancelled`,
+      success_url: `${baseUrl}/clinic/subscription?payment=success&reports=${reports}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/clinic/subscription?payment=cancelled`,
       metadata: {
         package_id: packageId,
         customer_email: customerEmail,

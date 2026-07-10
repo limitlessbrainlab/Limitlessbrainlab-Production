@@ -213,8 +213,9 @@ const LoginForm = ({ userType: userTypeProp } = {}) => {
             )}
           </div>
 
-          {/* Remember Me & Forgot Password */}
-          <div className="flex items-center justify-between animate-slide-up" style={{ animationDelay: '0.3s' }}>
+          {/* Forgot Password (Remember Me hidden) */}
+          <div className="flex items-center justify-end animate-slide-up" style={{ animationDelay: '0.3s' }}>
+            {/* "Remember me" hidden — it was non-functional. To re-enable, restore this block:
             <div className="flex items-center group">
               <input
                 id="remember-me"
@@ -226,6 +227,7 @@ const LoginForm = ({ userType: userTypeProp } = {}) => {
                 Remember me
               </label>
             </div>
+            */}
             <Link
               to="/forgot-password"
               className="text-sm text-[#323956] hover:text-[#232D3C] font-semibold transition-all duration-200 hover:underline hover:underline-offset-4"

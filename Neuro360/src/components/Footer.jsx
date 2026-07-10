@@ -18,7 +18,7 @@ const Footer = () => {
   const { openProgramForm } = useProgramForm();
   const [formData, setFormData] = useState({
     email: '',
-    country_code: '+971',
+    country_code: '+91',
     contact_number: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,7 +90,7 @@ const Footer = () => {
       // Reset form
       setFormData({
         email: '',
-        country_code: '+971',
+        country_code: '+91',
         contact_number: ''
       });
     } catch (error) {

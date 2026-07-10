@@ -9,7 +9,7 @@ const BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '');
 
 const DemoReportPopup = ({ isOpen, onClose }) => {
   const [email, setEmail] = useState('');
-  const [countryCode, setCountryCode] = useState('+971');
+  const [countryCode, setCountryCode] = useState('+91');
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -47,7 +47,7 @@ const DemoReportPopup = ({ isOpen, onClose }) => {
 
       toast.success('Demo report request submitted successfully!');
       setEmail('');
-      setCountryCode('+971');
+      setCountryCode('+91');
       setPhone('');
       onClose();
     } catch (error) {

@@ -234,44 +234,57 @@ export const AuthProvider = ({ children }) => {
         try {
           const parsedUser = JSON.parse(storedUser);
 
-          // Super admins authenticate via a real Supabase JWT — never trust the
-          // localStorage copy blindly. Validate the live session against the
-          // Supabase server, confirm it belongs to the same email, and re-derive
-          // the role from profiles. If anything is missing/expired/tampered,
-          // clear everything and force a fresh login.
-          // (Clinics & patients use local_token_* with no Supabase session, so
-          //  they keep the existing localStorage-restore behavior below.)
+          // Super admins are never trusted from localStorage blindly — re-derive the
+          // role from the trusted `profiles` table before restoring. We support the
+          // app's two admin auth paths:
+          //  - Supabase JWT path: validate the live session, confirm the same email,
+          //    read the profile by auth user id.
+          //  - Local password path (profiles.password + comparePassword): this creates
+          //    NO Supabase session, so instead of force-logging-out, re-validate against
+          //    profiles by email. Without this fallback, a legitimately logged-in local-
+          //    password admin gets wiped on the post-login reload and bounced to /login.
+          // (Clinics & patients use local_token_* with no Supabase session, so they keep
+          //  the localStorage-restore behavior below.)
           if (parsedUser.role === 'super_admin') {
             if (!supabase) {
               throw new Error('Supabase unavailable — cannot validate admin session');
             }
 
-            const { data: { user: authUser }, error: authErr } = await supabase.auth.getUser();
-            const sameEmail = authUser?.email?.toLowerCase() === parsedUser.email?.toLowerCase();
+            let validatedProfile = null;
 
-            if (authErr || !authUser || !sameEmail) {
-              throw new Error('Invalid or expired admin session');
+            // Preferred: a live Supabase Auth session (production admins in Supabase Auth).
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            if (authUser && authUser.email?.toLowerCase() === parsedUser.email?.toLowerCase()) {
+              const { data: p } = await supabase
+                .from('profiles')
+                .select('id, role, full_name, avatar_url')
+                .eq('id', authUser.id)
+                .single();
+              if (p?.role === 'super_admin') validatedProfile = p;
             }
 
-            // Re-derive role from the trusted profiles table (defends against a
-            // tampered localStorage role).
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('role, full_name, avatar_url')
-              .eq('id', authUser.id)
-              .single();
+            // Fallback: local-password admins have no Supabase session — re-validate
+            // against the trusted profiles table by email (the same source login trusts).
+            if (!validatedProfile && parsedUser.email) {
+              const { data: p } = await supabase
+                .from('profiles')
+                .select('id, role, full_name, avatar_url')
+                .eq('email', parsedUser.email)
+                .eq('role', 'super_admin')
+                .maybeSingle();
+              if (p?.role === 'super_admin') validatedProfile = p;
+            }
 
-            if (!profile || profile.role !== 'super_admin') {
+            if (!validatedProfile) {
               throw new Error('Account is not a super admin');
             }
 
             const validatedUser = {
               ...parsedUser,
-              id: authUser.id,
-              email: authUser.email,
+              id: validatedProfile.id || parsedUser.id,
               role: 'super_admin',
-              name: profile.full_name || parsedUser.name,
-              avatar: profile.avatar_url || parsedUser.avatar,
+              name: validatedProfile.full_name || parsedUser.name,
+              avatar: validatedProfile.avatar_url || parsedUser.avatar,
             };
 
             setUser(validatedUser);

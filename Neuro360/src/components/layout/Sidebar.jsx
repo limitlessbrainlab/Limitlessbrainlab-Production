@@ -228,7 +228,7 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
         { id: 'reports', label: 'Reports & Files', icon: FileSpreadsheet, path: '/clinic/reports' },
         { id: 'subscription', label: 'Subscription', icon: CreditCard, path: '/clinic/subscription' },
         { id: 'usage', label: 'Usage Tracking', icon: TrendingUp, path: '/clinic/usage' },
-        { id: 'settings', label: 'Settings', icon: Settings, path: '/clinic/settings' }
+        // { id: 'settings', label: 'Settings', icon: Settings, path: '/clinic/settings' } // hidden from sidebar per request
       ];
     } else {
       // Patient navigation with tier badges

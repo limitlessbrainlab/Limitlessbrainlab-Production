@@ -1808,7 +1808,7 @@ const PatientDashboard = () => {
     // { id: 'five-pillars', label: '5 Pillars of Mastery', icon: Award }, // hidden from sidebar per request
     { id: 'brain-courses', label: 'Brain Courses', icon: GraduationCap },
     // { id: 'events', label: 'Events', icon: Calendar }, // hidden — not active yet
-    { id: 'wallet', label: 'Wallet', icon: Wallet },
+    // { id: 'wallet', label: 'Wallet', icon: Wallet }, // hidden from sidebar per request
     { id: 'feedback', label: 'Feedback | Help + Support', icon: HelpCircle }
   ];
 

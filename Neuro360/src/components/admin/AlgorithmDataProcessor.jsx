@@ -612,12 +612,18 @@ const AlgorithmDataProcessor = () => {
       const response = await fetchWithRetry(
         `${apiUrl}/qeeg/replace-logo-download`,
         fetchOptions,
-        { timeoutMs: 90000, retries: 1 }
+        { timeoutMs: 180000, retries: 2 }
       );
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err.message || 'Processing failed');
+        // Surface the real reason instead of a generic message so failures are diagnosable.
+        const reason = err.message || err.error ||
+          (response.status === 401 ? 'Your session expired — please log out and log back in, then retry.' :
+           response.status === 413 ? 'That PDF is too large to process.' :
+           `Server error (${response.status}).`);
+        console.error('replace-logo-download failed:', response.status, reason);
+        throw new Error(reason);
       }
 
       const blob = await response.blob();

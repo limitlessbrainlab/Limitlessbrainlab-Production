@@ -550,6 +550,17 @@ function buildReportDataFromNeuroSenseMd(mdText, patient = {}, algorithmResults 
     if (!e) return { label: '', value: null, unit: '', optimal: '', status: 'N/A' };
     return { label: e.label, value: e.value, unit: e.unit, optimal: e.optimal, status: e.status };
   };
+
+  // Focus Score & Alpha:Theta Balance are NOT part of the NeuroSense-values MD
+  // (the extraction schema omits them), so they always arrive null here. Recover
+  // them from the deterministic algorithmResults — the same source the NeuroSense
+  // report uses — exactly as buildReportDataFromSource does. Focus Score is a
+  // number; Alpha:Theta Balance is a { fz, cz, pz } object.
+  const incomingParams = toParameters(algorithmResults);
+  const focusVal = metricValue(incomingParams, 'Focus Score');
+  const alphaThetaMetric = metricMatch(incomingParams, 'Alpha:Theta Balance');
+  const alphaThetaVal = metricValue(incomingParams, 'Alpha:Theta Balance');
+
   const deepDive = {
     alphaPeak: ddEntry('alphaPeak'),
     arousal: ddEntry('arousal'),
@@ -557,8 +568,14 @@ function buildReportDataFromNeuroSenseMd(mdText, patient = {}, algorithmResults 
     regeneration: ddEntry('regeneration'),
     frontalAsymmetry: ddEntry('frontalAsymmetry'),
     daytimeDelta: ddEntry('daytimeDelta'),
-    focusScore: ddEntry('focusScore'),
-    alphaTheta: ddEntry('alphaTheta'),
+    focusScore: ddEntry('focusScore').value != null ? ddEntry('focusScore') : {
+      label: 'Focus Score', value: focusVal, unit: '', optimal: '< 1.5',
+      status: focusScoreStatus(focusVal),
+    },
+    alphaTheta: ddEntry('alphaTheta').value != null ? ddEntry('alphaTheta') : {
+      label: 'Alpha:Theta Balance', value: alphaThetaVal, unit: '', optimal: '> 1.0 (healthy)',
+      status: alphaThetaStatus(alphaThetaMetric, alphaThetaVal),
+    },
   };
 
   // Brainwave profile: copied verbatim from the MD.

@@ -299,7 +299,9 @@ Return ONE pure JSON object (no markdown, no code fences, no prose):
     "relaxation": <number or null>,
     "regeneration": <percent or null>,
     "frontalAsymmetry": <number, keep sign, or null>,
-    "daytimeDelta": <percent or null>
+    "daytimeDelta": <percent or null>,
+    "focusScore": <Focus Score (Theta:Beta) ratio number, e.g. 1.20, or null>,
+    "alphaTheta": { "fz": <ratio number or null>, "cz": <ratio number or null>, "pz": <ratio number or null> }
   },
   "brainwave": { "delta": <% or null>, "theta": <% or null>, "alpha": <% or null>, "beta": <% or null>, "hiBeta": <% or null>, "alphaPeakHz": <Hz or null> }
 }
@@ -316,6 +318,11 @@ Rules:
 - "deepDive" values are raw numbers wherever they appear (Alpha Peak in Hz, Arousal,
   Relaxation, Regeneration %, Frontal Alpha Asymmetry keeping its +/- sign, Daytime
   or Excessive Delta %).
+- "focusScore" is the single "Focus Score (Theta:Beta)" ratio printed on the report
+  (e.g. 1.20). "alphaTheta" is the Alpha:Theta Balance printed as "Fz: .., Cz: .., Pz: .."
+  — copy each channel's number into fz/cz/pz. If the report prints only
+  "Indeterminate"/"Normal"/"Abnormal" with no per-channel numbers, set "alphaTheta" to null.
+  Copy verbatim; never compute.
 
 Here is the report text:
 ${pdfText}`;

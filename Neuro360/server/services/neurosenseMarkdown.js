@@ -64,6 +64,13 @@ function classFromPercent(percent, inverted) {
 function ddStatus(label, value) {
   const v = num(value);
   const name = String(label || '').toLowerCase();
+  // Alpha:Theta Balance can arrive as a {fz,cz,pz} object — the order is healthy
+  // when fz < cz < pz. Resolve it before the numeric null-guard below.
+  if (name.includes('theta') && value && typeof value === 'object') {
+    const f = Number(value.fz), c = Number(value.cz), p = Number(value.pz);
+    if ([f, c, p].every(Number.isFinite)) return (f < c && c < p) ? 'Healthy' : 'Low';
+    return 'N/A';
+  }
   if (v == null) return value === 'Indeterminate' ? 'N/A' : 'N/A';
   if (name.includes('alpha peak')) return v > 9 ? 'Healthy' : 'Low';
   if (name.includes('arousal')) return v < 1 ? 'Balanced' : 'Elevated';
@@ -81,6 +88,14 @@ function fmtVal(v) {
   if (n != null) return String(n);
   if (v === 'Indeterminate') return 'Indeterminate';
   return 'null';
+}
+
+// Deep-dive values can be an object (Alpha:Theta Balance = {fz,cz,pz}); serialize it
+// as JSON so it survives the pipe-delimited Markdown round-trip. A JSON object of
+// numeric ratios contains no '|', so it stays pipe-safe on the deepdive| line.
+function fmtDDVal(v) {
+  if (v && typeof v === 'object') return JSON.stringify(v);
+  return fmtVal(v);
 }
 
 /**
@@ -159,7 +174,7 @@ function buildNeuroSenseMarkdown(source, algorithmResults, patient = {}) {
   for (const f of DD_FIELDS) {
     const v = dd[f.sourceKey];
     const status = ddStatus(f.label, v);
-    lines.push('deepdive|' + f.key + '|' + f.label + '|' + fmtVal(v) + '|' + f.unit + '|' + f.optimal + '|' + status);
+    lines.push('deepdive|' + f.key + '|' + f.label + '|' + fmtDDVal(v) + '|' + f.unit + '|' + f.optimal + '|' + status);
   }
   lines.push('');
   lines.push('## Brainwave');
@@ -186,6 +201,14 @@ function toVal(s) {
   if (str === 'Indeterminate') return 'Indeterminate';
   const n = Number(str);
   return isFinite(n) ? n : null;
+}
+
+// Deep-dive counterpart to toVal that also decodes a JSON object value
+// (Alpha:Theta Balance = {fz,cz,pz}); everything else defers to toVal.
+function toDDVal(s) {
+  const str = String(s == null ? '' : s).trim();
+  if (str.startsWith('{')) { try { return JSON.parse(str); } catch { return null; } }
+  return toVal(str);
 }
 
 /**
@@ -233,7 +256,7 @@ function parseNeuroSenseMarkdown(md) {
     }
     const d = parsePrefixed(line, 'deepdive|');
     if (d) {
-      out.deepDive[d[0]] = { key: d[0], label: d[1], value: toVal(d[2]), unit: d[3] || '', optimal: d[4] || '', status: d[5] || 'N/A' };
+      out.deepDive[d[0]] = { key: d[0], label: d[1], value: toDDVal(d[2]), unit: d[3] || '', optimal: d[4] || '', status: d[5] || 'N/A' };
       continue;
     }
     const w = parsePrefixed(line, 'brainwave|');

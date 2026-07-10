@@ -271,15 +271,19 @@ export const authService = {
       if (superAdminProfile) {
         let adminPasswordMatch = false;
 
-        if (superAdminProfile.password) {
-          adminPasswordMatch = await comparePassword(password, superAdminProfile.password);
-        } else if (supabase) {
-          // ponytail: production super-admins live in Supabase Auth; keep legacy profile-password support only as fallback.
+        if (supabase) {
+          // production super-admins live in Supabase Auth. Always authenticate here so a
+          // real Supabase session is created — every downstream validator (AuthContext
+          // reload, backend authMiddleware) requires that session/JWT. A populated
+          // profiles.password must NOT downgrade login to a session-less local check.
           const { error } = await supabase.auth.signInWithPassword({
             email: normalizedEmail,
             password
           });
           adminPasswordMatch = !error;
+        } else if (superAdminProfile.password) {
+          // Legacy fallback only when Supabase is unavailable.
+          adminPasswordMatch = await comparePassword(password, superAdminProfile.password);
         }
 
         if (!adminPasswordMatch) {

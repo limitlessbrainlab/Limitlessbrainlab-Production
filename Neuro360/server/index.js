@@ -218,7 +218,7 @@ function getEmailFooterHtml() {
               <p style="margin:14px 0 0; color:#555; font-size:14px; font-style:italic;">&ldquo;A healthy brain is the foundation of a limitless life.&rdquo;</p>
               ${sig}
               <p style="margin:0 0 16px; color:#323956; font-size:14px;">Access all the brain health courses &nbsp;<a href="https://www.limitlessbrainacademy.com" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">www.limitlessbrainacademy.com</a></p>
-              <p style="margin:0 0 12px; color:#323956; font-size:14px;">&#128222; &nbsp;WhatsApp: <a href="https://w.app/labchat" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">+971 50 138 2897</a></p>
+              <p style="margin:0 0 12px; color:#323956; font-size:14px;">&#128222; &nbsp;WhatsApp: <a href="https://api.whatsapp.com/send?phone=919769696534&text=%F0%9F%98%8A" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">+91 9769696534</a></p>
               <p style="margin:0 0 10px; color:#323956; font-size:14px;">Social Media:</p>
               <table cellpadding="0" cellspacing="0"><tr>
                 <td style="padding-right:14px;"><a href="https://www.instagram.com/drsweta.adatia/?hl=en" target="_blank"><img src="https://img.icons8.com/fluency/48/instagram-new.png" alt="Instagram" width="30" height="30" style="display:block; border:0;"/></a></td>
@@ -888,10 +888,13 @@ app.use((req, res, next) => {
 // Placed after body parsing so email-keyed limiters can read req.body.
 app.use([
   '/api/send-otp', '/api/verify-otp', '/api/send-password-reset', '/api/send-password-email',
-  '/api/send-welcome-email', '/api/send-report-email', '/api/send-assessment-email',
+  '/api/send-welcome-email', '/api/send-assessment-email',
   '/api/send-no-credit-email', '/api/send-partner-welcome-email', '/api/send-partner-email-update',
   '/api/notifications/send', '/api/check-email-exists', '/api/wallet/invoice-email'
 ], rateLimiters.emailLimiter);
+// Report emails get a dedicated, higher limit — sending several patients' reports in one
+// sitting must not be throttled by the generic 5/hour email budget (OTP/welcome/etc.).
+app.use(['/api/send-report-email'], rateLimiters.reportEmailLimiter);
 app.use(['/api/send-password-reset', '/api/send-password-email'], rateLimiters.passwordResetLimiter);
 app.use([
   '/api/create-frequency-checkout', '/api/create-meditation-checkout', '/api/create-report-checkout',
@@ -6050,18 +6053,14 @@ app.post('/api/reset-password', async (req, res) => {
       if (adminErr) throw adminErr;
       if (adminRows && adminRows.length > 0) {
         const adminId = adminRows[0].id;
-        // Supabase Auth is the authoritative credential for super admins.
+        // Supabase Auth is the authoritative (and only) credential for super admins.
+        // Do NOT write profiles.password here: a populated profiles.password diverts login
+        // onto a session-less local-bcrypt branch and breaks super-admin sessions.
         try {
           await supabase.auth.admin.updateUserById(adminId, { password: newPassword });
         } catch (authErr) {
-          console.warn('reset-password: super_admin Auth update failed, will still try profile hash:', authErr?.message);
+          console.warn('reset-password: super_admin Auth update failed:', authErr?.message);
           await syncSupabaseAuth();
-        }
-        // Keep the profiles.password login branch in sync (harmless if the column is absent).
-        try {
-          await supabase.from('profiles').update({ password: hashed }).eq('id', adminId);
-        } catch (profErr) {
-          console.warn('reset-password: profiles.password update skipped:', profErr?.message);
         }
         role = 'super_admin';
       }

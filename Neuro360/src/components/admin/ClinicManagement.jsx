@@ -59,6 +59,10 @@ const ClinicManagement = ({ onUpdate }) => {
   const [error, setError] = useState(null);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [selectedClinicForAdmin, setSelectedClinicForAdmin] = useState(null);
+  // Ground-truth credentials shown to the admin right after creating a clinic, so they
+  // always have the exact password to hand over/verify even if the email renders or
+  // delivers imperfectly. { clinicName, email, password }
+  const [createdCredentials, setCreatedCredentials] = useState(null);
 
   const { register, handleSubmit, reset, watch, formState: { errors } } = useForm();
 
@@ -469,6 +473,10 @@ const ClinicManagement = ({ onUpdate }) => {
       // Close modal and reset form immediately after successful creation
       setShowModal(false);
       reset();
+
+      // Surface the exact credentials to the admin (ground truth, independent of how the
+      // clinic's email client renders the HTML) so they can verify/share them directly.
+      setCreatedCredentials({ clinicName: data.name, email: normalizedEmail, password });
 
       // Send login credentials email to the verified email
       try {
@@ -1792,6 +1800,55 @@ Please manually share these credentials with the clinic.`;
         }}
         onUpdate={loadClinics}
       />
+
+      {/* Created-clinic credentials (ground truth for the admin) */}
+      {createdCredentials && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setCreatedCredentials(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-[#323956] mb-1">Clinic created</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Login credentials were emailed to the clinic. Keep this copy to verify or share manually — the password is shown exactly as stored.
+            </p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3 bg-gray-50 rounded-lg px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-400">Email</p>
+                  <p className="text-sm font-semibold text-[#323956] break-all">{createdCredentials.email}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => { try { await navigator.clipboard.writeText(createdCredentials.email); toast.success('Email copied'); } catch (e) { toast.error('Copy failed'); } }}
+                  className="shrink-0 p-2 rounded-md hover:bg-gray-200 text-gray-600"
+                  title="Copy email"
+                >
+                  <Copy size={16} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between gap-3 bg-gray-50 rounded-lg px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-400">Password</p>
+                  <p className="text-sm font-semibold text-[#323956] font-mono break-all">{createdCredentials.password}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => { try { await navigator.clipboard.writeText(createdCredentials.password); toast.success('Password copied'); } catch (e) { toast.error('Copy failed'); } }}
+                  className="shrink-0 p-2 rounded-md hover:bg-gray-200 text-gray-600"
+                  title="Copy password"
+                >
+                  <Copy size={16} />
+                </button>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCreatedCredentials(null)}
+              className="mt-5 w-full py-2.5 rounded-lg bg-[#323956] text-white text-sm font-semibold hover:bg-[#1a1f36]"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

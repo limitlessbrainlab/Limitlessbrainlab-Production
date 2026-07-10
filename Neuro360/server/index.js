@@ -316,6 +316,17 @@ const SERVER_VERSION = DEPLOY_SIGNATURE;
 // Outbound email "From" address (all emails to users/patients/clinics)
 const EMAIL_FROM = `"Limitless Brain Lab" <${process.env.EMAIL_FROM || 'info@limitlessbrainlab.com'}>`;
 
+// Escape user-supplied values before interpolating into email HTML. Without this,
+// a typed password containing < > & or " renders corrupted in the mail client
+// (e.g. "Br@in<Lab>2026" shows as "Br@in2026"), so the recipient copies the wrong
+// password and login fails with "Invalid email or password".
+const escapeHtml = (value) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
 // Consistent "date + time" formatter for email templates → e.g. "22 June 2026, 02:51 PM" (IST).
 const fmtDateTime = (d = new Date()) => {
   const dt = d ? new Date(d) : new Date();
@@ -4568,12 +4579,12 @@ app.post('/api/clinic-credentials', async (req, res) => {
                   <!-- Welcome Message -->
                   <tr>
                     <td style="padding: 32px 32px 16px;">
-                      <h2 style="color: #323956; margin: 0 0 8px; font-size: 24px;">Welcome, ${contactPerson || clinicName || 'Clinic Admin'}! </h2>
+                      <h2 style="color: #323956; margin: 0 0 8px; font-size: 24px;">Welcome, ${escapeHtml(contactPerson || clinicName || 'Clinic Admin')}! </h2>
                       <p style="color: #666; margin: 0 0 12px; font-size: 14px; line-height: 1.6;">
                         Thank you for registering with <strong>Limitless Brain Lab</strong>! We are thrilled to have you onboard and look forward to a long-term association filled with health, happiness, and growth.
                       </p>
                       <p style="color: #666; margin: 0 0 12px; font-size: 14px; line-height: 1.6;">
-                        Your clinic account <strong>${clinicName || ''}</strong> has been activated. Below are your login credentials. Please login and choose your plan to get started.
+                        Your clinic account <strong>${escapeHtml(clinicName || '')}</strong> has been activated. Below are your login credentials. Please login and choose your plan to get started.
                       </p>
                     </td>
                   </tr>
@@ -4590,7 +4601,7 @@ app.post('/api/clinic-credentials', async (req, res) => {
                               <tr>
                                 <td style="padding: 12px 16px;">
                                   <p style="color: rgba(255,255,255,0.7); margin: 0; font-size: 11px;">USERNAME / EMAIL</p>
-                                  <p style="color: #ffffff; margin: 4px 0 0; font-size: 16px; font-weight: 600;">${email}</p>
+                                  <p style="color: #ffffff; margin: 4px 0 0; font-size: 16px; font-weight: 600;">${escapeHtml(email)}</p>
                                 </td>
                               </tr>
                             </table>
@@ -4599,7 +4610,7 @@ app.post('/api/clinic-credentials', async (req, res) => {
                               <tr>
                                 <td style="padding: 12px 16px;">
                                   <p style="color: rgba(255,255,255,0.7); margin: 0; font-size: 11px;">PASSWORD</p>
-                                  <p style="color: #ffffff; margin: 4px 0 0; font-size: 16px; font-weight: 600; font-family: monospace;">${password}</p>
+                                  <p style="color: #ffffff; margin: 4px 0 0; font-size: 16px; font-weight: 600; font-family: monospace;">${escapeHtml(password)}</p>
                                 </td>
                               </tr>
                             </table>
@@ -4750,7 +4761,7 @@ app.post('/api/clinic-rejection', async (req, res) => {
                       <table width="100%" style="background:#fff5f5;border-left:4px solid #e53e3e;border-radius:8px;margin:16px 0;">
                         <tr><td style="padding:16px 20px;">
                           <p style="color:#c53030;margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Reason</p>
-                          <p style="color:#742a2a;margin:0;font-size:14px;line-height:1.6;">${remark}</p>
+                          <p style="color:#742a2a;margin:0;font-size:14px;line-height:1.6;">${escapeHtml(remark)}</p>
                         </td></tr>
                       </table>` : ''}
                       <p style="color:#666;margin:12px 0 0;font-size:14px;line-height:1.6;">
@@ -6000,7 +6011,7 @@ app.post('/api/send-password-email', async (req, res) => {
             <p style="color: #555;">Your password has been successfully changed. Here are your updated login credentials:</p>
             <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0;">
               <p style="margin: 4px 0; color: #333;"><strong>Email:</strong> ${email}</p>
-              <p style="margin: 4px 0; color: #333;"><strong>New Password:</strong> ${password}</p>
+              <p style="margin: 4px 0; color: #333;"><strong>New Password:</strong> ${escapeHtml(password)}</p>
             </div>
             <p style="color: #999; font-size: 12px;">If you did not make this change, please contact support immediately.</p>
             <div style="text-align: center; margin: 24px 0;">
@@ -6192,7 +6203,7 @@ app.post('/api/send-welcome-email', async (req, res) => {
 
                 <div style="background: white; border-radius: 8px; padding: 12px 15px; border-left: 4px solid #10b981;">
                   <p style="color: #888; margin: 0; font-size: 11px; text-transform: uppercase;">Password</p>
-                  <p style="color: #323956; margin: 4px 0 0; font-size: 15px; font-weight: 600; font-family: monospace;">${password}</p>
+                  <p style="color: #323956; margin: 4px 0 0; font-size: 15px; font-weight: 600; font-family: monospace;">${escapeHtml(password)}</p>
                 </div>
               </div>
 
@@ -6413,7 +6424,7 @@ app.post('/api/send-email-update-notification', async (req, res) => {
                 <div style="background: white; border-radius: 8px; padding: 12px 15px; border-left: 4px solid #10b981;">
                   ${hasNewPassword
                     ? `<p style="color: #888; margin: 0; font-size: 11px; text-transform: uppercase;">New Password</p>
-                  <p style="color: #323956; margin: 4px 0 0; font-size: 15px; font-weight: 600; font-family: monospace;">${password}</p>`
+                  <p style="color: #323956; margin: 4px 0 0; font-size: 15px; font-weight: 600; font-family: monospace;">${escapeHtml(password)}</p>`
                     : `<p style="color: #888; margin: 0; font-size: 11px; text-transform: uppercase;">Password</p>
                   <p style="color: #323956; margin: 4px 0 0; font-size: 14px; font-weight: 500;">Unchanged — keep using your existing password.</p>`}
                 </div>
@@ -7569,7 +7580,7 @@ app.post('/api/send-partner-welcome-email', async (req, res) => {
               </div>
               <div style="background: white; border-radius: 8px; padding: 13px 15px; border-left: 4px solid #1E3A5F;">
                 <p style="color: #888; margin: 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Password</p>
-                <p style="color: #333; margin: 5px 0 0; font-size: 14px; font-weight: 600; font-family: 'Courier New', monospace;">${password}</p>
+                <p style="color: #333; margin: 5px 0 0; font-size: 14px; font-weight: 600; font-family: 'Courier New', monospace;">${escapeHtml(password)}</p>
               </div>
             </div>
             <div style="text-align: center; margin: 30px 0;">
@@ -7774,7 +7785,7 @@ app.post('/api/send-partner-patient-welcome', async (req, res) => {
               </div>
               <div style="background: white; border-radius: 8px; padding: 13px 15px; border-left: 4px solid #1E3A5F;">
                 <p style="color: #888; margin: 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Password</p>
-                <p style="color: #333; margin: 5px 0 0; font-size: 14px; font-weight: 600; font-family: 'Courier New', monospace;">${password}</p>
+                <p style="color: #333; margin: 5px 0 0; font-size: 14px; font-weight: 600; font-family: 'Courier New', monospace;">${escapeHtml(password)}</p>
               </div>
             </div>
             <div style="text-align: center; margin: 30px 0;">

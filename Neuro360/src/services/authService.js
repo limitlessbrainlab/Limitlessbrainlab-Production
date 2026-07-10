@@ -70,6 +70,23 @@ export const authService = {
 
     const normalizedEmail = email.trim().toLowerCase();
 
+    // Thrown when a pre-login table read fails (network down, or an expired session
+    // token that 401s). The "Network error:" prefix makes getFriendlyErrorMessage map
+    // it to the connectivity message, so a read failure is never shown to the user as
+    // "Invalid email or password" (including the LoginForm fallback that re-runs the
+    // friendly-error mapper on this text).
+    const SERVER_UNREACHABLE = 'Network error: unable to reach the server. Please check your connection and try again.';
+
+    // Clear any stale/expired Supabase session so the pre-login table reads run as the
+    // anonymous role. A leftover expired JWT makes clinics/profiles reads 401, which the
+    // read helpers used to flatten to [] — surfacing to the user as "Invalid email or
+    // password" even though the credentials were correct.
+    try {
+      if (supabase) await supabase.auth.signOut({ scope: 'local' });
+    } catch (e) {
+      // ignore — worst case the reads run with whatever session exists
+    }
+
     try {
       // SUCCESS: PRIORITY 1: Check clinics table first (local password auth)
       // Must be before super admin check — an email may exist in both tables,
@@ -77,7 +94,13 @@ export const authService = {
 
       // Helper: check clinics table
       const checkClinicsTable = async () => {
-        const clinics = await DatabaseService.get('clinics') || [];
+        let clinics;
+        try {
+          clinics = await DatabaseService.get('clinics', { throwOnError: true }) || [];
+        } catch (readErr) {
+          console.error('ALERT: clinics read failed during login:', readErr?.message);
+          throw new Error(SERVER_UNREACHABLE);
+        }
         const clinicByEmail = clinics.find(c => (c.email || '').trim().toLowerCase() === normalizedEmail);
 
         if (clinicByEmail) {
@@ -121,7 +144,12 @@ export const authService = {
           .select('*')
           .eq('email', normalizedEmail);
 
-        if (!patientsError && patients && patients.length > 0) {
+        if (patientsError) {
+          console.error('ALERT: patients read failed during login:', patientsError?.message);
+          throw new Error(SERVER_UNREACHABLE);
+        }
+
+        if (patients && patients.length > 0) {
           let patient = null;
           for (const p of patients) {
             if (await comparePassword(password, p.password)) {
@@ -183,7 +211,13 @@ export const authService = {
 
       // PRIORITY 2: Check super admins — always check even if clinic password failed
       // (same email may be registered as both a clinic applicant and a super admin)
-      const superAdmins = await DatabaseService.get('superAdmins') || [];
+      let superAdmins;
+      try {
+        superAdmins = await DatabaseService.get('superAdmins', { throwOnError: true }) || [];
+      } catch (readErr) {
+        console.error('ALERT: superAdmins read failed during login:', readErr?.message);
+        throw new Error(SERVER_UNREACHABLE);
+      }
       const superAdminProfile = superAdmins.find(a => a.email === normalizedEmail && a.role === 'super_admin');
 
       if (superAdminProfile) {

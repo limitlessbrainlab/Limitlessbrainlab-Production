@@ -46,10 +46,10 @@ class DatabaseService {
   }
 
   // Generic CRUD operations
-  async get(table) {
+  async get(table, { throwOnError = false } = {}) {
     try {
       const actualTable = this.mapTableName(table);
-      const data = await this.supabaseService.get(actualTable);
+      const data = await this.supabaseService.get(actualTable, { throwOnError });
 
       // Ensure data is always an array
       if (!data) {
@@ -159,7 +159,9 @@ class DatabaseService {
       return Array.isArray(result) ? result : [];
     } catch (error) {
       console.error(`ERROR: Failed to get data from ${table}:`, error);
-      // Return empty array instead of throwing to prevent crashes
+      // Callers that need to tell a read failure apart from an empty table (login)
+      // opt in via throwOnError; everyone else keeps the crash-safe empty array.
+      if (throwOnError) throw error;
       return [];
     }
   }

@@ -185,8 +185,14 @@ class SupabaseService {
   }
 
   // Generic CRUD operations with demo fallback
-  async get(table) {
-    if (!this.isAvailable()) return [];
+  async get(table, { throwOnError = false } = {}) {
+    if (!this.isAvailable()) {
+      // Login relies on being able to tell "no matching row" apart from "could not
+      // read the table". When the caller asks, surface the unavailable client as an
+      // error instead of an empty result that reads as bad credentials.
+      if (throwOnError) throw new Error('Supabase client is not available');
+      return [];
+    }
 
     try {
       // Fetch all rows - Supabase defaults to 1000 row limit, use pagination for larger datasets
@@ -204,6 +210,9 @@ class SupabaseService {
 
         if (error) {
           console.error(`ERROR: Error fetching from ${table}:`, error);
+          // A read failure (e.g. a 401 from an expired session) must not be
+          // silently flattened to [] for callers that need to distinguish it.
+          if (throwOnError) throw error;
           return allData.length > 0 ? allData : [];
         }
 
@@ -219,6 +228,7 @@ class SupabaseService {
       return allData;
     } catch (error) {
       console.error(`ERROR: Error in get operation for ${table}:`, error);
+      if (throwOnError) throw error;
       return [];
     }
   }

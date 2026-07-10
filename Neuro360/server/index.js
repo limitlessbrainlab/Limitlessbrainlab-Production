@@ -1031,6 +1031,77 @@ app.post('/api/contact', async (req, res) => {
   }
 });
 
+// Clinic Request ("Request a Clinic" enquiry on the landing page) - PUBLIC (no auth).
+// The browser used to insert straight into clinic_enquiries with the anon key, but
+// that table's RLS blocks anonymous inserts, so every real submission failed with
+// "Failed to submit enquiry". Persist server-side (service-role key bypasses RLS)
+// and notify the admin — same pattern as /api/contact.
+app.post('/api/clinic-enquiry', async (req, res) => {
+  try {
+    const { name, email, phone, city, message } = req.body;
+
+    if (!name || !email || !city) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name, email, and city are required'
+      });
+    }
+
+    // Persist the lead server-side (best-effort: a DB hiccup must not stop the
+    // admin notification below).
+    if (supabase) {
+      const { error: dbError } = await supabase
+        .from('clinic_enquiries')
+        .insert([{ name, email, phone: phone || null, city, message: message || null, status: 'pending' }]);
+      if (dbError) console.error('clinic_enquiries insert failed:', dbError.message);
+    }
+
+    // Send success response (lead captured / notification underway)
+    res.json({
+      success: true,
+      message: 'Request received successfully'
+    });
+
+    // Send admin notification email
+    const mailOptions = {
+      from: EMAIL_FROM,
+      to: process.env.EMAIL_TO || process.env.EMAIL_USER,
+      subject: `Clinic Request - ${name}`,
+      html: getAdminNotificationHtml('Clinic Request', [
+        { label: 'Name', value: name },
+        { label: 'Email', value: email },
+        { label: 'Phone', value: phone || 'Not provided' },
+        { label: 'City / Region', value: city },
+        { label: 'Message', value: message || 'No message provided' }
+      ]),
+      attachments: getLogoAttachment()
+    };
+    emailTransporter.sendMail(mailOptions)
+      .catch((emailError) => console.error('Clinic request admin email failed:', emailError.message));
+
+    // Send confirmation email to user
+    const userConfirmation = {
+      from: EMAIL_FROM,
+      to: email,
+      subject: `Request Received - Limitless Brain Lab`,
+      html: getUserConfirmationHtml(name),
+      attachments: getFullAttachments()
+    };
+    emailTransporter.sendMail(userConfirmation)
+      .catch((err) => console.error('Clinic request user confirmation email failed:', err.message));
+
+  } catch (error) {
+    console.error('Error processing clinic enquiry:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to submit request',
+        error: error.message
+      });
+    }
+  }
+});
+
 // Claude API routes - auth handled per-route inside claudeRoutes
 app.use('/api', claudeRoutes);
 
@@ -1295,6 +1366,7 @@ app.get('/api/inquiries/:type', async (req, res) => {
 
     const tableMap = {
       'contact': 'contact_inquiries',
+      'clinic': 'clinic_enquiries',
       'partnership': 'franchise_inquiries',
       'professional': 'professional_onboarding',
       'program': 'program_inquiries',
@@ -1332,6 +1404,7 @@ app.delete('/api/inquiries/:type/:id', async (req, res) => {
 
     const tableMap = {
       'contact': 'contact_inquiries',
+      'clinic': 'clinic_enquiries',
       'partnership': 'franchise_inquiries',
       'professional': 'professional_onboarding',
       'program': 'program_inquiries'

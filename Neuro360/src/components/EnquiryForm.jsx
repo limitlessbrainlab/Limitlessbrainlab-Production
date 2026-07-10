@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { X, Send, MapPin, User, Mail, Phone, MessageSquare, CheckCircle, Sparkles } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
 import toast from 'react-hot-toast';
 import { countryCodes } from '../utils/countryCodes';
+import { getFriendlyErrorMessage } from '../utils/friendlyError';
+
+// API Configuration
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const EnquiryForm = ({ isOpen, onClose, initialLocation = '' }) => {
   const [formData, setFormData] = useState({
@@ -42,25 +45,24 @@ const EnquiryForm = ({ isOpen, onClose, initialLocation = '' }) => {
       setIsSubmitting(true);
       const fullPhone = formData.phone ? `${formData.countryCode} ${formData.phone}` : null;
 
-      const { data, error } = await supabase
-        .from('clinic_enquiries')
-        .insert([
-          {
-            name: formData.name.toUpperCase(),
-            email: formData.email,
-            phone: fullPhone,
-            city: formData.city.toUpperCase(),
-            message: formData.message ? formData.message.toUpperCase() : null,
-            status: 'pending',
-            created_at: new Date().toISOString(),
-          },
-        ])
-        .select();
+      // Submit to the backend, which persists the lead (service-role, bypasses RLS)
+      // and sends the admin + user emails. This replaces the browser-side Supabase
+      // insert that RLS (and ad-block/privacy filters) hard-failed for every visitor.
+      const response = await fetch(`${API_BASE_URL}/clinic-enquiry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name.toUpperCase(),
+          email: formData.email,
+          phone: fullPhone,
+          city: formData.city.toUpperCase(),
+          message: formData.message ? formData.message.toUpperCase() : null,
+        }),
+      });
 
-      if (error) {
-        console.error('Error saving enquiry:', error);
-        toast.error('Failed to submit enquiry. Please try again.');
-        return;
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw new Error((result && result.message) || `HTTP ${response.status}`);
       }
 
       setIsSuccess(true);
@@ -79,8 +81,8 @@ const EnquiryForm = ({ isOpen, onClose, initialLocation = '' }) => {
         onClose();
       }, 3000);
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Something went wrong. Please try again.');
+      console.error('Error submitting enquiry:', error);
+      toast.error(getFriendlyErrorMessage(error, 'Failed to submit enquiry. Please try again.'));
     } finally {
       setIsSubmitting(false);
     }

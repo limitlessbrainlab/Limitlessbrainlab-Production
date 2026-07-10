@@ -5,6 +5,7 @@ import {
   Users, Briefcase, Heart, BrainCircuit, X, Mail, User
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { WHATSAPP_URL } from '../config/whatsapp';
 import { getFriendlyErrorMessage } from '../utils/friendlyError';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -314,7 +315,7 @@ const NeuroCoaching = () => {
           </div>
           <div className="flex gap-2 sm:gap-3">
             <a
-              href="https://w.app/labchat"
+              href={WHATSAPP_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1 sm:flex-none px-3 sm:px-6 py-2 sm:py-3 bg-white text-[#323956] font-semibold rounded-lg sm:rounded-xl hover:bg-blue-50 transition-colors flex items-center justify-center text-xs sm:text-base"
@@ -497,7 +498,7 @@ const NeuroCoaching = () => {
                 </li>
               </ul>
               <button
-                onClick={() => window.open('https://w.app/protectmybrain', '_blank')}
+                onClick={() => window.open(WHATSAPP_URL, '_blank')}
                 className="w-full mt-4 py-2.5 border-2 border-[#323956] text-[#323956] dark:text-white dark:border-white font-semibold rounded-xl hover:bg-[#323956] hover:text-white dark:hover:bg-white dark:hover:text-gray-900 transition-colors text-sm"
               >
                 Inquire Now
@@ -539,7 +540,7 @@ const NeuroCoaching = () => {
                 </li>
               </ul>
               <button
-                onClick={() => window.open('https://w.app/protectmybrain', '_blank')}
+                onClick={() => window.open(WHATSAPP_URL, '_blank')}
                 className="w-full mt-4 py-2.5 bg-gradient-to-r from-[#323956] to-[#4a5578] text-white font-semibold rounded-xl hover:shadow-lg transition-all text-sm"
               >
                 Inquire Now

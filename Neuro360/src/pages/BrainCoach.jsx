@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { WHATSAPP_URL } from '../config/whatsapp';
 import { getFriendlyErrorMessage } from '../utils/friendlyError';
 import FeatureGate from '../components/access/FeatureGate';
 import {
@@ -789,16 +790,8 @@ const BrainCoach = () => {
 
   // Handle WhatsApp click
   const handleWhatsApp = (coach) => {
-    if (coach?.whatsapp || coach?.phone) {
-      const phone = (coach.whatsapp || coach.phone).replace(/[^0-9]/g, '');
-      const message = encodeURIComponent(
-        `Hi ${coach.name}, I found you on NeuroSense Brain Coach directory. I'm interested in scheduling a consultation. My name is ${user?.name || 'Patient'}.`
-      );
-      window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
-      toast.success('Opening WhatsApp...', { duration: 2000, icon: '💬' });
-    } else {
-      toast.error('WhatsApp number not available for this coach');
-    }
+    window.open(WHATSAPP_URL, '_blank');
+    toast.success('Opening WhatsApp...', { duration: 2000, icon: '💬' });
     setShowConnectModal(false);
   };
 
@@ -908,16 +901,8 @@ const BrainCoach = () => {
 
   // Handle direct book button via WhatsApp
   const handleDirectBook = (coach) => {
-    if (coach?.whatsapp || coach?.phone) {
-      const phone = (coach.whatsapp || coach.phone).replace(/[^0-9]/g, '');
-      const message = encodeURIComponent(
-        `Hi ${coach.name}, I found you on NeuroSense Brain Coach directory. I would like to book a consultation session. My name is ${user?.name || 'Patient'}. Please let me know your available slots.`
-      );
-      window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
-      toast.success('Opening WhatsApp to book...', { duration: 2000, icon: '📅' });
-    } else {
-      toast.error('WhatsApp number not available for this coach');
-    }
+    window.open(WHATSAPP_URL, '_blank');
+    toast.success('Opening WhatsApp to book...', { duration: 2000, icon: '📅' });
   };
 
   // Payment modal state
@@ -1504,13 +1489,7 @@ const BrainCoach = () => {
         )}
         {(clinic.whatsapp || clinic.phone) && (
           <button
-            onClick={() => {
-              const phone = (clinic.whatsapp || clinic.phone).replace(/[^0-9]/g, '');
-              const message = encodeURIComponent(
-                `Hi, I found your clinic on NeuroSense360. I would like to inquire about your services.`
-              );
-              window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
-            }}
+            onClick={() => window.open(WHATSAPP_URL, '_blank')}
             className="flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center space-x-1.5"
           >
             <MessageCircle className="h-4 w-4" />
@@ -2013,14 +1992,14 @@ const BrainCoach = () => {
             </div>
             <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
               <button
-                onClick={() => window.open('https://w.app/protectmybrain', '_blank')}
+                onClick={() => window.open(WHATSAPP_URL, '_blank')}
                 className="px-5 py-2.5 bg-white text-[#323956] font-semibold rounded-lg hover:bg-blue-50 transition-colors text-sm flex items-center gap-2"
               >
                 <Calendar className="h-4 w-4" />
                 Inquire Now
               </button>
               <button
-                onClick={() => window.open('https://w.app/labchat', '_blank')}
+                onClick={() => window.open(WHATSAPP_URL, '_blank')}
                 className="px-5 py-2.5 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-colors text-sm flex items-center gap-2"
               >
                 <UserCheck className="h-4 w-4" />

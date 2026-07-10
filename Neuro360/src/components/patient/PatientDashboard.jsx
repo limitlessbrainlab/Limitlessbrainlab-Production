@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { WHATSAPP_URL } from '../../config/whatsapp';
 import bookingService from '../../services/bookingService';
 import progressTrackingService from '../../services/progressTrackingService';
 import { supabase } from '../../lib/supabaseClient';
@@ -2307,7 +2308,7 @@ const PatientDashboard = () => {
               You can schedule your assessment directly through the platform{' '}
               <a href="https://www.limitlessbrainlab.com" target="_blank" rel="noopener noreferrer" className="text-[#323956] dark:text-blue-400 underline">www.limitlessbrainlab.com</a>{' '}
               or WhatsApp{' '}
-              <a href="https://w.app/protectmybrain" target="_blank" rel="noopener noreferrer" className="text-[#323956] dark:text-blue-400 underline">https://w.app/protectmybrain</a>.
+              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="text-[#323956] dark:text-blue-400 underline">Chat with us on WhatsApp</a>.
               Once scheduled, you will receive instructions for your EEG/qEEG scan, either at a center or via a guided setup. Our team will assist you throughout the process.
             </p>
           </div>
@@ -2449,7 +2450,7 @@ const PatientDashboard = () => {
             Connect with Neurosense Coach
           </button>
           <button
-            onClick={() => window.open('https://w.app/labchat', '_blank')}
+            onClick={() => window.open(WHATSAPP_URL, '_blank')}
             className="px-2 sm:px-4 py-1.5 sm:py-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 transition-colors text-sm flex items-center gap-1"
           >
             <MessageCircle className="h-4 w-4" />

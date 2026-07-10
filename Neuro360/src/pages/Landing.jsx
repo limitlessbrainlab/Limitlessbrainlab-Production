@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Brain, ShieldCheck, Users, Truck, ArrowDown, Menu, X, MapPin, Instagram, Linkedin, Youtube, Facebook, Heart, Droplets, Stethoscope, Dna, FlaskConical, Activity } from 'lucide-react';
+import { WHATSAPP_URL } from '../config/whatsapp';
 import toast from 'react-hot-toast';
 import { getFriendlyErrorMessage } from '../utils/friendlyError';
 import BrainParametersSlider from '../components/BrainParametersSlider';
@@ -661,7 +662,7 @@ const Landing = () => {
                       </div>
                     </button>
                     {/* WhatsApp Chat */}
-                    <a href="https://w.app/protectmybrain" target="_blank" rel="noopener noreferrer" className="relative hover:opacity-90 transition-all group block mt-6">
+                    <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="relative hover:opacity-90 transition-all group block mt-6">
                       <img src="/Gemini_Generated_Image_qhdn3cqhdn3cqhdn-removebg-preview.png" alt="Neuro Coach" className="absolute -top-6 left-2 h-[60px] w-[45px] sm:h-[80px] sm:w-[60px] object-cover object-top drop-shadow-lg z-10" />
                       <div className="bg-[#1a1a2e] rounded-full flex items-center justify-end px-4 py-3 shadow-lg pl-[50px] sm:pl-[75px]">
                         <p className="text-white text-xs font-bold leading-tight text-right mr-3">WhatsApp Chat</p>
@@ -785,7 +786,7 @@ const Landing = () => {
                       </div>
                     </button>
                     {/* WhatsApp Chat */}
-                    <a href="https://w.app/treatmybrain" target="_blank" rel="noopener noreferrer" className="relative hover:opacity-90 transition-all group block mt-6">
+                    <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="relative hover:opacity-90 transition-all group block mt-6">
                       <img src="/Gemini_Generated_Image_qhdn3cqhdn3cqhdn-removebg-preview.png" alt="Neurologist" className="absolute -top-6 left-2 h-[60px] w-[45px] sm:h-[80px] sm:w-[60px] object-cover object-top drop-shadow-lg z-10" />
                       <div className="bg-[#1a1a2e] rounded-full flex items-center justify-end px-4 py-3 shadow-lg pl-[50px] sm:pl-[75px]">
                         <p className="text-white text-xs font-bold leading-tight text-right mr-3">WhatsApp Chat</p>
@@ -925,7 +926,7 @@ const Landing = () => {
                       </div>
                     </button>
                     {/* WhatsApp Chat */}
-                    <a href="https://w.app/protectmybrain" target="_blank" rel="noopener noreferrer" className="relative hover:opacity-90 transition-all group block mt-6">
+                    <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="relative hover:opacity-90 transition-all group block mt-6">
                       <img src="/Gemini_Generated_Image_qhdn3cqhdn3cqhdn-removebg-preview.png" alt="Neuro Coach" className="absolute -top-6 left-2 h-[60px] w-[45px] sm:h-[80px] sm:w-[60px] object-cover object-top drop-shadow-lg z-10" />
                       <div className="bg-[#1a1a2e] rounded-full flex items-center justify-end px-4 py-3 shadow-lg pl-[50px] sm:pl-[75px]">
                         <p className="text-white text-xs font-bold leading-tight text-right mr-3">WhatsApp Chat</p>
@@ -1090,7 +1091,7 @@ const Landing = () => {
                       </div>
                     </button>
                     {/* WhatsApp Chat */}
-                    <a href="https://w.app/treatmybrain" target="_blank" rel="noopener noreferrer" className="relative hover:opacity-90 transition-all group block mt-6">
+                    <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="relative hover:opacity-90 transition-all group block mt-6">
                       <img src="/Gemini_Generated_Image_qhdn3cqhdn3cqhdn-removebg-preview.png" alt="Neurologist" className="absolute -top-6 left-2 h-[60px] w-[45px] sm:h-[80px] sm:w-[60px] object-cover object-top drop-shadow-lg z-10" />
                       <div className="bg-[#1a1a2e] rounded-full flex items-center justify-end px-4 py-3 shadow-lg pl-[50px] sm:pl-[75px]">
                         <p className="text-white text-xs font-bold leading-tight text-right mr-3">WhatsApp Chat</p>

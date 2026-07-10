@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { WHATSAPP_URL } from '../config/whatsapp';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -273,7 +274,7 @@ const Photobiomodulation = () => {
 
   // Open WhatsApp for Dr Roland
   const handleWhatsAppDrRoland = () => {
-    window.open('https://w.app/labchat', '_blank');
+    window.open(WHATSAPP_URL, '_blank');
     toast.success('Opening WhatsApp...', { icon: '💬' });
   };
 

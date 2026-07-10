@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { X, MapPin, Sparkles, Phone, RefreshCw } from 'lucide-react';
 import { useContactForm } from '../context/ContactFormContext';
 import LocationService from '../services/locationService';
+import { WHATSAPP_URL } from '../config/whatsapp';
 
 // Fallback locations used when DB fetch fails
 const WHATSAPP_NUMBER = '+919769696534';
-const WHATSAPP_LINK = `https://wa.me/919769696534`;
+const WHATSAPP_LINK = WHATSAPP_URL;
 
 const DEFAULT_CLINIC_LOCATIONS = [
   {

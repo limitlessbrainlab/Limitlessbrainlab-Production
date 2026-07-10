@@ -11,6 +11,7 @@ const {
   loginLimiter,
   uploadLimiter,
   emailLimiter,
+  reportEmailLimiter,
   paymentLimiter,
   reportLimiter,
   passwordResetLimiter
@@ -97,6 +98,7 @@ const setupRateLimiters = (app) => {
     loginLimiter,
     uploadLimiter,
     emailLimiter,
+    reportEmailLimiter,
     paymentLimiter,
     reportLimiter,
     passwordResetLimiter

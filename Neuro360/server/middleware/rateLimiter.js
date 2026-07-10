@@ -87,6 +87,25 @@ const emailLimiter = rateLimit({
 });
 
 /**
+ * Report email rate limiter
+ * 60 report emails per hour per user — report delivery is a core admin function and
+ * must NOT share the generic 5/hour email budget (which OTP/welcome/etc. also consume),
+ * otherwise sending several patients' reports in one sitting gets throttled to a 429.
+ */
+const reportEmailLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 60,
+  message: {
+    success: false,
+    error: 'Report email limit exceeded. Maximum 60 per hour',
+    code: 'REPORT_EMAIL_RATE_LIMIT_EXCEEDED'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || req.ip
+});
+
+/**
  * Payment processing rate limiter
  * 5 payments per hour per user
  */
@@ -142,6 +161,7 @@ module.exports = {
   loginLimiter,
   uploadLimiter,
   emailLimiter,
+  reportEmailLimiter,
   paymentLimiter,
   reportLimiter,
   passwordResetLimiter

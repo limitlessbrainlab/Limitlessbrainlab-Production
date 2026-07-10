@@ -316,6 +316,14 @@ const SERVER_VERSION = DEPLOY_SIGNATURE;
 // Outbound email "From" address (all emails to users/patients/clinics)
 const EMAIL_FROM = `"Limitless Brain Lab" <${process.env.EMAIL_FROM || 'info@limitlessbrainlab.com'}>`;
 
+// Canonical production URL for user-facing navigation/login links in emails.
+// Hardcoded on purpose: some backends set FRONTEND_URL to a stale *.vercel.app
+// deployment, and a login link pointing there sends clinics to old code that
+// rejects valid credentials with "Invalid email or password". Login/dashboard
+// CTAs must always land on production, independent of which backend sends the mail.
+// (Stripe success_url/cancel_url still use FRONTEND_URL — that is intentional.)
+const APP_URL = 'https://limitlessbrainlab.com';
+
 // Escape user-supplied values before interpolating into email HTML. Without this,
 // a typed password containing < > & or " renders corrupted in the mail client
 // (e.g. "Br@in<Lab>2026" shows as "Br@in2026"), so the recipient copies the wrong
@@ -460,7 +468,7 @@ const getAdminNotificationHtml = (formTitle, dataRows) => `
               </table>
               <p style="color: #555; font-size: 14px; line-height: 1.7; margin: 0 0 20px;">Please login to your portal to review and approve.</p>
               <div style="text-align: center; margin: 0 0 24px;">
-                <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/admin/login" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 36px; border-radius: 8px; font-weight: 600; font-size: 15px;">Login to Portal →</a>
+                <a href="${APP_URL}/admin/login" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 36px; border-radius: 8px; font-weight: 600; font-size: 15px;">Login to Portal →</a>
               </div>
               <p style="color: #555; font-size: 14px; margin: 0 0 4px;">Best regards,</p>
               <p style="color: #323956; font-size: 14px; font-weight: 600; margin: 0 0 2px;">Support Team,</p>
@@ -4050,7 +4058,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                         <!-- Access Button -->
                         <tr>
                           <td style="padding: 0 32px 24px;" align="center">
-                            <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/${isMeditationPurchase ? 'dashboard' : 'frequencies'}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                            <a href="${APP_URL}/${isMeditationPurchase ? 'dashboard' : 'frequencies'}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                               ${isMeditationPurchase ? 'Access Your Meditations' : 'Access Your Frequencies'}
                             </a>
                           </td>
@@ -4288,7 +4296,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
               </div>
               <p style="color: #555; font-size: 14px;">Your access to all features continues uninterrupted. Thank you for being part of the Limitless Brain Lab community.</p>
               <div style="text-align: center; margin-top: 24px;">
-                <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard" style="display: inline-block; background: #323956; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">Go to Dashboard</a>
+                <a href="${APP_URL}/dashboard" style="display: inline-block; background: #323956; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">Go to Dashboard</a>
               </div>
             </div>
             <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
@@ -4334,7 +4342,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
               </div>
               <p style="color: #555; font-size: 14px;">Common reasons for payment failure include expired card, insufficient funds, or card declined by your bank.</p>
               <div style="text-align: center; margin-top: 24px;">
-                <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard/subscription" style="display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">Update Payment Method</a>
+                <a href="${APP_URL}/dashboard/subscription" style="display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">Update Payment Method</a>
               </div>
             </div>
             <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
@@ -4707,7 +4715,7 @@ app.post('/api/clinic-credentials', async (req, res) => {
                   <!-- Login Button -->
                   <tr>
                     <td style="padding: 0 32px 24px;" align="center">
-                      <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic/login" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                      <a href="${APP_URL}/clinic/login" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                         Login to Your Clinic Portal
                       </a>
                     </td>
@@ -5042,7 +5050,7 @@ app.post('/api/registration-confirmation', async (req, res) => {
                     <!-- CTA Button -->
                     <tr>
                       <td style="padding: 0 32px 24px; text-align: center;">
-                        <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                        <a href="${APP_URL}/dashboard" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                           Go to My Dashboard
                         </a>
                       </td>
@@ -5394,7 +5402,7 @@ app.post('/api/send-24hr-reminder', async (req, res) => {
                   <!-- CTA Button -->
                   <tr>
                     <td style="padding: 0 32px 24px; text-align: center;">
-                      <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                      <a href="${APP_URL}/dashboard" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                         Explore Your Dashboard
                       </a>
                     </td>
@@ -5605,7 +5613,7 @@ app.put('/api/bookings/:id', async (req, res) => {
 
                           <!-- CTA Button -->
                           <div style="text-align: center; margin: 0 0 24px;">
-                            <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard/brain-coach" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
+                            <a href="${APP_URL}/dashboard/brain-coach" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
                               Book Your Next Session
                             </a>
                           </div>
@@ -6088,7 +6096,7 @@ app.post('/api/send-password-email', async (req, res) => {
             </div>
             <p style="color: #999; font-size: 12px;">If you did not make this change, please contact support immediately.</p>
             <div style="text-align: center; margin: 24px 0;">
-              <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/login" style="display: inline-block; background: #323956; color: #fff; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-weight: 600;">Login Now</a>
+              <a href="${APP_URL}/login" style="display: inline-block; background: #323956; color: #fff; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-weight: 600;">Login Now</a>
             </div>
           </div>
         </div>
@@ -7657,7 +7665,7 @@ app.post('/api/send-partner-welcome-email', async (req, res) => {
               </div>
             </div>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Access Partner Dashboard →</a>
+              <a href="${APP_URL}/clinic" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Access Partner Dashboard →</a>
             </div>
           </div>
           <div style="background: #f8fafc; padding: 18px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
@@ -7712,7 +7720,7 @@ app.post('/api/send-partner-payment-success', async (req, res) => {
               </table>
             </div>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Go to Dashboard</a>
+              <a href="${APP_URL}/clinic" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Go to Dashboard</a>
             </div>
           </div>
           <div style="background: #f8fafc; padding: 18px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
@@ -7808,7 +7816,7 @@ app.post('/api/send-partner-no-credit-alert', async (req, res) => {
               <p style="margin: 0; color: #C2410C; font-weight: 600; font-size: 14px;">Action Required: Purchase a report package</p>
             </div>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic/subscription" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Buy More Credits</a>
+              <a href="${APP_URL}/clinic/subscription" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Buy More Credits</a>
             </div>
           </div>
           <div style="background: #f8fafc; padding: 18px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
@@ -7862,7 +7870,7 @@ app.post('/api/send-partner-patient-welcome', async (req, res) => {
               </div>
             </div>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/patient/login" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Login Now →</a>
+              <a href="${APP_URL}/patient/login" style="display: inline-block; background: linear-gradient(135deg, #2E5BA8 0%, #1E3A5F 100%); color: white; text-decoration: none; padding: 13px 35px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(46, 91, 168, 0.4);">Login Now →</a>
             </div>
           </div>
           <div style="background: #f8fafc; padding: 18px 30px; text-align: center; border-top: 1px solid #e5e7eb;">

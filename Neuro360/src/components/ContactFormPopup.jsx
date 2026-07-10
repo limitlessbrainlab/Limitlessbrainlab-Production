@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Send, User, Mail, Phone, Globe, MessageSquare, CheckCircle, Sparkles, ChevronDown } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
 import toast from 'react-hot-toast';
-import { countryCodes } from '../utils/countryCodes';
+import { countryCodes, validatePhoneNumber, getCountryByCode } from '../utils/countryCodes';
 import LocationService, { DEFAULT_LOCATIONS } from '../services/locationService';
 import { getFriendlyErrorMessage } from '../utils/friendlyError';
 
@@ -164,6 +163,18 @@ const ContactFormPopup = ({ isOpen, onClose, source = null }) => {
       return;
     }
 
+    // Validate phone length for the selected country (India +91 = exactly 10 digits).
+    if (!validatePhoneNumber(formData.phone, formData.countryCode)) {
+      const country = getCountryByCode(formData.countryCode);
+      const digits = country
+        ? (country.minLength === country.maxLength
+            ? `${country.maxLength}-digit`
+            : `${country.minLength}-${country.maxLength} digit`)
+        : 'valid';
+      toast.error(`Please enter a ${digits} phone number`);
+      return;
+    }
+
     setIsSubmitting(true);
 
     const fullName = `${formData.firstName.toUpperCase()} ${formData.lastName.toUpperCase()}`.trim();
@@ -174,74 +185,30 @@ const ContactFormPopup = ({ isOpen, onClose, source = null }) => {
       // Only treat source as data when it's a real string. Some callers pass the
       // click event (onClick={openContactForm}); ignore those.
       const cleanSource = typeof source === 'string' && source.trim() ? source.trim() : null;
-      const rawMessage = formData.message ? formData.message.toUpperCase() : null;
 
-      // Save to Supabase database — this is the source of truth for capturing
-      // the lead. If this succeeds, the inquiry is recorded.
-      const baseRow = {
-        name: fullName,
-        email: formData.email,
-        phone: fullPhone,
-        city: selectedCity,
-        message: rawMessage,
-      };
+      // Submit to the backend, which is the source of truth: it persists the lead
+      // (service-role, bypasses RLS) and sends the admin + user emails. This removes
+      // the fragile browser-side Supabase insert that ad-block/privacy filters could
+      // block and that was hard-failing the whole submission.
+      const response = await fetch(`${API_BASE_URL}/contact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firstName: formData.firstName.toUpperCase(),
+          lastName: formData.lastName.toUpperCase(),
+          email: formData.email,
+          phone: fullPhone,
+          city: selectedCity,
+          message: formData.message ? formData.message.toUpperCase() : '',
+          source: cleanSource
+        })
+      });
 
-      let { error: dbError } = await supabase
-        .from('contact_inquiries')
-        .insert([{ ...baseRow, source: cleanSource }]);
-
-      // Some databases don't yet have the `source` column. Rather than failing
-      // the whole lead capture, retry without the column. (PostgREST returns
-      // PGRST204 / "could not find the 'source' column" when it's missing.)
-      // To avoid losing the source, fold it into the message as a tag the admin
-      // view parses back out — see WebsiteInquiries `extractSource`.
-      const isMissingSourceColumn =
-        dbError &&
-        (dbError.code === 'PGRST204' ||
-          (/source/i.test(dbError.message || '') && /column|schema cache/i.test(dbError.message || '')));
-
-      if (isMissingSourceColumn) {
-        console.warn('contact_inquiries.source column missing — folding source into message.');
-        const taggedMessage = cleanSource
-          ? `[source:${cleanSource}]${rawMessage ? ` ${rawMessage}` : ''}`
-          : rawMessage;
-        ({ error: dbError } = await supabase
-          .from('contact_inquiries')
-          .insert([{ ...baseRow, message: taggedMessage }]));
-      }
-
-      if (dbError) {
-        console.error('Database error:', dbError);
-        throw new Error('Failed to save your message. Please try again.');
-      }
-
-      // Send email notification via backend nodemailer API. This is best-effort:
-      // the inquiry is already saved above, so a failure here (backend down,
-      // network blip, non-JSON response) must NOT tell the user their message
-      // failed — the backend itself sends email fire-and-forget.
-      try {
-        const response = await fetch(`${API_BASE_URL}/contact`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            firstName: formData.firstName.toUpperCase(),
-            lastName: formData.lastName.toUpperCase(),
-            email: formData.email,
-            phone: fullPhone,
-            city: selectedCity,
-            message: formData.message ? formData.message.toUpperCase() : '',
-            source
-          })
-        });
-
-        if (!response.ok) {
-          const result = await response.json().catch(() => null);
-          console.error('Email notification failed:', result || `HTTP ${response.status}`);
-        }
-      } catch (emailError) {
-        console.error('Email notification request failed:', emailError);
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw new Error((result && result.message) || `HTTP ${response.status}`);
       }
 
       setIsSuccess(true);
@@ -424,11 +391,17 @@ const ContactFormPopup = ({ isOpen, onClose, source = null }) => {
                     />
                     <input
                       type="tel"
+                      inputMode="numeric"
                       name="phone"
                       value={formData.phone}
-                      onChange={handleInputChange}
+                      onChange={(e) => {
+                        const max = getCountryByCode(formData.countryCode)?.maxLength || 10;
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, max);
+                        setFormData(prev => ({ ...prev, phone: digits }));
+                      }}
                       onFocus={() => setFocusedField('phone')}
                       onBlur={() => setFocusedField(null)}
+                      maxLength={getCountryByCode(formData.countryCode)?.maxLength || 10}
                       placeholder="98765 43210"
                       className="flex-1 min-w-0 h-11 sm:h-12 px-3 sm:px-4 bg-white border-2 border-gray-200 rounded-lg sm:rounded-xl text-base focus:ring-0 focus:border-[#323956] focus:shadow-lg focus:shadow-[#323956]/10 transition-all duration-200 placeholder-gray-400"
                       required

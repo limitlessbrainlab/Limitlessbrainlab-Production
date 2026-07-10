@@ -6,7 +6,7 @@ import Footer from '../components/Footer';
 import toast from 'react-hot-toast';
 import { getFriendlyErrorMessage } from '../utils/friendlyError';
 import { supabase } from '../lib/supabaseClient';
-import { countryCodes } from '../utils/countryCodes';
+import { countryCodes, validatePhoneNumber, getCountryByCode } from '../utils/countryCodes';
 import LocationService, { DEFAULT_LOCATIONS } from '../services/locationService';
 
 // API Base URL for backend email
@@ -165,56 +165,46 @@ const NeurosenseBooking = () => {
       return;
     }
 
+    // Validate phone length for the selected country (India +91 = exactly 10 digits).
+    if (!validatePhoneNumber(formData.phone, formData.countryCode)) {
+      const country = getCountryByCode(formData.countryCode);
+      const digits = country
+        ? (country.minLength === country.maxLength
+            ? `${country.maxLength}-digit`
+            : `${country.minLength}-${country.maxLength} digit`)
+        : 'valid';
+      toast.error(`Please enter a ${digits} phone number`);
+      return;
+    }
+
     setIsSubmitting(true);
 
     const fullName = `${formData.firstName.toUpperCase()} ${formData.lastName.toUpperCase()}`.trim();
     const fullPhone = `${formData.countryCode} ${formData.phone}`;
 
     try {
-      // Save to Supabase database
-      const { error: dbError } = await supabase
-        .from('contact_inquiries')
-        .insert([
-          {
-            name: fullName,
-            email: formData.email,
-            phone: fullPhone,
-            city: formData.city,
-            message: formData.message ? formData.message.toUpperCase() : null
-          }
-        ]);
+      // Submit to the backend, which is the source of truth: it persists the lead
+      // (service-role, bypasses RLS) and sends the admin + user emails. This removes
+      // the fragile browser-side Supabase insert that could reject and hard-fail the
+      // whole submission.
+      const response = await fetch(`${API_BASE_URL}/contact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firstName: formData.firstName.toUpperCase(),
+          lastName: formData.lastName.toUpperCase(),
+          email: formData.email,
+          phone: fullPhone,
+          city: formData.city,
+          message: formData.message ? formData.message.toUpperCase() : ''
+        })
+      });
 
-      if (dbError) {
-        console.error('Database error:', dbError);
-        // Continue with email even if DB fails
-      }
-
-      // Send email via backend API (nodemailer)
-      try {
-        const emailResponse = await fetch(`${API_BASE_URL}/contact`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            firstName: formData.firstName.toUpperCase(),
-            lastName: formData.lastName.toUpperCase(),
-            email: formData.email,
-            phone: fullPhone,
-            city: formData.city,
-            message: formData.message ? formData.message.toUpperCase() : ''
-          })
-        });
-
-        const emailResult = await emailResponse.json();
-
-        if (emailResult.success) {
-        } else {
-          console.error('Email error:', emailResult.message);
-        }
-      } catch (emailError) {
-        console.error('Email notification failed:', emailError);
-        // Don't fail the whole submission if email fails
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw new Error((result && result.message) || `HTTP ${response.status}`);
       }
 
       toast.success('Message sent successfully! We will contact you soon.');
@@ -229,7 +219,7 @@ const NeurosenseBooking = () => {
       });
     } catch (error) {
       console.error('Error sending message:', error);
-      toast.error('Failed to send message. Please try again.');
+      toast.error(getFriendlyErrorMessage(error, 'Failed to send message. Please try again.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -686,9 +676,15 @@ const NeurosenseBooking = () => {
                   </select>
                   <input
                     type="tel"
+                    inputMode="numeric"
                     name="phone"
                     value={formData.phone}
-                    onChange={handleInputChange}
+                    onChange={(e) => {
+                      const max = getCountryByCode(formData.countryCode)?.maxLength || 10;
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, max);
+                      setFormData(prev => ({ ...prev, phone: digits }));
+                    }}
+                    maxLength={getCountryByCode(formData.countryCode)?.maxLength || 10}
                     placeholder="98765 43210"
                     required
                     className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#323956]/20 focus:border-[#323956] outline-none transition-all uppercase"

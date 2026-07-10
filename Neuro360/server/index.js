@@ -951,7 +951,19 @@ app.post('/api/contact', async (req, res) => {
     const isProtectMyBrain = source === 'protect-my-brain';
     const isTreatMyBrain = source === 'treat-my-brain';
 
-    // Send success response immediately
+    // Persist the lead server-side (service-role key bypasses RLS) — this is the
+    // source of truth for the inquiry, so it no longer depends on a browser-side
+    // anon insert that can be blocked by ad-block/privacy filters or a network reject.
+    // Best-effort: a DB hiccup must not stop the admin notification below.
+    if (supabase) {
+      const cleanSource = typeof source === 'string' && source.trim() ? source.trim() : null;
+      const { error: dbError } = await supabase
+        .from('contact_inquiries')
+        .insert([{ name: fullName, email, phone, city, message: message || null, source: cleanSource }]);
+      if (dbError) console.error('contact_inquiries insert failed:', dbError.message);
+    }
+
+    // Send success response (lead captured / notification underway)
     res.json({
       success: true,
       message: 'Message received successfully'

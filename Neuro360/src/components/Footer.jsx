@@ -28,9 +28,12 @@ const Footer = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    const nextValue = name === 'contact_number'
+      ? value.replace(/\D/g, '').slice(0, 10)
+      : value;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: nextValue
     }));
   };
 
@@ -40,6 +43,11 @@ const Footer = () => {
     // Validate form
     if (!formData.email.trim() || !formData.contact_number.trim()) {
       toast.error('Please fill in all fields');
+      return;
+    }
+
+    if (!/^\d{10}$/.test(formData.contact_number.trim())) {
+      toast.error('Please enter a valid 10-digit phone number');
       return;
     }
 
@@ -233,10 +241,10 @@ const Footer = () => {
                     onChange={handleInputChange}
                     className="w-[108px] sm:w-28 px-1 sm:px-2 py-2.5 bg-gray-800 text-white rounded-lg text-[10px] sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#F5D05D] transition-all flex-shrink-0"
                   >
+                    <option value="+91">🇮🇳+91</option>
                     <option value="+971">🇦🇪+971</option>
                     <option value="+1">🇺🇸+1</option>
                     <option value="+44">🇬🇧+44</option>
-                    <option value="+91">🇮🇳+91</option>
                     <option value="+966">🇸🇦+966</option>
                     <option value="+974">🇶🇦+974</option>
                     <option value="+965">🇰🇼+965</option>
@@ -251,10 +259,12 @@ const Footer = () => {
                   </select>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
                     name="contact_number"
                     value={formData.contact_number}
                     onChange={handleInputChange}
-                    placeholder="Contact number"
+                    placeholder="9876543210"
                     className="flex-1 min-w-0 px-3 py-2.5 bg-gray-800 text-white rounded-lg text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#F5D05D] transition-all"
                     required
                   />

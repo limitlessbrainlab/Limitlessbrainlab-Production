@@ -23,6 +23,11 @@ const DemoReportPopup = ({ isOpen, onClose }) => {
       return;
     }
 
+    if (!/^\d{10}$/.test(phone)) {
+      toast.error('Please enter a valid 10-digit phone number');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const fullPhone = `${countryCode} ${phone}`;
@@ -111,9 +116,11 @@ const DemoReportPopup = ({ isOpen, onClose }) => {
               </select>
               <input
                 type="tel"
+                inputMode="numeric"
+                maxLength={10}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="50 123 4567"
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                placeholder="9876543210"
                 required
                 className="flex-1 min-w-0 px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#323956] focus:border-transparent"
               />

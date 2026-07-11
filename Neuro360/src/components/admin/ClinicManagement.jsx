@@ -533,11 +533,34 @@ const ClinicManagement = ({ onUpdate }) => {
       }
 
       const editPassword = data.editPassword?.trim();
-      const hashedPassword = editPassword ? await hashPassword(editPassword) : undefined;
       const normalizedEmail = data.email.trim().toLowerCase();
 
       // Check if email has changed
       const emailChanged = (selectedClinic?.email || '').trim().toLowerCase() !== normalizedEmail;
+
+      // Resolve the plaintext password to show in the email-update mail. Priority:
+      //  1) a password the admin just typed,
+      //  2) the clinic's stored plaintext,
+      //  3) (legacy clinics with neither, only when the email actually changed) a freshly
+      //     generated one — bcrypt hashes can't be reversed, so we can't recover their old
+      //     password; issue a new one so the email always carries working credentials. The
+      //     email change already force-logs-out the clinic, so they sign in with this one.
+      let passwordForEmail = editPassword || selectedClinic?.plain_password || '';
+      let hashedPassword = editPassword ? await hashPassword(editPassword) : undefined;
+      let plainToStore = editPassword || undefined;
+
+      if (emailChanged && !passwordForEmail) {
+        const generateSecurePassword = () => {
+          const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$';
+          let pwd = '';
+          for (let i = 0; i < 12; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+          return pwd;
+        };
+        const generated = generateSecurePassword();
+        passwordForEmail = generated;
+        hashedPassword = await hashPassword(generated);
+        plainToStore = generated;
+      }
 
       // Keep country code and phone separate
       const updateData = {
@@ -555,7 +578,7 @@ const ClinicManagement = ({ onUpdate }) => {
         // contract_agreed not saved — column not yet in DB
         password: hashedPassword || undefined,
         // Keep plaintext in sync so the credential emails always show the real current password
-        plain_password: editPassword || undefined,
+        plain_password: plainToStore,
         passwordResetAt: hashedPassword ? new Date().toISOString() : undefined,
         // Bump on email OR password change so the clinic's open session is force-logged-out
         credentials_updated_at: (emailChanged || hashedPassword) ? new Date().toISOString() : undefined
@@ -575,13 +598,15 @@ const ClinicManagement = ({ onUpdate }) => {
             partnerName: data.name,
             oldEmail: selectedClinic?.email || '',
             newEmail: normalizedEmail,
-            password: editPassword || selectedClinic?.plain_password || ''
+            password: passwordForEmail
           })
         }).catch(err => console.error('Failed to send clinic email update notification:', err));
       }
 
-      if (hashedPassword) {
-        // Send new credentials to clinic email
+      if (editPassword) {
+        // Admin explicitly set a new password — send it via the dedicated credentials email.
+        // (A generated password on an email-only edit is delivered by send-partner-email-update
+        // above, so we must NOT fall in here for that path.)
         try {
           await sendCredentialsEmail(
             { name: data.name, email: normalizedEmail, contactPerson: data.contactPerson || data.name },

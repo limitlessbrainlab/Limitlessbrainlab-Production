@@ -3,7 +3,7 @@ import {
   CreditCard,
   Download,
   Calendar,
-  DollarSign,
+  Banknote,
   FileText,
   Clock,
   CheckCircle,
@@ -203,7 +203,7 @@ const PaymentHistory = ({ clinicId }) => {
     if (currency === 'INR') {
       return `₹${amount?.toLocaleString() || 0}`;
     }
-    return `$${amount?.toLocaleString() || 0}`;
+    return `USD ${amount?.toLocaleString() || 0}`;
   };
 
   // Handle viewing detailed transaction history
@@ -290,7 +290,7 @@ const PaymentHistory = ({ clinicId }) => {
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div className="flex items-center">
             <div className="p-3 bg-green-100 rounded-full">
-              <DollarSign className="h-6 w-6 text-green-600" />
+              <Banknote className="h-6 w-6 text-green-600" />
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Spent</p>

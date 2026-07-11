@@ -355,7 +355,7 @@ const AgreementManager = () => {
                     <div className="text-sm">
                       <span className="text-[#323956] font-medium">Yes</span>
                       <span className="text-gray-500 ml-1">
-                        (${agreement.cobrandingFee}/mo)
+                        (USD {agreement.cobrandingFee}/mo)
                       </span>
                     </div>
                   ) : (

@@ -183,8 +183,8 @@ const Pricing = () => {
                 {/* Price & CTA */}
                 <div className="pt-4 border-t border-gray-100 mt-auto">
                   <div className="flex items-baseline gap-2 mb-3">
-                    <span className="text-gray-400 line-through text-sm">${bundles[0].originalPrice.usd}</span>
-                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#323956]">${bundles[0].salePrice.usd}</span>
+                    <span className="text-gray-400 line-through text-sm">USD {bundles[0].originalPrice.usd}</span>
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-[#323956]">USD {bundles[0].salePrice.usd}</span>
                   </div>
                   <button
                     onClick={openContactForm}
@@ -235,8 +235,8 @@ const Pricing = () => {
                 {/* Price & CTA */}
                 <div className="pt-4 border-t border-white/10 mt-auto">
                   <div className="flex items-baseline gap-2 mb-3">
-                    <span className="text-white/40 line-through text-sm">${bundles[1].originalPrice.usd}</span>
-                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">${bundles[1].salePrice.usd}</span>
+                    <span className="text-white/40 line-through text-sm">USD {bundles[1].originalPrice.usd}</span>
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">USD {bundles[1].salePrice.usd}</span>
                   </div>
                   <button
                     onClick={openContactForm}
@@ -283,8 +283,8 @@ const Pricing = () => {
                 {/* Price & CTA */}
                 <div className="pt-4 border-t border-white/10 mt-auto">
                   <div className="flex items-baseline gap-2 mb-3">
-                    <span className="text-white/40 line-through text-sm">${bundles[2].originalPrice.usd}</span>
-                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">${bundles[2].salePrice.usd}</span>
+                    <span className="text-white/40 line-through text-sm">USD {bundles[2].originalPrice.usd}</span>
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">USD {bundles[2].salePrice.usd}</span>
                   </div>
                   <button
                     onClick={openContactForm}
@@ -350,8 +350,8 @@ const Pricing = () => {
                 <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
                   <div>
                     <div className="flex items-baseline gap-1.5">
-                      <span className="text-gray-400 line-through text-xs">${service.originalPrice.usd}</span>
-                      <span className="text-lg font-bold text-[#323956]">${service.salePrice.usd}</span>
+                      <span className="text-gray-400 line-through text-xs">USD {service.originalPrice.usd}</span>
+                      <span className="text-lg font-bold text-[#323956]">USD {service.salePrice.usd}</span>
                     </div>
                     <div className="text-[10px] text-gray-400">
                       AED {service.salePrice.aed} | INR {service.salePrice.inr}

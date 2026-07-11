@@ -132,7 +132,7 @@ export default function CoachBooking({ coach, onBookingComplete, onCancel }: Coa
                       <div className="text-sm text-gray-600">{pricing.duration} minutes</div>
                     </div>
                     <div className="text-lg font-semibold text-brain-600">
-                      ${pricing.price}
+                      USD {pricing.price}
                     </div>
                   </div>
                 </button>
@@ -224,7 +224,7 @@ export default function CoachBooking({ coach, onBookingComplete, onCancel }: Coa
                 <div>Time: {formatTime(selectedSlot.datetime)}</div>
                 <div>Duration: {selectedSlot.duration} minutes</div>
                 <div className="font-medium text-brain-600">
-                  Total: ${coach.pricing.find(p => p.sessionType === selectedSessionType)?.price}
+                  Total: USD {coach.pricing.find(p => p.sessionType === selectedSessionType)?.price}
                 </div>
               </div>
             </div>

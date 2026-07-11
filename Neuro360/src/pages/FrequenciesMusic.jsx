@@ -58,7 +58,7 @@ const FrequenciesMusic = () => {
   // Currency and pricing configuration by country
   const currencyConfig = {
     IN: { currency: 'INR', symbol: '₹', packPrice: 399, originalPrice: 699 },
-    US: { currency: 'USD', symbol: '$', packPrice: 29, originalPrice: 49 },
+    US: { currency: 'USD', symbol: 'USD ', packPrice: 29, originalPrice: 49 },
     GB: { currency: 'GBP', symbol: '£', packPrice: 24, originalPrice: 39 },
     AE: { currency: 'AED', symbol: 'AED ', packPrice: 99, originalPrice: 179 },
     EU: { currency: 'EUR', symbol: '€', packPrice: 27, originalPrice: 45 },
@@ -223,7 +223,7 @@ const FrequenciesMusic = () => {
     setPurchasedPackId(pId);
     setPurchasedPacks(prev => [...new Set([...prev, pId])]);
     setPaymentSuccessDetails({
-      name: packName, amount: `$${amount} USD`, email: user?.email || '',
+      name: packName, amount: `USD ${amount}`, email: user?.email || '',
       date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       transactionId: sId || 'N/A'
@@ -853,8 +853,8 @@ const FrequenciesMusic = () => {
                     ) : (
                       <>
                         <div className="flex items-center space-x-1.5 sm:space-x-2 mb-1.5 sm:mb-2">
-                          <span className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white">${pack.price}</span>
-                          <span className="text-[10px] sm:text-sm text-gray-400 line-through">${pack.originalPrice}</span>
+                          <span className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white">USD {pack.price}</span>
+                          <span className="text-[10px] sm:text-sm text-gray-400 line-through">USD {pack.originalPrice}</span>
                         </div>
                         <button
                           onClick={() => handlePurchase(pack.id, pack.name, pack.price)}
@@ -1171,8 +1171,8 @@ const FrequenciesMusic = () => {
                   <h3 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base">{selectedPack.name} Binaural Beats</h3>
                   <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">{selectedPack.frequency} · {selectedPack.category}</p>
                   <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-gray-400 line-through text-xs">${selectedPack.originalPrice}</span>
-                    <span className="text-lg sm:text-xl font-bold text-purple-600">${selectedPack.price}</span>
+                    <span className="text-gray-400 line-through text-xs">USD {selectedPack.originalPrice}</span>
+                    <span className="text-lg sm:text-xl font-bold text-purple-600">USD {selectedPack.price}</span>
                   </div>
                 </div>
               </div>
@@ -1228,7 +1228,7 @@ const FrequenciesMusic = () => {
                     Processing...
                   </>
                 ) : (
-                  <>Pay ${selectedPack.price} & Unlock</>
+                  <>Pay USD {selectedPack.price} & Unlock</>
                 )}
               </button>
             </div>

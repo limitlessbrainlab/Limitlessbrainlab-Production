@@ -247,7 +247,7 @@ class NotificationService {
       type: 'success',
       category: 'payment',
       title: 'Payment Received',
-      message: `Payment of $${amount} received from ${patientName || clinicName || 'user'} for ${planName || 'subscription'}.`,
+      message: `Payment of USD ${amount} received from ${patientName || clinicName || 'user'} for ${planName || 'subscription'}.`,
       clinicName,
       patientName,
       action: 'view_payment'

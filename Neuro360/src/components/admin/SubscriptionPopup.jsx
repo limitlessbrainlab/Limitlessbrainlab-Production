@@ -67,10 +67,10 @@ const SubscriptionPopup = ({ isOpen, onClose, clinicId, currentUsage, onSubscrib
       if (data.country_code === 'IN') {
         setUserCurrency({ currency: 'INR', symbol: '₹' });
       } else {
-        setUserCurrency({ currency: 'USD', symbol: '$' });
+        setUserCurrency({ currency: 'USD', symbol: 'USD ' });
       }
     } catch {
-      setUserCurrency({ currency: 'USD', symbol: '$' });
+      setUserCurrency({ currency: 'USD', symbol: 'USD ' });
     }
   };
 

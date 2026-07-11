@@ -404,7 +404,7 @@ const PatientSubscriptions = () => {
                           {payment.payment_type === 'subscription' ? `${(payment.tier || 'Plan').toUpperCase()} Subscription` : payment.payment_type || 'Payment'}
                         </span>
                         <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                          ${(payment.amount || 0).toFixed(2)} {payment.currency || 'USD'}
+                          {payment.currency || 'USD'} {(payment.amount || 0).toFixed(2)}
                         </span>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">

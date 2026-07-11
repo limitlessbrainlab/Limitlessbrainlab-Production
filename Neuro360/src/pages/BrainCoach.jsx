@@ -103,7 +103,7 @@ const BrainCoach = () => {
     const numericAmount = Number(paidAmount);
     const hasAmount = Number.isFinite(numericAmount) && numericAmount > 0;
     const currencyCode = (paidCurrency || 'inr').toLowerCase();
-    const currencySymbol = currencyCode === 'inr' ? '₹' : '$';
+    const currencySymbol = currencyCode === 'inr' ? '₹' : 'USD ';
     const formattedAmount = hasAmount
       ? `${currencySymbol}${numericAmount.toLocaleString('en-IN')}`
       : '—';
@@ -294,9 +294,9 @@ const BrainCoach = () => {
   const getCurrencySymbol = (country) => {
     const currencyMap = {
       'india': '₹',
-      'usa': '$',
-      'us': '$',
-      'united states': '$',
+      'usa': 'USD ',
+      'us': 'USD ',
+      'united states': 'USD ',
       'uae': 'AED ',
       'dubai': 'AED ',
       'united arab emirates': 'AED ',

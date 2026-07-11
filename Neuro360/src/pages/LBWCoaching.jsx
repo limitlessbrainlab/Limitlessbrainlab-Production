@@ -76,7 +76,7 @@ const LBWCoaching = () => {
       title: 'Brain Coaching',
       icon: '',
       description: 'Focus enhancement, executive function, and cognitive performance optimization.',
-      price: 'Starting at $80/session',
+      price: 'Starting at USD 80/session',
       color: 'blue'
     },
     {
@@ -84,7 +84,7 @@ const LBWCoaching = () => {
       title: 'Nervous System Coaching',
       icon: '',
       description: 'Stress regulation, trauma recovery, and nervous system optimization.',
-      price: 'Starting at $90/session',
+      price: 'Starting at USD 90/session',
       color: 'green'
     },
     {
@@ -92,7 +92,7 @@ const LBWCoaching = () => {
       title: 'qEEG Consultation',
       icon: '',
       description: 'Brain mapping analysis and neurofeedback treatment planning.',
-      price: 'Starting at $150/session',
+      price: 'Starting at USD 150/session',
       color: 'purple'
     }
   ];
@@ -292,7 +292,7 @@ const LBWCoaching = () => {
                     <div className="border-t border-gray-100 pt-4">
                       <div className="flex items-center justify-between mb-3">
                         <div>
-                          <p className="text-2xl font-bold text-gray-900">${coach.price}</p>
+                          <p className="text-2xl font-bold text-gray-900">USD {coach.price}</p>
                           <p className="text-xs text-gray-500">per session</p>
                         </div>
                         <div className="text-right">

@@ -1,4 +1,4 @@
-import { Building2, FileText, DollarSign } from 'lucide-react';
+import { Building2, FileText, Banknote } from 'lucide-react';
 
 // Convert a real timestamp into a short relative-time label (e.g. "5 minutes
 // ago"). Guards against missing/invalid dates by returning "".
@@ -82,7 +82,7 @@ export const buildRecentActivities = (allClinics = [], allReports = [], allPayme
       message: `Payment of ₹${payment.amount} received from ${clinic ? clinic.name : 'Unknown Clinic'}`,
       createdAt: payment.createdAt,
       time: timeAgo(payment.createdAt),
-      icon: DollarSign,
+      icon: Banknote,
       color: 'purple'
     });
   });

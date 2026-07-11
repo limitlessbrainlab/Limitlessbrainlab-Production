@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  TrendingUp, DollarSign, Users, FileText, Calendar,
+  TrendingUp, Banknote, Users, FileText, Calendar,
   BarChart3, PieChart, Download, Filter, RefreshCw,
   Target, Award, Clock, AlertTriangle
 } from 'lucide-react';
@@ -268,13 +268,13 @@ const AdvancedAnalytics = ({ clinicId, clinic }) => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Revenue</p>
-              <p className="text-2xl font-bold text-gray-900">${analyticsData.revenue.total.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-gray-900">USD {analyticsData.revenue.total.toLocaleString()}</p>
               <p className="text-sm text-[#323956] flex items-center gap-1">
                 <TrendingUp className="h-3 w-3" />
-                +${analyticsData.revenue.period.toLocaleString()} this period
+                +USD {analyticsData.revenue.period.toLocaleString()} this period
               </p>
             </div>
-            <DollarSign className="h-8 w-8 text-purple-600" />
+            <Banknote className="h-8 w-8 text-purple-600" />
           </div>
         </div>
 

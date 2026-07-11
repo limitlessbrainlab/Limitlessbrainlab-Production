@@ -76,7 +76,7 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
       if (data.country_code === 'IN') {
         setUserCurrency({ currency: 'INR', symbol: '\u20b9' });
       } else {
-        setUserCurrency({ currency: 'USD', symbol: '$' });
+        setUserCurrency({ currency: 'USD', symbol: 'USD ' });
       }
     } catch {
       setUserCurrency({ currency: 'INR', symbol: '\u20b9' });

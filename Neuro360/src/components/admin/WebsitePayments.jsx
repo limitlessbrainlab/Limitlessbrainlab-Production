@@ -6,7 +6,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  DollarSign,
+  Banknote,
   Mail,
   Calendar,
   CreditCard,
@@ -148,7 +148,7 @@ const WebsitePayments = () => {
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-green-600 dark:text-green-400" />
+              <Banknote className="w-5 h-5 text-green-600 dark:text-green-400" />
             </div>
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400">Total Revenue</p>
@@ -333,7 +333,7 @@ const WebsitePayments = () => {
                 { icon: CreditCard, label: 'Type', value: selectedItem.type },
                 { icon: CreditCard, label: 'Product', value: selectedItem.product },
                 { icon: Mail, label: 'Email', value: selectedItem.email },
-                { icon: DollarSign, label: 'Amount', value: formatAmount(selectedItem.amount, selectedItem.currency) },
+                { icon: Banknote, label: 'Amount', value: formatAmount(selectedItem.amount, selectedItem.currency) },
                 { icon: CreditCard, label: 'Status', value: selectedItem.status },
                 { icon: CreditCard, label: 'Stripe Session', value: selectedItem.stripe_session_id },
               ].map((row, i) => {

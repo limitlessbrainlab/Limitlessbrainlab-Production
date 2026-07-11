@@ -55,7 +55,7 @@ class PaymentGatewayService {
       const defaultLocation = {
         country: 'US',
         currency: 'USD',
-        symbol: '$',
+        symbol: 'USD ',
         multiplier: 1,
         timestamp: Date.now()
       };
@@ -151,12 +151,18 @@ class PaymentGatewayService {
 
   // Format price for display
   formatPrice(amount, currency) {
-    const location = this.userLocation || { symbol: '$' };
+    const location = this.userLocation || { symbol: 'USD ' };
+    const resolvedCurrency = currency || location.currency || 'USD';
+
+    // US dollars must display as "USD 12.34", never the "$" icon
+    if (resolvedCurrency === 'USD') {
+      return `USD ${amount}`;
+    }
 
     try {
       return new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency: currency || location.currency || 'USD'
+        currency: resolvedCurrency
       }).format(amount);
     } catch {
       return `${location.symbol}${amount}`;

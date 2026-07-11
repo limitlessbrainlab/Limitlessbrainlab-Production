@@ -95,6 +95,9 @@ const LocationService = {
         .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+        return { success: false, error: 'No rows updated — check permissions.' };
+      }
       this.clearCache();
       return { success: true, data: data[0] };
     } catch (error) {
@@ -106,12 +109,16 @@ const LocationService = {
   // Delete a location
   async deleteLocation(id) {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('preferred_locations')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+        return { success: false, error: 'No rows deleted — check permissions.' };
+      }
       this.clearCache();
       return { success: true };
     } catch (error) {
@@ -250,6 +257,9 @@ const LocationService = {
         .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+        return { success: false, error: 'No rows updated — check permissions.' };
+      }
       this.clearClinicCache();
       return { success: true, data: data[0] };
     } catch (error) {
@@ -261,12 +271,16 @@ const LocationService = {
   // Delete a clinic location
   async deleteClinicLocation(id) {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('clinic_locations')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+        return { success: false, error: 'No rows deleted — check permissions.' };
+      }
       this.clearClinicCache();
       return { success: true };
     } catch (error) {

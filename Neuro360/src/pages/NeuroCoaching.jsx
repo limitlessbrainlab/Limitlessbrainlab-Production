@@ -226,7 +226,7 @@ const NeuroCoaching = () => {
                       }}
                       className={`w-full mt-2 py-2 sm:py-3 font-semibold rounded-lg sm:rounded-xl transition-all text-xs sm:text-base bg-gradient-to-r ${school.color} text-white hover:shadow-lg hover:scale-[1.02]`}
                     >
-                      Enroll Now — ${school.priceUSD}
+                      Enroll Now — USD {school.priceUSD}
                     </button>
                   </div>
                 </div>
@@ -371,7 +371,7 @@ const NeuroCoaching = () => {
                 <p className="text-gray-500 dark:text-gray-400 text-xs sm:text-sm mt-1">{selectedPlan.duration} · {selectedPlan.format}</p>
                 <div className="mt-2 sm:mt-3 flex items-baseline gap-2">
                   <span className="text-gray-400 text-xs sm:text-sm">{selectedPlan.price}</span>
-                  <span className="text-xl sm:text-2xl font-bold text-[#323956] dark:text-white">USD ${selectedPlan.priceUSD}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-[#323956] dark:text-white">USD {selectedPlan.priceUSD}</span>
                 </div>
               </div>
 
@@ -426,7 +426,7 @@ const NeuroCoaching = () => {
                     Processing...
                   </>
                 ) : (
-                  <>Pay USD ${selectedPlan.priceUSD} & Enroll</>
+                  <>Pay USD {selectedPlan.priceUSD} & Enroll</>
                 )}
               </button>
             </div>

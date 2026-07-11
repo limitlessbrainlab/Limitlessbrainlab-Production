@@ -579,7 +579,7 @@ const Photobiomodulation = () => {
               className="px-6 py-3 bg-white/20 text-white font-semibold rounded-xl hover:bg-white/30 transition-colors flex items-center justify-center border border-white/30"
             >
               <Sparkles className="h-5 w-5 mr-2" />
-              Discount Code: LIMITLESS for $100 off
+              Discount Code: LIMITLESS for USD 100 off
             </button>
           </div>
 

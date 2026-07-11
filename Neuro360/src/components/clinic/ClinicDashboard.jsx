@@ -37,7 +37,7 @@ const PendingSubscriptionGate = ({ user, clinic, onPaymentSuccess }) => {
       const res = await fetch('https://ipapi.co/json/');
       const data = await res.json();
       if (data.country_code !== 'IN') {
-        setUserCurrency({ currency: 'USD', symbol: '$' });
+        setUserCurrency({ currency: 'USD', symbol: 'USD ' });
       }
     } catch { /* default INR */ }
   };
@@ -302,7 +302,7 @@ const CreditsExhaustedPopup = ({ user, clinic, onDismiss, onPaymentSuccess }) =>
     try {
       const res = await fetch('https://ipapi.co/json/');
       const data = await res.json();
-      if (data.country_code !== 'IN') setUserCurrency({ currency: 'USD', symbol: '$' });
+      if (data.country_code !== 'IN') setUserCurrency({ currency: 'USD', symbol: 'USD ' });
     } catch { /* default INR */ }
   };
 

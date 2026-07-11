@@ -35,7 +35,7 @@ const PaymentHistoryModal = ({ isOpen, payment, onClose }) => {
     const pkgName = packageInfo.name || payment.packageName || 'EEG Reports';
     const reportsCount = packageInfo.reportsIncluded || payment.reports || 0;
     const amount = payment.amount || 0;
-    const currency = payment.currency === 'USD' ? '$' : '\u20b9';
+    const currency = payment.currency === 'USD' ? 'USD ' : '\u20b9';
     const logoUrl = window.location.origin + '/IBW%20Logo.png';
 
     return `<!DOCTYPE html>

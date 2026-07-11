@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   CreditCard, 
-  DollarSign, 
+  Banknote, 
   Calendar,
   Download,
   Eye,
@@ -235,7 +235,7 @@ const PaymentHistory = ({ selectedClinic }) => {
           <div className="p-8">
             <div className="flex items-center justify-between mb-4">
               <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <DollarSign className="h-8 w-8 text-white" />
+                <Banknote className="h-8 w-8 text-white" />
               </div>
             </div>
             <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Total Revenue</p>

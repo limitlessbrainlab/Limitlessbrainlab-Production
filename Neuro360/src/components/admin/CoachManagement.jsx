@@ -691,7 +691,7 @@ const CoachManagement = ({ onUpdate }) => {
                     })
                     .map((booking) => {
                       const coachName = (booking.item_name || '').replace('Brain Coaching - ', '').replace('Brain Coach Session - ', '').trim() || 'Unknown Coach';
-                      const amount = booking.currency === 'INR' ? `₹${(booking.amount || 0).toLocaleString()}` : `$${(booking.amount || 0).toLocaleString()}`;
+                      const amount = booking.currency === 'INR' ? `₹${(booking.amount || 0).toLocaleString()}` : `USD ${(booking.amount || 0).toLocaleString()}`;
                       return (
                         <tr key={booking.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                           <td className="px-4 py-3">

@@ -585,7 +585,7 @@ const PatientDashboard = () => {
         name: assessment.title || 'Brain Assessment',
         link: category === 'bundle' ? bundleLinkFrom(availableAssessments, assessment) : (assessment.link || ''),
         price,
-        amountLabel: `$${price.toFixed(2)} USD`,
+        amountLabel: `USD ${price.toFixed(2)}`,
         bundleIds: category === 'bundle'
           ? availableAssessments.filter((item) => assessmentCategory(item) !== 'bundle').map((item) => item.id)
           : []
@@ -598,12 +598,12 @@ const PatientDashboard = () => {
         name: legacy.title,
         link: legacy.link || '',
         price: legacy.price,
-        amountLabel: `$${legacy.price.toFixed(2)} USD`,
+        amountLabel: `USD ${legacy.price.toFixed(2)}`,
         bundleIds: legacy.bundleIds || []
       };
     }
 
-    return { name: 'Brain Assessment', link: '', price: 0, amountLabel: '$0.00 USD', bundleIds: [] };
+    return { name: 'Brain Assessment', link: '', price: 0, amountLabel: 'USD 0.00', bundleIds: [] };
   }, [availableAssessments]);
 
   const openAssessment = (assessment) => {
@@ -2113,13 +2113,13 @@ const PatientDashboard = () => {
                       <div className="mt-auto pt-4 border-t border-gray-100 dark:border-gray-700">
                         {service.isFree ? (
                           <div className="flex items-baseline gap-2 mb-3">
-                            <span className="text-gray-400 line-through text-sm">USD ${service.originalPrice.usd}</span>
+                            <span className="text-gray-400 line-through text-sm">USD {service.originalPrice.usd}</span>
                             <span className="text-2xl font-bold text-green-600">FREE</span>
                           </div>
                         ) : (
                           <div className="flex items-baseline gap-2 mb-3">
-                            <span className="text-gray-400 line-through text-sm">USD ${service.originalPrice.usd}</span>
-                            <span className="text-xl font-bold bg-gradient-to-r from-[#323956] to-[#4A6FA5] bg-clip-text text-transparent">USD ${service.salePrice.usd}</span>
+                            <span className="text-gray-400 line-through text-sm">USD {service.originalPrice.usd}</span>
+                            <span className="text-xl font-bold bg-gradient-to-r from-[#323956] to-[#4A6FA5] bg-clip-text text-transparent">USD {service.salePrice.usd}</span>
                           </div>
                         )}
                         {service.isFree && service.link && (
@@ -2155,7 +2155,7 @@ const PatientDashboard = () => {
           <div className="relative flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
               <h3 className="text-xl font-bold mb-1">Limitless Brain Lab Cognitive Assessments</h3>
-              <p className="text-gray-300 text-sm">Bundle: <span className="line-through text-gray-400">$89.95</span> <span className="text-[#F5D05D] font-bold text-xl">$19.99</span></p>
+              <p className="text-gray-300 text-sm">Bundle: <span className="line-through text-gray-400">USD 89.95</span> <span className="text-[#F5D05D] font-bold text-xl">USD 19.99</span></p>
             </div>
             <button
               onClick={() => {
@@ -2169,7 +2169,7 @@ const PatientDashboard = () => {
                 setBcShowPayment(true);
               }}
               className="px-6 py-3 bg-[#F5D05D] hover:bg-[#e5c04d] text-[#323956] rounded-xl font-bold text-sm transition-all transform hover:scale-105 whitespace-nowrap">
-              Buy Bundle — $19.99
+              Buy Bundle — USD 19.99
             </button>
           </div>
         </div>
@@ -2189,8 +2189,8 @@ const PatientDashboard = () => {
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
                   <h3 className="font-bold text-gray-900 dark:text-white">{bcSelectedService.title}</h3>
                   <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-gray-400 line-through text-sm">USD ${bcSelectedService.originalPrice.usd}</span>
-                    <span className="text-2xl font-bold text-[#323956]">USD ${bcSelectedService.salePrice.usd}</span>
+                    <span className="text-gray-400 line-through text-sm">USD {bcSelectedService.originalPrice.usd}</span>
+                    <span className="text-2xl font-bold text-[#323956]">USD {bcSelectedService.salePrice.usd}</span>
                   </div>
                 </div>
                 <div>
@@ -2205,7 +2205,7 @@ const PatientDashboard = () => {
                 </div>
                 <button onClick={handlePay} disabled={bcProcessing || !bcPaymentEmail}
                   className="w-full py-3 bg-gradient-to-r from-[#323956] to-[#4A6FA5] text-white font-bold rounded-xl hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                  {bcProcessing ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Processing...</> : `Pay USD $${bcSelectedService.salePrice.usd} & Continue`}
+                  {bcProcessing ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Processing...</> : `Pay USD ${bcSelectedService.salePrice.usd} & Continue`}
                 </button>
               </div>
             </div>
@@ -4806,7 +4806,7 @@ const PatientDashboard = () => {
                       {new Date(appointment.appointment_date).toLocaleDateString()} at {appointment.start_time}
                     </p>
                     <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                      Duration: {appointment.duration} min • ${appointment.price}
+                      Duration: {appointment.duration} min • USD {appointment.price}
                     </p>
                   </div>
                 </div>
@@ -7969,11 +7969,11 @@ const PatientDashboard = () => {
     // Currency and pricing configuration by country
     const currencyConfig = {
       IN: { currency: 'INR', symbol: '₹', packPrice: 399, bundlePrice: 1499, bundleOriginal: 2394 },
-      US: { currency: 'USD', symbol: '$', packPrice: 7.99, bundlePrice: 29.99, bundleOriginal: 47.94 },
+      US: { currency: 'USD', symbol: 'USD ', packPrice: 7.99, bundlePrice: 29.99, bundleOriginal: 47.94 },
       GB: { currency: 'GBP', symbol: '£', packPrice: 6.99, bundlePrice: 24.99, bundleOriginal: 41.94 },
       AE: { currency: 'AED', symbol: 'AED ', packPrice: 29, bundlePrice: 119, bundleOriginal: 174 },
       EU: { currency: 'EUR', symbol: '€', packPrice: 7.49, bundlePrice: 27.99, bundleOriginal: 44.94 },
-      DEFAULT: { currency: 'USD', symbol: '$', packPrice: 7.99, bundlePrice: 29.99, bundleOriginal: 47.94 }
+      DEFAULT: { currency: 'USD', symbol: 'USD ', packPrice: 7.99, bundlePrice: 29.99, bundleOriginal: 47.94 }
     };
 
     const euCountries = ['DE', 'FR', 'IT', 'ES', 'NL', 'BE', 'AT', 'PT', 'IE', 'FI', 'GR', 'PL', 'CZ', 'HU', 'SK', 'RO', 'BG', 'HR', 'SI', 'LT', 'LV', 'EE', 'CY', 'MT', 'LU'];
@@ -8155,7 +8155,7 @@ const PatientDashboard = () => {
       setPurchasedMedPackId(pId);
       setPurchasedPacks(prev => [...new Set([...prev, pId])]);
       setMedPaymentSuccessDetails({
-        name: packName, amount: `$${amount} USD`, email: user?.email || '',
+        name: packName, amount: `USD ${amount}`, email: user?.email || '',
         date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
         time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
         transactionId: sId || 'N/A'
@@ -8735,8 +8735,8 @@ const PatientDashboard = () => {
                     ) : (
                       <>
                         <div className="flex items-center space-x-1.5 sm:space-x-2 mb-1.5 sm:mb-2">
-                          <span className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white">${pack.price}</span>
-                          <span className="text-[10px] sm:text-sm text-gray-400 line-through">${pack.originalPrice}</span>
+                          <span className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white">USD {pack.price}</span>
+                          <span className="text-[10px] sm:text-sm text-gray-400 line-through">USD {pack.originalPrice}</span>
                         </div>
                         <button
                           onClick={() => handlePurchase(pack.id, pack.name)}
@@ -8961,8 +8961,8 @@ const PatientDashboard = () => {
                     <h3 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base">{selectedMedPack.name} {selectedMedPack.suffix || 'Meditation'}</h3>
                     <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">{selectedMedPack.category} · {selectedMedPack.duration}</p>
                     <div className="mt-1 flex items-baseline gap-2">
-                      <span className="text-gray-400 line-through text-xs">${selectedMedPack.originalPrice}</span>
-                      <span className="text-lg sm:text-xl font-bold text-purple-600">${selectedMedPack.price}</span>
+                      <span className="text-gray-400 line-through text-xs">USD {selectedMedPack.originalPrice}</span>
+                      <span className="text-lg sm:text-xl font-bold text-purple-600">USD {selectedMedPack.price}</span>
                     </div>
                   </div>
                 </div>
@@ -9016,7 +9016,7 @@ const PatientDashboard = () => {
                       Processing...
                     </>
                   ) : (
-                    <>Pay ${selectedMedPack.price} & Unlock</>
+                    <>Pay USD {selectedMedPack.price} & Unlock</>
                   )}
                 </button>
               </div>

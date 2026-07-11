@@ -8,7 +8,7 @@ import {
   X,
   RefreshCw,
   Search,
-  DollarSign,
+  Banknote,
   Tag,
   Package,
   FileText,
@@ -379,9 +379,9 @@ const AssessmentManagement = () => {
                     <td className="px-6 py-4">
                       <div className="space-y-1 text-sm">
                         <div className="flex items-center space-x-1 text-gray-600 dark:text-gray-400">
-                          <DollarSign className="h-3 w-3" />
-                          <span className="line-through text-gray-400">${assessment.original_price_usd}</span>
-                          <span className="font-semibold text-green-600 dark:text-green-400">${assessment.sale_price_usd}</span>
+                          <Banknote className="h-3 w-3" />
+                          <span className="line-through text-gray-400">USD {assessment.original_price_usd}</span>
+                          <span className="font-semibold text-green-600 dark:text-green-400">USD {assessment.sale_price_usd}</span>
                         </div>
                       </div>
                     </td>

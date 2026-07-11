@@ -204,7 +204,7 @@ const BrandingConfiguration = () => {
       };
 
       await DatabaseService.create('billing', billingRecord.id, billingRecord);
-      toast.info(`Billing record created: $${amount} co-branding fee`);
+      toast.info(`Billing record created: USD ${amount} co-branding fee`);
     } catch (error) {
       console.error('Error creating billing record:', error);
       toast.error('Failed to create billing record');
@@ -372,7 +372,7 @@ const BrandingConfiguration = () => {
                 </div>
                 <div className="flex items-center gap-2 text-sm text-amber-700">
                   <CreditCard className="w-4 h-4" />
-                  <span className="font-semibold">${watchedValues.coBrandingFee}</span>
+                  <span className="font-semibold">USD {watchedValues.coBrandingFee}</span>
                 </div>
               </div>
 

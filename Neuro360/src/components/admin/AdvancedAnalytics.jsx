@@ -4,7 +4,7 @@ import {
   TrendingUp,
   Users,
   FileText,
-  DollarSign,
+  Banknote,
   Calendar,
   MapPin,
   AlertTriangle,
@@ -226,7 +226,7 @@ const AdvancedAnalytics = () => {
         clinic.reportsAllowed,
         clinic.reportsUsed,
         `${clinic.utilizationRate}%`,
-        `$${revenue}`
+        `USD ${revenue}`
       ];
     }) || [];
 
@@ -343,10 +343,10 @@ const AdvancedAnalytics = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900">${analytics.overview?.totalRevenue?.toLocaleString() || 0}</p>
+              <p className="text-2xl font-bold text-gray-900">USD {analytics.overview?.totalRevenue?.toLocaleString() || 0}</p>
             </div>
             <div className="p-3 bg-yellow-100 rounded-full">
-              <DollarSign className="w-6 h-6 text-yellow-600" />
+              <Banknote className="w-6 h-6 text-yellow-600" />
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
@@ -486,7 +486,7 @@ const AdvancedAnalytics = () => {
       {/* Revenue by Clinic */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-          <DollarSign className="w-5 h-5 text-yellow-500" />
+          <Banknote className="w-5 h-5 text-yellow-500" />
           Revenue Patterns per Clinic
         </h3>
 
@@ -498,10 +498,10 @@ const AdvancedAnalytics = () => {
                 <span className="text-xs text-gray-500">{clinic.paymentCount} payments</span>
               </div>
               <div className="text-2xl font-bold text-[#323956]">
-                ${clinic.revenue.toLocaleString()}
+                USD {clinic.revenue.toLocaleString()}
               </div>
               <div className="text-sm text-gray-600">
-                Avg: ${clinic.paymentCount > 0 ? (clinic.revenue / clinic.paymentCount).toFixed(0) : 0}/payment
+                Avg: USD {clinic.paymentCount > 0 ? (clinic.revenue / clinic.paymentCount).toFixed(0) : 0}/payment
               </div>
             </div>
           ))}
@@ -533,7 +533,7 @@ const AdvancedAnalytics = () => {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Revenue:</span>
-                  <span className="font-medium text-[#323956]">${metrics.revenue?.toLocaleString() || 0}</span>
+                  <span className="font-medium text-[#323956]">USD {metrics.revenue?.toLocaleString() || 0}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Avg Tests/Clinic:</span>

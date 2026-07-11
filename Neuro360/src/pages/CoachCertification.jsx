@@ -233,7 +233,7 @@ const CoachCertification = () => {
                 <Users className="h-7 w-7 text-blue-600" />
               </div>
               <h4 className="font-bold text-gray-900 mb-2">Growing Demand</h4>
-              <p className="text-sm text-gray-600">Mental wellness is a $120B+ industry with increasing demand for qualified coaches.</p>
+              <p className="text-sm text-gray-600">Mental wellness is a USD 120B+ industry with increasing demand for qualified coaches.</p>
             </div>
             <div className="text-center p-6 bg-gradient-to-br from-green-50 to-teal-50 rounded-xl">
               <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-4">

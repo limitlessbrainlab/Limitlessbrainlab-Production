@@ -2098,7 +2098,7 @@ const Landing = () => {
                     <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">Choose the right assessment for your brain health journey</p>
                     <div className="mb-4 sm:mb-6 py-3 sm:py-4 bg-gray-50 rounded-xl sm:rounded-2xl">
                       <span className="text-xs sm:text-sm text-gray-400 block mb-1">Starting from</span>
-                      <span className="text-2xl sm:text-3xl md:text-5xl font-extrabold text-[#323956]">$29.99</span>
+                      <span className="text-2xl sm:text-3xl md:text-5xl font-extrabold text-[#323956]">USD 29.99</span>
                     </div>
                     <ul className="text-left space-y-2.5 sm:space-y-3 mb-6 sm:mb-8 flex-grow">
                       {['A cognitive report (globally validated)', '25 pages detailed report', 'At the comforts of your home digitally delivered'].map((t) => (

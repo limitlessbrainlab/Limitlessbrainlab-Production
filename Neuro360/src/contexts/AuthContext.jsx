@@ -807,14 +807,12 @@ export const AuthProvider = ({ children }) => {
           const patientData = { ...userData };
 
           if (patientData.avatar) {
-            // Map avatar to both profile_image and avatar_url for compatibility
+            // Map avatar to the real DB columns only when we actually have an image URL
             patientData.profile_image = patientData.avatar;
             patientData.avatar_url = patientData.avatar;
-            patientData.profileImage = patientData.avatar;
-            // Don't save the original avatar field to database
-            delete patientData.avatar;
-          } else {
           }
+          // avatar is a UI-only alias — never send it to the patients table (no such column)
+          delete patientData.avatar;
 
           // Remove password fields from patient data (handled separately by Supabase Auth)
           delete patientData.password;

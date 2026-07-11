@@ -648,10 +648,10 @@ const Wallet = () => {
   <table>
     <thead><tr><th>Description</th><th class="right">Amount</th></tr></thead>
     <tbody>
-      <tr><td>${esc(inv.description || 'Purchase')}</td><td class="right">$${amount.toFixed(2)}</td></tr>
+      <tr><td>${esc(inv.description || 'Purchase')}</td><td class="right">USD ${amount.toFixed(2)}</td></tr>
     </tbody>
     <tfoot>
-      <tr><td class="right total">Total</td><td class="right total">$${amount.toFixed(2)} USD</td></tr>
+      <tr><td class="right total">Total</td><td class="right total">USD ${amount.toFixed(2)}</td></tr>
       <tr><td class="right">Status</td><td class="right"><span class="badge">${esc(inv.status || 'Paid')}</span></td></tr>
     </tfoot>
   </table>
@@ -893,7 +893,7 @@ const Wallet = () => {
                   </div>
                   <span className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">Total Spent</span>
                 </div>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">${walletBalance.totalSpent.toLocaleString()}</p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">USD {walletBalance.totalSpent.toLocaleString()}</p>
                 <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-1">All time</p>
               </div>
 
@@ -909,7 +909,7 @@ const Wallet = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">${walletBalance.thisMonth.toLocaleString()}</p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">USD {walletBalance.thisMonth.toLocaleString()}</p>
                 <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-1">This Month</p>
               </div>
 
@@ -998,7 +998,7 @@ const Wallet = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">${purchase.amount}</p>
+                        <p className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">USD {purchase.amount}</p>
                         <span className={`text-[10px] sm:text-xs ${purchase.status === 'Paid' ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
                           {purchase.status}
                         </span>
@@ -1199,7 +1199,7 @@ const Wallet = () => {
                           <span>Plan: <strong>{sub.plan}</strong></span>
                           {sub.renewal !== '-' && <span>Renewal: <strong>{sub.renewal}</strong></span>}
                           <span>
-                            <strong>${sub.amount}</strong>
+                            <strong>USD {sub.amount}</strong>
                             {sub.period !== 'one-time' && <span>/{sub.period}</span>}
                           </span>
                         </div>
@@ -1397,7 +1397,7 @@ const Wallet = () => {
                           {invoice.status}
                         </span>
                       </td>
-                      <td className="py-3 sm:py-4 px-3 sm:px-4 text-right text-xs sm:text-sm font-medium text-gray-900 dark:text-white">${invoice.amount}</td>
+                      <td className="py-3 sm:py-4 px-3 sm:px-4 text-right text-xs sm:text-sm font-medium text-gray-900 dark:text-white">USD {invoice.amount}</td>
                       <td className="py-3 sm:py-4 px-3 sm:px-4 text-right">
                         <div className="flex items-center justify-end space-x-1 sm:space-x-2">
                           <button
@@ -1563,7 +1563,7 @@ const Wallet = () => {
                           </span>
                         </td>
                         <td className="py-3 sm:py-4 px-3 sm:px-4 text-right text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
-                          ${purchase.amount}
+                          USD {purchase.amount}
                         </td>
                         <td className="py-3 sm:py-4 px-3 sm:px-4 text-right">
                           <button

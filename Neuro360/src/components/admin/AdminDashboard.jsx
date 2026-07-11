@@ -4,7 +4,7 @@ import {
   Users, 
   Building2, 
   FileText, 
-  DollarSign, 
+  Banknote, 
   TrendingUp, 
   AlertTriangle,
   CheckCircle,
@@ -105,7 +105,7 @@ const AdminDashboard = ({ analytics = {} }) => {
       value: `₹${realTimeData.monthlyRevenue || 0}`,
       change: '+8.12%',
       changeType: 'increase',
-      icon: DollarSign,
+      icon: Banknote,
       color: 'yellow',
       subtitle: 'All time earnings'
     }

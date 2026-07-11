@@ -11,7 +11,7 @@ import {
   Trash2,
   Eye,
   Upload,
-  DollarSign,
+  Banknote,
   Activity,
   AlertTriangle,
   CheckCircle,
@@ -103,8 +103,8 @@ const SuperAdminPanel = () => {
             
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2 text-sm text-gray-600">
-                <DollarSign className="h-4 w-4" />
-                <span>Revenue: ${analytics.monthlyRevenue || 0}</span>
+                <Banknote className="h-4 w-4" />
+                <span>Revenue: USD {analytics.monthlyRevenue || 0}</span>
               </div>
               <button
                 onClick={handleLogout}
@@ -191,11 +191,11 @@ const AdminDashboard = ({ analytics, onRefresh }) => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center">
             <div className="p-2 bg-yellow-100 rounded-lg">
-              <DollarSign className="h-6 w-6 text-yellow-600" />
+              <Banknote className="h-6 w-6 text-yellow-600" />
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Monthly Revenue</p>
-              <p className="text-2xl font-bold text-gray-900">${analytics.monthlyRevenue || 0}</p>
+              <p className="text-2xl font-bold text-gray-900">USD {analytics.monthlyRevenue || 0}</p>
             </div>
           </div>
         </div>

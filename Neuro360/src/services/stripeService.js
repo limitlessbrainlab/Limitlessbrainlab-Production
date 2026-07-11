@@ -26,7 +26,7 @@ class StripeService {
 
     // Currency configuration by country
     this.currencyConfig = {
-      US: { currency: 'USD', symbol: '$', multiplier: 1 },
+      US: { currency: 'USD', symbol: 'USD ', multiplier: 1 },
       IN: { currency: 'INR', symbol: '₹', multiplier: 83 },
       GB: { currency: 'GBP', symbol: '£', multiplier: 0.79 },
       EU: { currency: 'EUR', symbol: '€', multiplier: 0.92 },
@@ -34,7 +34,7 @@ class StripeService {
       AU: { currency: 'AUD', symbol: 'A$', multiplier: 1.53 },
       CA: { currency: 'CAD', symbol: 'C$', multiplier: 1.36 },
       SG: { currency: 'SGD', symbol: 'S$', multiplier: 1.34 },
-      DEFAULT: { currency: 'USD', symbol: '$', multiplier: 1 }
+      DEFAULT: { currency: 'USD', symbol: 'USD ', multiplier: 1 }
     };
 
     // EU countries for currency mapping

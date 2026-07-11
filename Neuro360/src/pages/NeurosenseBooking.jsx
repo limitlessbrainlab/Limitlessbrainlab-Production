@@ -354,18 +354,18 @@ const NeurosenseBooking = () => {
                       <div className="mt-3 sm:mt-4 md:mt-5 pt-3 sm:pt-4 border-t border-gray-100 min-h-[3.5rem] sm:min-h-[4rem] md:min-h-[4.5rem]">
                         {service.isFree ? (
                           <div className="flex items-baseline gap-2 mb-1 sm:mb-1.5">
-                            <span className="text-gray-400 line-through text-xs sm:text-sm">USD ${service.originalPrice.usd}</span>
+                            <span className="text-gray-400 line-through text-xs sm:text-sm">USD {service.originalPrice.usd}</span>
                             <span className="text-xl sm:text-2xl md:text-3xl font-bold text-green-600">FREE</span>
                           </div>
                         ) : service.originalPrice.usd === service.salePrice.usd ? (
                           <div className="flex items-baseline gap-2 mb-1 sm:mb-1.5">
-                            <span className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-[#323956] to-[#4A6FA5] bg-clip-text text-transparent">USD ${service.salePrice.usd}</span>
+                            <span className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-[#323956] to-[#4A6FA5] bg-clip-text text-transparent">USD {service.salePrice.usd}</span>
                           </div>
                         ) : (
                           <>
                             <div className="flex items-baseline gap-1.5 sm:gap-2 mb-1 sm:mb-1.5">
-                              <span className="text-gray-400 line-through text-[10px] sm:text-xs md:text-sm">USD ${service.originalPrice.usd}</span>
-                              <span className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-[#323956] to-[#4A6FA5] bg-clip-text text-transparent">USD ${service.salePrice.usd}</span>
+                              <span className="text-gray-400 line-through text-[10px] sm:text-xs md:text-sm">USD {service.originalPrice.usd}</span>
+                              <span className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-[#323956] to-[#4A6FA5] bg-clip-text text-transparent">USD {service.salePrice.usd}</span>
                             </div>
                             {service.originalPrice.aed && (
                               <div className="flex gap-2 sm:gap-3 text-[9px] sm:text-[10px] md:text-[11px] text-gray-400">
@@ -460,7 +460,7 @@ const NeurosenseBooking = () => {
                   Limitless Brain Lab Cognitive Assessments
                 </h3>
                 <p className="text-gray-300 text-xs sm:text-sm md:text-base lg:text-lg">
-                  Bundle: <span className="text-gray-400 line-through text-sm sm:text-base">$89.95</span> <span className="text-[#F5D05D] font-bold text-base sm:text-lg md:text-xl lg:text-2xl">$19.99</span>
+                  Bundle: <span className="text-gray-400 line-through text-sm sm:text-base">USD 89.95</span> <span className="text-[#F5D05D] font-bold text-base sm:text-lg md:text-xl lg:text-2xl">USD 19.99</span>
                 </p>
               </div>
               <button
@@ -479,7 +479,7 @@ const NeurosenseBooking = () => {
                 }}
                 className="inline-block px-5 sm:px-6 md:px-8 py-2.5 sm:py-3 md:py-3.5 bg-[#F5D05D] hover:bg-[#e5c04d] text-[#323956] rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm md:text-base transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl whitespace-nowrap"
               >
-                Buy Bundle - $19.99
+                Buy Bundle - USD 19.99
               </button>
             </div>
           </div>
@@ -515,8 +515,8 @@ const NeurosenseBooking = () => {
                 <h3 className="font-bold text-gray-900 text-sm sm:text-base">{selectedService.title}</h3>
                 <p className="text-gray-500 text-xs sm:text-sm mt-1 line-clamp-2">{selectedService.description}</p>
                 <div className="mt-2 sm:mt-3 flex items-baseline gap-2">
-                  <span className="text-gray-400 line-through text-xs sm:text-sm">USD ${selectedService.originalPrice.usd}</span>
-                  <span className="text-xl sm:text-2xl font-bold text-[#323956]">USD ${selectedService.salePrice.usd}</span>
+                  <span className="text-gray-400 line-through text-xs sm:text-sm">USD {selectedService.originalPrice.usd}</span>
+                  <span className="text-xl sm:text-2xl font-bold text-[#323956]">USD {selectedService.salePrice.usd}</span>
                 </div>
               </div>
 
@@ -572,7 +572,7 @@ const NeurosenseBooking = () => {
                   </>
                 ) : (
                   <>
-                    Pay USD ${selectedService.salePrice.usd} & Continue
+                    Pay USD {selectedService.salePrice.usd} & Continue
                   </>
                 )}
               </button>

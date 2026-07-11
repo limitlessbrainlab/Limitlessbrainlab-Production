@@ -144,7 +144,7 @@ export default function CoachProfile({ coach, onBookSession, onClose }: CoachPro
                         <div className="text-sm text-gray-600">{pricing.duration} minutes</div>
                       </div>
                       <div className="text-xl font-semibold text-brain-600">
-                        ${pricing.price}
+                        USD {pricing.price}
                       </div>
                     </div>
                   ))}

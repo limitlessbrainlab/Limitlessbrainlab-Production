@@ -93,7 +93,7 @@ export default function CoachingPage() {
               <p className="text-gray-700 dark:text-gray-200 text-base mb-4 font-medium leading-6">
                 Focus enhancement, executive function, and cognitive performance optimization.
               </p>
-              <div className="text-base text-gray-700 dark:text-gray-200 mb-4 font-medium">Starting at $80/session</div>
+              <div className="text-base text-gray-700 dark:text-gray-200 mb-4 font-medium">Starting at USD 80/session</div>
               <Button
                 onClick={() => setSelectedSpecialty('adhd')}
                 variant="brain"
@@ -111,7 +111,7 @@ export default function CoachingPage() {
               <p className="text-gray-700 dark:text-gray-200 text-base mb-4 font-medium leading-6">
                 Stress regulation, trauma recovery, and nervous system optimization.
               </p>
-              <div className="text-sm text-gray-500 mb-4">Starting at $90/session</div>
+              <div className="text-sm text-gray-500 mb-4">Starting at USD 90/session</div>
               <Button
                 onClick={() => setSelectedSpecialty('stress')}
                 variant="calm"
@@ -129,7 +129,7 @@ export default function CoachingPage() {
               <p className="text-gray-700 dark:text-gray-200 text-base mb-4 font-medium leading-6">
                 Brain mapping analysis and neurofeedback treatment planning.
               </p>
-              <div className="text-sm text-gray-500 mb-4">Starting at $150/session</div>
+              <div className="text-sm text-gray-500 mb-4">Starting at USD 150/session</div>
               <Button
                 onClick={() => setSelectedSpecialty('memory')}
                 variant="wellness"

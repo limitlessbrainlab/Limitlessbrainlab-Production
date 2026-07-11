@@ -20,6 +20,7 @@ import DatabaseService from '../../services/databaseService';
 import { supabase } from '../../lib/supabaseClient';
 import SubscriptionPopup from '../admin/SubscriptionPopup';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
+import { getPatientDisplayName, getReportSnapshotName, replaceNameInText } from '../../utils/patientNameResolver';
 
 const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpdate, creditsExhausted = false }) => {
   const { user } = useAuth();
@@ -865,6 +866,17 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
                 p.id === report.reportData?.patientId
               );
 
+              // Live-lookup display: rewrite any frozen patient name baked into the
+              // report title/description with the current patient name.
+              const liveName = getPatientDisplayName(patient);
+              const snapshotName = getReportSnapshotName(report);
+              const docTitle = replaceNameInText(
+                report.reportData?.title || report.report_data?.title || report.fileName || 'Document',
+                snapshotName, liveName
+              );
+              const rawDesc = report.reportData?.description || report.report_data?.description;
+              const docDesc = replaceNameInText(rawDesc, snapshotName, liveName);
+
               return (
                 <div key={report.id} className="p-6 hover:bg-amber-50 transition-colors border-l-4 border-amber-400">
                   <div className="flex items-center justify-between">
@@ -875,7 +887,7 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
                       <div className="flex-1">
                         <div className="flex items-center space-x-2">
                           <h4 className="text-lg font-medium text-gray-900">
-                            {report.reportData?.title || report.report_data?.title || report.fileName || 'Document'}
+                            {docTitle}
                           </h4>
                           <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded">
                             Document
@@ -898,12 +910,9 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
                             From Super Admin
                           </span>
                         </div>
-                        {(report.reportData?.description || report.report_data?.description) && (
+                        {docDesc && (
                           <p className="text-sm text-gray-500 mt-1 italic">
-                            {(report.reportData?.description || report.report_data?.description).length > 100
-                              ? `${(report.reportData?.description || report.report_data?.description).substring(0, 100)}...`
-                              : (report.reportData?.description || report.report_data?.description)
-                            }
+                            {docDesc.length > 100 ? `${docDesc.substring(0, 100)}...` : docDesc}
                           </p>
                         )}
                       </div>

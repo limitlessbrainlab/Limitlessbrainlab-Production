@@ -36,6 +36,7 @@ import { supabase } from '../../lib/supabaseClient';
 import NotificationService from '../../services/notificationService';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import useRealtimeRefetch from '../../hooks/useRealtimeRefetch';
+import { getPatientDisplayName, indexPatientsById, getReportSnapshotName, replaceNameInText } from '../../utils/patientNameResolver';
 
 const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) => {
   const { user } = useAuth();
@@ -432,48 +433,44 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
     }
   };
 
-  // Function to fix patient names in reports
+  // Resolve the CURRENT patient name for each report by joining on patient_id, so a
+  // rename in the clinic/patient portal shows up on OLD reports too (live-lookup
+  // display). We intentionally do NOT short-circuit on the report's snapshot name -
+  // that is exactly what left old reports stuck with the pre-rename name.
   const fixPatientNames = (reports, patients) => {
+    const patientsById = indexPatientsById(patients);
     return reports.map(report => {
-      // If report already has a patient name, use it
-      if (report.patientName && report.patientName !== 'Unknown Patient') {
-        return report;
-      }
+      // Prefer the live patient record by id.
+      const pid = report.patientId || report.patient_id;
+      let patient = pid != null ? patientsById.get(pid) : null;
 
-      // Try to find patient by ID with multiple field variations
-      let patient = patients.find(p =>
-        p.id === report.patientId ||
-        p.id === report.patient_id
-      );
-
-      // Get patient name with multiple field variations
-      const getPatientName = (p) => {
-        return p?.name || p?.fullName || p?.full_name || null;
-      };
-
-      // If not found by ID, try to find by name (case insensitive)
+      // Fall back to name matching only when the id doesn't resolve a patient.
       if (!patient && report.patientName) {
-        patient = patients.find(p => {
-          const pName = getPatientName(p);
-          return pName && pName.toLowerCase() === report.patientName.toLowerCase();
-        });
+        const target = report.patientName.toLowerCase();
+        patient = patients.find(p => getPatientDisplayName(p)?.toLowerCase() === target)
+          || patients.find(p => getPatientDisplayName(p)?.toLowerCase().includes(target));
       }
 
-      // If still not found, try partial name matching
-      if (!patient && report.patientName) {
-        patient = patients.find(p => {
-          const pName = getPatientName(p);
-          return pName && pName.toLowerCase().includes(report.patientName.toLowerCase());
-        });
-      }
+      const snapshotName = getReportSnapshotName(report);
+      const patientName = getPatientDisplayName(patient) || snapshotName || 'Unknown Patient';
+      const patientUid = patient?.patient_uid || patient?.external_id || report.patientUid || '';
 
-      const patientName = patient ? getPatientName(patient) : (report.patientName || 'Unknown Patient');
-      const patientUid = patient?.patient_uid || patient?.external_id || '';
+      // Rewrite any frozen name baked into the title / report_data strings so the
+      // report heading reflects the current name as well.
+      const rd = report.reportData || report.report_data;
+      const fixedRd = rd ? {
+        ...rd,
+        title: replaceNameInText(rd.title, snapshotName, patientName),
+        description: replaceNameInText(rd.description, snapshotName, patientName),
+        patientName: rd.patientName != null ? patientName : rd.patientName
+      } : undefined;
 
       return {
         ...report,
-        patientName: patientName,
-        patientUid: patientUid
+        patientName,
+        patientUid,
+        title: replaceNameInText(report.title, snapshotName, patientName),
+        ...(fixedRd ? { reportData: fixedRd, report_data: fixedRd } : {})
       };
     });
   };

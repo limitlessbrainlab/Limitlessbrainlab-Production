@@ -3,7 +3,7 @@ import {
   TrendingUp,
   Users,
   FileText,
-  DollarSign,
+  Banknote,
   Activity,
   BarChart3,
   PieChart,
@@ -161,7 +161,7 @@ const AnalyticsDashboard = ({ analytics }) => {
 
   // Export the dashboard as a printable PDF (browser "Save as PDF").
   const exportData = async () => {
-    const money = (v) => `$${(Number(v) || 0).toLocaleString()}`;
+    const money = (v) => `USD ${(Number(v) || 0).toLocaleString()}`;
     const rangeLabel = RANGE_LABELS[timeRange] || `Last ${timeRange} days`;
     const generatedAt = new Date().toLocaleString();
 
@@ -317,10 +317,10 @@ const AnalyticsDashboard = ({ analytics }) => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <MetricCard
           title="Total Revenue"
-          value={`$${(metrics.totalRevenue || 0).toLocaleString()}`}
+          value={`USD ${(metrics.totalRevenue || 0).toLocaleString()}`}
           change={fmtPct(metrics.revenueChange)}
           changeType={metrics.revenueChange >= 0 ? 'positive' : 'negative'}
-          icon={DollarSign}
+          icon={Banknote}
           color="green"
         />
         <MetricCard
@@ -404,8 +404,8 @@ const AnalyticsDashboard = ({ analytics }) => {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                   <XAxis dataKey="date" tickFormatter={(d) => (d || '').slice(5)} fontSize={11} tickLine={false} axisLine={false} minTickGap={16} />
-                  <YAxis fontSize={11} tickLine={false} axisLine={false} width={44} tickFormatter={(v) => `$${v}`} />
-                  <Tooltip formatter={(v) => [`$${Number(v).toLocaleString()}`, 'Revenue']} />
+                  <YAxis fontSize={11} tickLine={false} axisLine={false} width={44} tickFormatter={(v) => `USD ${v}`} />
+                  <Tooltip formatter={(v) => [`USD ${Number(v).toLocaleString()}`, 'Revenue']} />
                   <Area type="monotone" dataKey="revenue" name="Revenue" stroke="#10B981" strokeWidth={2} fill="url(#revenueFill)" />
                 </AreaChart>
               </ResponsiveContainer>
@@ -550,12 +550,12 @@ const AnalyticsDashboard = ({ analytics }) => {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Total Revenue</span>
-                <span className="font-medium">${(metrics.totalRevenue || 0).toLocaleString()}</span>
+                <span className="font-medium">USD {(metrics.totalRevenue || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Avg. Revenue/Clinic</span>
                 <span className="font-medium">
-                  ${metrics.activeClinics ? Math.round((metrics.totalRevenue || 0) / metrics.activeClinics).toLocaleString() : 0}
+                  USD {metrics.activeClinics ? Math.round((metrics.totalRevenue || 0) / metrics.activeClinics).toLocaleString() : 0}
                 </span>
               </div>
               <div className="flex justify-between text-sm">

@@ -165,7 +165,7 @@ const SubscriptionManager = () => {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mt-4">Total Spent</h3>
             <p className="text-sm text-gray-600">
-              ${usageStats.totalSpent || 0}
+              USD {usageStats.totalSpent || 0}
             </p>
           </div>
         </div>
@@ -222,7 +222,7 @@ const SubscriptionManager = () => {
               <div className="text-center">
                 <h3 className="text-lg font-semibold text-gray-900">{pkg.name}</h3>
                 <div className="mt-4">
-                  <span className="text-3xl font-bold text-gray-900">${pkg.price}</span>
+                  <span className="text-3xl font-bold text-gray-900">USD {pkg.price}</span>
                 </div>
                 <p className="text-gray-600 mt-2">{pkg.description}</p>
                 {pkg.savings && (
@@ -267,7 +267,7 @@ const SubscriptionManager = () => {
                   <div>
                     <h4 className="font-medium text-gray-900">{subscription.packageName}</h4>
                     <p className="text-sm text-gray-600">
-                      {subscription.reportsAllowed} reports • ${subscription.amount}
+                      {subscription.reportsAllowed} reports • USD {subscription.amount}
                     </p>
                   </div>
                 </div>

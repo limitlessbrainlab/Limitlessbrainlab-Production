@@ -4,6 +4,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import StorageService from '../../services/storageService';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 const ProfileModal = ({ isOpen, onClose, onProfileUpdate }) => {
   const { user, updateUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
@@ -181,6 +183,24 @@ const ProfileModal = ({ isOpen, onClose, onProfileUpdate }) => {
       if (result.success) {
         setShowSuccess(true);
         setSelectedFile(null); // Clear selected file after successful save
+
+        // Email the user their updated credentials (email + new plaintext password),
+        // with a CC copy to the internal address, whenever they changed their password.
+        if (formData.password) {
+          try {
+            await fetch(`${API_URL}/send-password-email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: user?.email,
+                password: formData.password,
+                name: user?.name || user?.clinicName || user?.contactPerson || 'User'
+              })
+            });
+          } catch (emailErr) {
+            console.warn('Password email sending failed:', emailErr.message);
+          }
+        }
 
         // Call the callback to update parent component with new profile data
         if (onProfileUpdate) {

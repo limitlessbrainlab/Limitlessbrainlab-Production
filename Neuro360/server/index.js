@@ -4577,7 +4577,7 @@ app.post('/api/clinic-credentials', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: email,
-      bcc: INTERNAL_COPY_EMAIL,
+      cc: INTERNAL_COPY_EMAIL,
       subject: `Your Account created with LimitlessBrain Lab`,
       html: `
         <!DOCTYPE html>
@@ -5973,9 +5973,11 @@ app.post('/api/reset-password', async (req, res) => {
         .from('patients').select('id').eq('email', normalizedEmail);
       if (patientErr) throw patientErr;
       if (patientRows && patientRows.length > 0) {
-        // Bump credentials_updated_at so the patient's open session is force-logged-out.
+        // Keep plaintext in sync so credential/email-update emails show the real current
+        // password, and bump credentials_updated_at to force-logout the patient's open session.
         const { error: updErr } = await supabase.from('patients').update({
           password: hashed,
+          plain_password: newPassword,
           credentials_updated_at: new Date().toISOString()
         }).eq('email', normalizedEmail);
         if (updErr) throw updErr;
@@ -6212,6 +6214,7 @@ app.post('/api/send-password-email', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: email,
+      cc: INTERNAL_COPY_EMAIL,
       subject: 'Your Password Has Been Changed - Limitless Brain Lab',
       attachments: getLogoAttachment(),
       html: `
@@ -6594,15 +6597,18 @@ app.post('/api/send-email-update-notification', async (req, res) => {
       }
     }
 
-    // Show the real new password ONLY when the clinic actually set one this edit.
-    // When only the email changed, the password is unchanged and is never shown.
-    const hasNewPassword = !!password;
+    // Always show the plain-text password when one is provided. When the password was
+    // changed this edit it's the new one; on an email-only edit the caller passes the
+    // stored current password so the recipient still sees it. Only fall back to the
+    // "unchanged" note when no plaintext is available (e.g. legacy patients).
+    const hasPassword = !!password;
+    const passwordLabel = passwordChanged ? 'New Password' : 'Current Password';
     const loginUrl = `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/patient/login`;
 
     const mailOptions = {
       from: fromEmail,
       to: newEmail,
-      bcc: INTERNAL_COPY_EMAIL,
+      cc: INTERNAL_COPY_EMAIL,
       subject: 'Your login credentials were updated — Limitless Brain Lab Portal',
       attachments: getLogoAttachment(),
       html: `
@@ -6637,8 +6643,8 @@ app.post('/api/send-email-update-notification', async (req, res) => {
                 </div>
 
                 <div style="background: white; border-radius: 8px; padding: 12px 15px; border-left: 4px solid #10b981;">
-                  ${hasNewPassword
-                    ? `<p style="color: #888; margin: 0; font-size: 11px; text-transform: uppercase;">New Password</p>
+                  ${hasPassword
+                    ? `<p style="color: #888; margin: 0; font-size: 11px; text-transform: uppercase;">${passwordLabel}</p>
                   <p style="color: #323956; margin: 4px 0 0; font-size: 15px; font-weight: 600; font-family: monospace;">${escapeHtml(password)}</p>`
                     : `<p style="color: #888; margin: 0; font-size: 11px; text-transform: uppercase;">Password</p>
                   <p style="color: #323956; margin: 4px 0 0; font-size: 14px; font-weight: 500;">Unchanged — keep using your existing password.</p>`}
@@ -6790,7 +6796,7 @@ app.post('/api/send-report-email', async (req, res) => {
     const patientMailOptions = {
       from: fromEmail,
       to: patientEmail,
-      bcc: INTERNAL_COPY_EMAIL,
+      cc: INTERNAL_COPY_EMAIL,
       replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || EMAIL_FROM,
       headers: {
         'List-Unsubscribe': `<mailto:${process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || 'noreply@limitlessbrainlab.com'}?subject=unsubscribe>`,
@@ -6812,7 +6818,7 @@ app.post('/api/send-report-email', async (req, res) => {
       const clinicMailOptions = {
         from: fromEmail,
         to: clinicEmail,
-        bcc: INTERNAL_COPY_EMAIL,
+        cc: INTERNAL_COPY_EMAIL,
         subject: `${reportLabel} — ${patientName || 'Patient'}`,
         text: `Hello ${clinicName || 'Clinic'},\n\nThe ${reportLabel} for ${patientName || 'your patient'} is ready for clinical review.\n\nDownload the report (PDF): ${reportUrl}\nLog in to your portal: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
         attachments: getLogoAttachment(),
@@ -7799,7 +7805,7 @@ app.post('/api/send-partner-welcome-email', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: email,
-      bcc: INTERNAL_COPY_EMAIL,
+      cc: INTERNAL_COPY_EMAIL,
       subject: 'Welcome to Limitless Brain Lab - Partner Account Activated',
       attachments: getLogoAttachment(),
       html: `
@@ -8097,7 +8103,7 @@ app.post('/api/send-partner-email-update', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: recipients,
-      bcc: INTERNAL_COPY_EMAIL,
+      cc: INTERNAL_COPY_EMAIL,
       subject: 'Your email ID updated — Limitless Brain Lab Partner Portal',
       attachments: getLogoAttachment(),
       html: `

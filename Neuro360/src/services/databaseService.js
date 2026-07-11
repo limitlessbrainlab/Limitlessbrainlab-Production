@@ -242,6 +242,7 @@ class DatabaseService {
         'id', 'org_id', 'clinic_id', 'clinic_name', 'owner_user', 'external_id', 'name', 'full_name', 'date_of_birth',
         'gender', 'phone', 'country_code', 'email', 'password', 'address', 'medical_history', 'improvement_focus',
         'brain_fitness_score', 'is_active', 'created_at', 'updated_at',
+        'plain_password', // Plaintext kept so credential/email-update emails can re-show the patient's current password
         'credentials_updated_at', // Bumped on email/password change → forces open sessions to re-login
         'avatar', 'profile_image', 'profileImage', 'avatar_url',
         'occupation', 'handedness', 'referred_by',

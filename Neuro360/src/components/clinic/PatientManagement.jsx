@@ -374,6 +374,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
         handedness: data.handedness || '',
         referred_by: data.referredBy === 'Others' ? (data.referredByOther?.trim() || 'Others') : (data.referredBy || ''),
         password: pwd,
+        plain_password: data.password, // Plaintext kept so credential/email-update emails can re-show the current password
         medical_history: {
           ...(data.notes ? { notes: data.notes } : {}),
           ...(!data.dateOfBirth && data.age ? { age: parseInt(data.age) } : {})
@@ -478,8 +479,10 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
       };
 
       // Only overwrite the bcrypt password column when a new password was entered.
+      // Keep the plaintext copy in sync so future email-update emails can re-show it.
       if (passwordChanged) {
         patientData.password = await hashPassword(data.password);
+        patientData.plain_password = data.password;
       }
 
       // Bump on email OR password change so the patient's open session is force-logged-out
@@ -510,7 +513,8 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
           body: JSON.stringify({
             patientName: data.name,
             newEmail: data.email,
-            password: passwordChanged ? data.password : null,
+            // On an email-only edit, send the stored current plaintext so the email still shows it.
+            password: passwordChanged ? data.password : (selectedPatient?.plain_password || null),
             emailChanged,
             passwordChanged,
             clinicName: user?.clinicName || user?.name || 'Your Clinic',

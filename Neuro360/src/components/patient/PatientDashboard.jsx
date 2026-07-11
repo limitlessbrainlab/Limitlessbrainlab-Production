@@ -1356,6 +1356,23 @@ const PatientDashboard = () => {
           setProfileImageUrl(profileImage);
         } else {
         }
+
+        // Also refresh the profile text fields so edits made in the avatar
+        // "Profile" modal appear without a full page reload.
+        const profileDetails = patientRecord.medical_history?.profile_details || {};
+        setPatientData(prev => ({
+          ...prev,
+          profile: {
+            ...prev.profile,
+            name: patientRecord.fullName || patientRecord.full_name || patientRecord.name || prev.profile?.name,
+            phone: patientRecord.phone ?? prev.profile?.phone,
+            address: patientRecord.address ?? prev.profile?.address,
+            dateOfBirth: patientRecord.dateOfBirth || patientRecord.date_of_birth || prev.profile?.dateOfBirth,
+            gender: patientRecord.gender ?? prev.profile?.gender,
+            occupation: profileDetails.occupation || patientRecord.occupation || prev.profile?.occupation,
+            handedness: profileDetails.handedness || patientRecord.handedness || prev.profile?.handedness
+          }
+        }));
       } else {
         console.error('ERROR: Patient record not found for reload');
       }

@@ -161,6 +161,9 @@ const ProfileModal = ({ isOpen, onClose, onProfileUpdate }) => {
       // Prepare data to send
       const dataToSave = { ...formData, avatar: avatarUrl };
 
+      // Email is the login identity and is read-only here — never write it
+      delete dataToSave.email;
+
       // Remove password fields if not changing password
       if (!formData.password) {
         delete dataToSave.currentPassword;
@@ -329,9 +332,10 @@ const ProfileModal = ({ isOpen, onClose, onProfileUpdate }) => {
               type="email"
               name="email"
               value={formData.email}
-              onChange={handleInputChange}
-              disabled={!isEditing}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 dark:disabled:bg-gray-800"
+              readOnly
+              disabled
+              title="Email is used to sign in and cannot be changed here"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-not-allowed"
             />
           </div>
 

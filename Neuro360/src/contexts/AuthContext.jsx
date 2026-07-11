@@ -697,6 +697,10 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
 
+      // Snapshot current state so we can roll back if the DB write fails
+      const previousUser = user;
+      const previousUserStorage = localStorage.getItem('user');
+
       // Update local state immediately for better UX
       const updatedUser = { ...user, ...userData };
 
@@ -792,9 +796,19 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (dbError) {
         console.error('ERROR: Database update failed:', dbError);
-        // Don't fail the entire operation if database fails
+        // Roll back the optimistic update so the UI reflects reality instead of
+        // showing a fake success (e.g. when an RLS policy rejects the write).
+        setUser(previousUser);
+        if (previousUserStorage !== null) {
+          localStorage.setItem('user', previousUserStorage);
+        } else {
+          localStorage.removeItem('user');
+        }
+        const message = getFriendlyErrorMessage(dbError, 'We could not save your changes. Please try again.');
+        toast.error(message);
+        return { success: false, error: message };
       }
-      
+
       toast.success('Profile updated successfully!');
       return { success: true };
     } catch (error) {

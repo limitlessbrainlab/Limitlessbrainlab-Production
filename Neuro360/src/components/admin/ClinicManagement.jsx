@@ -65,7 +65,7 @@ const ClinicManagement = ({ onUpdate }) => {
   // delivers imperfectly. { clinicName, email, password }
   const [createdCredentials, setCreatedCredentials] = useState(null);
 
-  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm();
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm({ defaultValues: { countryCode: '+91' } });
 
   // Delete clinic function
   const deleteClinic = async (clinic, index) => {
@@ -818,7 +818,7 @@ const ClinicManagement = ({ onUpdate }) => {
         address: clinic.address || '',
       });
     } else {
-      reset({});
+      reset({ countryCode: '+91' });
     }
     setShowModal(true);
   };
@@ -826,7 +826,7 @@ const ClinicManagement = ({ onUpdate }) => {
   const closeModal = () => {
     setShowModal(false);
     setSelectedClinic(null);
-    reset({});
+    reset({ countryCode: '+91' });
   };
 
   const viewClinicDetails = (clinic) => {
@@ -2083,6 +2083,9 @@ const ClinicModal = ({ clinic, clinics, user, onSubmit, onClose, register, handl
                   lineHeight: "1.5"
                 }}
               >
+                {/* Default: India */}
+                <option value="+91">IN +91</option>
+
                 {/* North America */}
                 <option value="+1">US +1</option>
                 <option value="+1">CA +1</option>
@@ -2113,7 +2116,6 @@ const ClinicModal = ({ clinic, clinics, user, onSubmit, onClose, register, handl
                 <option value="+7">RU +7</option>
 
                 {/* Asia - South */}
-                <option value="+91">IN +91</option>
                 <option value="+92">PK +92</option>
                 <option value="+880">BD +880</option>
                 <option value="+94">LK +94</option>

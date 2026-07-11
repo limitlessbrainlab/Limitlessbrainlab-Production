@@ -1665,8 +1665,15 @@ const AlgorithmDataProcessor = () => {
       };
 
 
-      const savedReport = await DatabaseService.addReport(reportData);
-      checkCreditAlert(clinicId); // credit consumed → maybe alert clinic + admin
+      // A DB save failure must NOT suppress the email — the patient/clinic still need
+      // their report link. Save best-effort, then always attempt email delivery below.
+      try {
+        await DatabaseService.addReport(reportData);
+        checkCreditAlert(clinicId); // credit consumed → maybe alert clinic + admin
+      } catch (saveError) {
+        console.error('⚠️ Could not save report row (continuing to email anyway):', saveError);
+        toast.error('Could not save the report to the dashboard, but we will still email it.');
+      }
 
       // Send report emails to clinic and patient
       try {
@@ -1698,7 +1705,7 @@ const AlgorithmDataProcessor = () => {
 
         if (!emailResponse.ok) {
           const emailErrorData = await emailResponse.json().catch(() => null);
-          const emailErrorMessage = emailErrorData?.message || `Server error (${emailResponse.status})`;
+          const emailErrorMessage = emailErrorData?.message || emailErrorData?.error || `Server error (${emailResponse.status})`;
           console.error('Failed to send report emails:', emailErrorMessage);
           toast.error(`Report saved, but email delivery failed: ${emailErrorMessage}`);
         } else {
@@ -1826,8 +1833,15 @@ const AlgorithmDataProcessor = () => {
       };
 
 
-      const savedReport = await DatabaseService.addReport(reportData);
-      checkCreditAlert(clinicId); // credit consumed → maybe alert clinic + admin
+      // A DB save failure must NOT suppress the email — the patient/clinic still need
+      // their report link. Save best-effort, then always attempt email delivery below.
+      try {
+        await DatabaseService.addReport(reportData);
+        checkCreditAlert(clinicId); // credit consumed → maybe alert clinic + admin
+      } catch (saveError) {
+        console.error('⚠️ Could not save report row (continuing to email anyway):', saveError);
+        toast.error('Could not save the report to the dashboard, but we will still email it.');
+      }
 
       // Send report emails to clinic and patient
       try {
@@ -1859,7 +1873,7 @@ const AlgorithmDataProcessor = () => {
 
         if (!emailResponse.ok) {
           const emailErrorData = await emailResponse.json().catch(() => null);
-          const emailErrorMessage = emailErrorData?.message || `Server error (${emailResponse.status})`;
+          const emailErrorMessage = emailErrorData?.message || emailErrorData?.error || `Server error (${emailResponse.status})`;
           console.error('Failed to send Claude report emails:', emailErrorMessage);
           toast.error(`Report saved, but email delivery failed: ${emailErrorMessage}`);
         } else {
@@ -1955,6 +1969,86 @@ const AlgorithmDataProcessor = () => {
     } catch (error) {
       console.error('❌ Error sending Claude report for record:', error);
       toast.error(getFriendlyErrorMessage(error, 'Failed to send the Neurosense Performance Report. Please try again.'));
+    }
+  };
+
+  // Send the base Neurosense Report for a specific Processing-History record — mirrors
+  // sendClaudeReportForRecord but sources the URL from the record's base pdfUrl and uses
+  // the 'neurosense' email template.
+  const sendReportForRecord = async (record) => {
+    const url = record.pdfUrl || record.pdf_url;
+    if (!url) { toast.error('No Neurosense Report on this record'); return; }
+
+    try {
+      const patientName = record.inputData?.patientName || record.patientName || getPatientName(selectedPatient);
+      const patientId = record.patientId || record.inputData?.patientId || selectedPatient?.id;
+      const patientEmail = record.patientEmail || record.inputData?.patientEmail || selectedPatient?.email;
+
+      const { clinicId, clinicEmail, clinicName } = await resolveClinicForEmail({
+        patientId,
+        clinicId: record.clinicId || record.inputData?.clinicId || selectedPatient?.clinicId || selectedPatient?.clinic_id || selectedPatient?.org_id
+      });
+
+      // Hard block when the clinic has no report credits left.
+      if (await blockIfNoCredits(clinicId)) return;
+
+      // Standard Neurosense-Report-<name>.pdf name (matches the download button).
+      const fileName = `Neurosense-Report-${(patientName || 'patient').replace(/[^a-z0-9]/gi, '-')}.pdf`;
+      const savedResults = parseResultsData(record.outputData || record.output_data || record.results);
+
+      const reportData = {
+        clinicId: clinicId,
+        patientId: record.patientId || selectedPatient?.id,
+        fileName: fileName,
+        filePath: url,
+        reportType: 'NeuroSense Report',
+        reportData: {
+          title: `Neurosense Report - ${patientName}`,
+          reportType: 'NeuroSense Report',
+          description: `Neurosense Report for ${patientName}`,
+          fileUrl: url,
+          filePath: url,
+          patientName: patientName,
+          processedAt: new Date().toISOString(),
+          brainParameters: savedResults || [],
+          uploadedBy: 'Super Admin',
+          uploadStatus: 'completed',
+          storedInCloud: url.includes('supabase')
+        },
+        status: 'completed'
+      };
+
+      await DatabaseService.addReport(reportData);
+      checkCreditAlert(clinicId); // credit consumed → maybe alert clinic + admin
+
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const baseUrl = apiUrl.replace(/\/api\/?$/, '');
+      const token = await getFreshToken();
+      const emailHeaders = { 'Content-Type': 'application/json' };
+      if (token) {
+        emailHeaders['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${baseUrl}/api/send-report-email`, {
+        method: 'POST',
+        headers: emailHeaders,
+        body: JSON.stringify({
+          patientName: patientName,
+          patientEmail: patientEmail,
+          clinicName: clinicName,
+          clinicEmail: clinicEmail,
+          reportUrl: url,
+          reportFileName: fileName,
+          reportType: 'neurosense',
+          generatedAt: record.processed_at || record.processedAt || record.created_at || record.createdAt || new Date().toISOString()
+        })
+      });
+      if (!response.ok) throw new Error(`Server error (${response.status})`);
+
+      toast.success('Neurosense Report sent to patient & clinic.');
+    } catch (error) {
+      console.error('❌ Error sending Neurosense Report for record:', error);
+      toast.error(getFriendlyErrorMessage(error, 'Failed to send the Neurosense Report. Please try again.'));
     }
   };
 
@@ -3644,6 +3738,18 @@ const AlgorithmDataProcessor = () => {
                       >
                         <Download className="h-4 w-4" />
                         <span>Download Neurosense Report</span>
+                      </button>
+                    )}
+
+                    {/* Base Neurosense Report — send to patient & clinic */}
+                    {(record.pdfUrl || record.pdf_url) && (
+                      <button
+                        onClick={() => sendReportForRecord(record)}
+                        className="px-3 py-2 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors flex items-center justify-center space-x-1"
+                        title="Send the Neurosense Report to the patient and clinic"
+                      >
+                        <Send className="h-4 w-4" />
+                        <span>Send to Clinic & Patient</span>
                       </button>
                     )}
 

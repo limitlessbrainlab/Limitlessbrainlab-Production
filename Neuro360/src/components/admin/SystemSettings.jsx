@@ -28,6 +28,7 @@ import toast from 'react-hot-toast';
 import DatabaseBackupService from '../../services/databaseBackupService';
 import LocationService from '../../services/locationService';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
+import { countryCodes, validatePhoneNumber, getCountryByCode } from '../../utils/countryCodes';
 
 const SystemSettings = () => {
   const [activeSection, setActiveSection] = useState('general');
@@ -113,7 +114,7 @@ const SystemSettings = () => {
   const [clinicLocationsLoading, setClinicLocationsLoading] = useState(false);
   const [clinicLocationForm, setClinicLocationForm] = useState(null); // null = hidden, {} = add mode, {id: ...} = edit mode
   const [clinicFormData, setClinicFormData] = useState({
-    name: '', title: '', description: '', address: '', phone: '', image_url: '', status: 'active', sort_order: ''
+    name: '', title: '', description: '', address: '', countryCode: '+91', phone: '', image_url: '', status: 'active', sort_order: ''
   });
 
   // Load locations when section is active
@@ -212,12 +213,15 @@ const SystemSettings = () => {
   };
 
   const handleOpenClinicEditForm = (loc) => {
+    // Best-effort split of a stored "+91 99999 00001" style value into code + number.
+    const { countryCode, phone } = splitPhone(loc.phone || '');
     setClinicFormData({
       name: loc.name || '',
       title: loc.title || '',
       description: loc.description || '',
       address: loc.address || '',
-      phone: loc.phone || '',
+      countryCode,
+      phone,
       image_url: loc.image_url || '',
       status: loc.status || 'active',
       sort_order: loc.sort_order || ''
@@ -225,13 +229,36 @@ const SystemSettings = () => {
     setClinicLocationForm({ id: loc.id }); // object with id = edit mode
   };
 
+  // Split a stored phone string into a known country code + the remaining number.
+  const splitPhone = (stored) => {
+    const value = (stored || '').trim();
+    if (value.startsWith('+')) {
+      // Match the longest known code first (e.g. +971 before +9).
+      const match = [...countryCodes]
+        .sort((a, b) => b.code.length - a.code.length)
+        .find((c) => value.startsWith(c.code));
+      if (match) {
+        return { countryCode: match.code, phone: value.slice(match.code.length).trim() };
+      }
+    }
+    return { countryCode: '+91', phone: value };
+  };
+
   const handleClinicFormChange = (field, value) => {
-    setClinicFormData(prev => ({ ...prev, [field]: value }));
+    // Phone: keep digits only (country code is picked from the dropdown separately)
+    const nextValue = field === 'phone' ? value.replace(/\D/g, '') : value;
+    setClinicFormData(prev => ({ ...prev, [field]: nextValue }));
   };
 
   const handleClinicFormSubmit = async () => {
     if (!clinicFormData.name.trim()) {
       toast.error('Location name is required');
+      return;
+    }
+
+    // Validate the phone number against the selected country's length rules
+    if (clinicFormData.phone.trim() && !validatePhoneNumber(clinicFormData.phone, clinicFormData.countryCode)) {
+      toast.error('Please enter a valid phone number for the selected country');
       return;
     }
 
@@ -242,7 +269,7 @@ const SystemSettings = () => {
         title: clinicFormData.title.trim(),
         description: clinicFormData.description.trim(),
         address: clinicFormData.address.trim(),
-        phone: clinicFormData.phone.trim(),
+        phone: clinicFormData.phone.trim() ? `${clinicFormData.countryCode} ${clinicFormData.phone.trim()}` : '',
         image_url: clinicFormData.image_url.trim(),
         status: clinicFormData.status,
         sort_order: clinicFormData.sort_order ? parseInt(clinicFormData.sort_order) : undefined
@@ -261,7 +288,7 @@ const SystemSettings = () => {
         title: clinicFormData.title.trim(),
         description: clinicFormData.description.trim(),
         address: clinicFormData.address.trim(),
-        phone: clinicFormData.phone.trim(),
+        phone: clinicFormData.phone.trim() ? `${clinicFormData.countryCode} ${clinicFormData.phone.trim()}` : '',
         image_url: clinicFormData.image_url.trim(),
         status: clinicFormData.status,
         sort_order: clinicFormData.sort_order ? parseInt(clinicFormData.sort_order) : undefined
@@ -541,13 +568,28 @@ const SystemSettings = () => {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
-              <input
-                type="text"
-                value={clinicFormData.phone}
-                onChange={(e) => handleClinicFormChange('phone', e.target.value)}
-                placeholder="+91 99999 00001"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
+              <div className="flex gap-2">
+                <select
+                  value={clinicFormData.countryCode}
+                  onChange={(e) => handleClinicFormChange('countryCode', e.target.value)}
+                  className="w-28 px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                  {countryCodes.map((c) => (
+                    <option key={`${c.country}-${c.code}`} value={c.code} disabled={c.disabled}>
+                      {c.disabled ? c.country : `${c.flag} ${c.code}`}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={getCountryByCode(clinicFormData.countryCode)?.maxLength || 15}
+                  value={clinicFormData.phone}
+                  onChange={(e) => handleClinicFormChange('phone', e.target.value)}
+                  placeholder="9999900001"
+                  className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
             </div>
           </div>
 
@@ -573,8 +615,16 @@ const SystemSettings = () => {
               </label>
             </div>
             {clinicFormData.image_url && (
-              <div className="mt-2 relative w-24 h-16 rounded-lg overflow-hidden border border-gray-200">
+              <div className="mt-2 relative w-24 h-16 rounded-lg overflow-hidden border border-gray-200 group">
                 <img src={clinicFormData.image_url} alt="Preview" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+                <button
+                  type="button"
+                  onClick={() => handleClinicFormChange('image_url', '')}
+                  title="Remove image"
+                  className="absolute top-1 right-1 p-0.5 bg-black/60 hover:bg-red-600 text-white rounded-full"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
             )}
           </div>

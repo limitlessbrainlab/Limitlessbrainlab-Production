@@ -3,9 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import reportEmailTemplate from '../shared/reportEmailTemplate.cjs';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
-const FROM_ADDRESS = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@limitlessbrainlab.com';
+const FROM_ADDRESS = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'info@limitlessbrainlab.com';
 const EMAIL_FROM = `"Limitless Brain Lab" <${FROM_ADDRESS}>`;
-const LOGO_URL = `${FRONTEND_URL}/IBW%20Logo.png`;
+// Load the logo from the brand production domain (aligned with the From domain), never a
+// *.vercel.app host. A remote image from a domain other than the sender's is a spam smell;
+// this serverless function can't reliably read /public for a cid: attachment, so serving it
+// from the same brand domain as the sender is the robust equivalent.
+const LOGO_URL = 'https://limitlessbrainlab.com/IBW%20Logo.png';
 const { getReportEmailHtml, getNeuroSenseReportEmailHtml } = reportEmailTemplate;
 
 function getBody(req) {
@@ -95,6 +99,10 @@ export default async function handler(req, res) {
           from: fromEmail,
           to: clinicEmail,
           replyTo: replyTo(),
+          headers: {
+            'List-Unsubscribe': `<mailto:${replyTo()}?subject=unsubscribe>`,
+            'X-Mailer': 'Limitless Brain Lab Mailer'
+          },
           subject: `${reportLabel} - ${patientName || 'Patient'}`,
           text: `Hello ${clinicName || 'Clinic'},\n\nThe ${reportLabel} for ${patientName || 'your patient'} is ready.\n\nDownload: ${reportUrl}\nLog in: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
           html: buildReportHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl: clinicLoginUrl, generatedAt, logoSrc: LOGO_URL }),

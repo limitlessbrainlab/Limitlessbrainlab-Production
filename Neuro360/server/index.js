@@ -123,14 +123,14 @@ function getEmailFooterHtml() {
               <p style="margin:0 0 16px; color:#323956; font-size:14px;">Access all the brain health courses &nbsp;<a href="https://www.limitlessbrainacademy.com" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">www.limitlessbrainacademy.com</a></p>
               <p style="margin:0 0 12px; color:#323956; font-size:14px;">&#128222; &nbsp;WhatsApp: <a href="https://api.whatsapp.com/send?phone=919769696534&text=%F0%9F%98%8A" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">+91 9769696534</a></p>
               <p style="margin:0 0 10px; color:#323956; font-size:14px;">Social Media:</p>
-              <table cellpadding="0" cellspacing="0"><tr>
-                <td style="padding-right:14px;"><a href="https://www.instagram.com/drsweta.adatia/?hl=en" target="_blank"><img src="https://img.icons8.com/fluency/48/instagram-new.png" alt="Instagram" width="30" height="30" style="display:block; border:0;"/></a></td>
-                <td style="padding-right:14px;"><a href="https://www.facebook.com/sweta.adatia" target="_blank"><img src="https://img.icons8.com/fluency/48/facebook-new.png" alt="Facebook" width="30" height="30" style="display:block; border:0;"/></a></td>
-                <td style="padding-right:14px;"><a href="https://www.linkedin.com/in/drswetaadatia/" target="_blank"><img src="https://img.icons8.com/fluency/48/linkedin.png" alt="LinkedIn" width="30" height="30" style="display:block; border:0;"/></a></td>
-                <td><a href="https://www.youtube.com/@drsweta.adatia" target="_blank"><img src="https://img.icons8.com/fluency/48/youtube-play.png" alt="YouTube English" width="30" height="30" style="display:block; border:0;"/></a></td>
-                <td style="padding-left:14px;"><a href="https://www.youtube.com/@drsweta.adatiahindi" target="_blank"><img src="https://img.icons8.com/fluency/48/youtube-play.png" alt="YouTube Hindi" width="30" height="30" style="display:block; border:0;"/></a></td>
-              </tr></table>
-              <p style="margin:8px 0 0; color:#888; font-size:12px;">&#9654; English &nbsp;&#9654; Hindi</p>
+              <!-- Text links (no remote images) keep the footer out of spam filters and render even when images are blocked. -->
+              <p style="margin:0; color:#323956; font-size:14px; line-height:1.8;">
+                <a href="https://www.instagram.com/drsweta.adatia/?hl=en" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">Instagram</a> &nbsp;&#183;&nbsp;
+                <a href="https://www.facebook.com/sweta.adatia" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">Facebook</a> &nbsp;&#183;&nbsp;
+                <a href="https://www.linkedin.com/in/drswetaadatia/" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">LinkedIn</a> &nbsp;&#183;&nbsp;
+                <a href="https://www.youtube.com/@drsweta.adatia" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">YouTube (English)</a> &nbsp;&#183;&nbsp;
+                <a href="https://www.youtube.com/@drsweta.adatiahindi" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">YouTube (Hindi)</a>
+              </p>
             </td>
           </tr>
         </table>
@@ -161,6 +161,20 @@ function enhanceMailOptions(mailOptions) {
   }
   if (!enhanced.replyTo && process.env.EMAIL_REPLY_TO) {
     enhanced.replyTo = process.env.EMAIL_REPLY_TO;
+  }
+  // Ensure a display name on the From header. A few flows set `from` to a bare address
+  // (invoice/renewal/payment-failed, or a clinic's own SMTP sender). A missing display name
+  // weakens the brand/trust signal that spam filters look at. Wrap bare addresses; leave
+  // already-named ("Name" <addr>) values untouched.
+  if (enhanced.from && typeof enhanced.from === 'string' && !enhanced.from.includes('<')) {
+    enhanced.from = `"Limitless Brain Lab" <${enhanced.from.trim()}>`;
+  }
+  // Add List-Unsubscribe to every message. Gmail/Outlook reward its presence with better
+  // inbox placement. Idempotent: the report/OTP flows that already set it are left as-is.
+  // (mailto form only — a one-click POST header would require a live https endpoint.)
+  if (!enhanced.headers || (!enhanced.headers['List-Unsubscribe'] && !enhanced.headers['list-unsubscribe'])) {
+    const unsubAddr = process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || 'info@limitlessbrainlab.com';
+    enhanced.headers = { ...(enhanced.headers || {}), 'List-Unsubscribe': `<mailto:${unsubAddr}?subject=unsubscribe>` };
   }
   return enhanced;
 }
@@ -217,6 +231,11 @@ const SERVER_VERSION = DEPLOY_SIGNATURE;
 
 // Outbound email "From" address (all emails to users/patients/clinics)
 const EMAIL_FROM = `"Limitless Brain Lab" <${process.env.EMAIL_FROM || 'info@limitlessbrainlab.com'}>`;
+
+// Internal audit copy: specific credential + report emails are BCC'd here so the
+// business keeps a record of every login/credential/report mail sent to clinics,
+// partners, and patients. Applied per-template (not globally) — see plan.
+const INTERNAL_COPY_EMAIL = process.env.INTERNAL_COPY_EMAIL || 'limitlessbrainlab@gmail.com';
 
 // Canonical production URL for user-facing navigation/login links in emails.
 // Hardcoded on purpose: some backends set FRONTEND_URL to a stale *.vercel.app
@@ -339,23 +358,6 @@ const buildClinicNotificationEmail = ({ to, subject, heading, subheading, greeti
   };
 };
 
-// Generate a random system password
-const generateSystemPassword = () => {
-  const length = 12;
-  const lowercase = 'abcdefghijklmnopqrstuvwxyz';
-  const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const numbers = '0123456789';
-  const symbols = '!@#$%^&*';
-  const allChars = lowercase + uppercase + numbers + symbols;
-  let password = '';
-  password += uppercase[Math.floor(Math.random() * uppercase.length)];
-  password += numbers[Math.floor(Math.random() * numbers.length)];
-  for (let i = 0; i < length - 2; i++) {
-    password += allChars[Math.floor(Math.random() * allChars.length)];
-  }
-  return password.split('').sort(() => Math.random() - 0.5).join('');
-};
-
 // Reusable admin notification email template
 const getAdminNotificationHtml = (formTitle, dataRows) => `
 <!DOCTYPE html>
@@ -466,7 +468,7 @@ const getUserConfirmationHtml = (userName) => `
           <!-- Footer -->
           <tr>
             <td style="background: #f8f9fc; padding: 16px 32px; border-top: 1px solid #e5e7eb; text-align: center;">
-              <p style="color: #aaa; margin: 0; font-size: 11px;">Limitlessbrainlab.com &nbsp;|&nbsp; limitlessbrainlab@gmail.com</p>
+              <p style="color: #aaa; margin: 0; font-size: 11px;">Limitlessbrainlab.com &nbsp;|&nbsp; info@limitlessbrainlab.com</p>
             </td>
           </tr>
 
@@ -517,7 +519,7 @@ const getReportReceivedHtml = (patientName, clinicName) => `
           <!-- Footer -->
           <tr>
             <td style="background: #f8f9fc; padding: 16px 32px; border-top: 1px solid #e5e7eb; text-align: center;">
-              <p style="color: #aaa; margin: 0; font-size: 11px;">Limitlessbrainlab.com &nbsp;|&nbsp; limitlessbrainlab@gmail.com</p>
+              <p style="color: #aaa; margin: 0; font-size: 11px;">Limitlessbrainlab.com &nbsp;|&nbsp; info@limitlessbrainlab.com</p>
             </td>
           </tr>
 
@@ -627,7 +629,7 @@ const getProtectMyBrainEmailHtml = (userName) => `
           <!-- Footer -->
           <tr>
             <td style="background: #f8f9fc; padding: 16px 32px; border-top: 1px solid #e5e7eb; text-align: center;">
-              <p style="color: #aaa; margin: 0; font-size: 11px;">Limitlessbrainlab.com &nbsp;|&nbsp; limitlessbrainlab@gmail.com</p>
+              <p style="color: #aaa; margin: 0; font-size: 11px;">Limitlessbrainlab.com &nbsp;|&nbsp; info@limitlessbrainlab.com</p>
             </td>
           </tr>
 
@@ -729,7 +731,7 @@ const getTreatMyBrainEmailHtml = (userName) => `
           <!-- Footer -->
           <tr>
             <td style="background: #f8f9fc; padding: 16px 32px; border-top: 1px solid #e5e7eb; text-align: center;">
-              <p style="color: #aaa; margin: 0; font-size: 11px;">Limitlessbrainlab.com &nbsp;|&nbsp; limitlessbrainlab@gmail.com</p>
+              <p style="color: #aaa; margin: 0; font-size: 11px;">Limitlessbrainlab.com &nbsp;|&nbsp; info@limitlessbrainlab.com</p>
             </td>
           </tr>
 
@@ -2601,7 +2603,7 @@ async function applySubscriptionPurchase(session) {
     const welcomeMail = {
       from: EMAIL_FROM,
       to: email,
-      subject: `Welcome to Limitless Brain Lab ${tier}!`,
+      subject: `Welcome to Limitless Brain Lab ${tier}`,
       attachments: getLogoAttachment(),
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -2999,7 +3001,7 @@ app.post('/api/send-assessment-email', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: customerEmail,
-      subject: `Your ${assessmentName} is Ready! - Limitless Brain Lab`,
+      subject: `Your ${assessmentName} is ready - Limitless Brain Lab`,
       attachments: getLogoAttachment(),
       html: `
         <!DOCTYPE html>
@@ -3095,7 +3097,7 @@ app.post('/api/send-assessment-email', async (req, res) => {
                   <tr>
                     <td style="background: #f8f9fc; padding: 20px 32px; border-top: 1px solid #e5e7eb;">
                       <p style="color: #888; margin: 0; font-size: 12px; text-align: center;">
-                        Thank you for choosing Limitless Brain Lab! If you have any questions, contact us at limitlessbrainlab@gmail.com
+                        Thank you for choosing Limitless Brain Lab! If you have any questions, contact us at info@limitlessbrainlab.com
                       </p>
                     </td>
                   </tr>
@@ -3565,7 +3567,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             const assessmentMailOptions = {
               from: EMAIL_FROM,
               to: session.customer_email,
-              subject: `Your ${assessmentName} is Ready! - Limitless Brain Lab`,
+              subject: `Your ${assessmentName} is ready - Limitless Brain Lab`,
               attachments: getLogoAttachment(),
               html: `
                 <!DOCTYPE html>
@@ -3665,7 +3667,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                           <tr>
                             <td style="background: #f8f9fc; padding: 20px 32px; border-top: 1px solid #e5e7eb;">
                               <p style="color: #888; margin: 0; font-size: 12px; text-align: center;">
-                                Thank you for choosing Limitless Brain Lab! If you have any questions, contact us at limitlessbrainlab@gmail.com
+                                Thank you for choosing Limitless Brain Lab! If you have any questions, contact us at info@limitlessbrainlab.com
                               </p>
                             </td>
                           </tr>
@@ -3751,7 +3753,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
               ? {
                   from: EMAIL_FROM,
                   to: session.customer_email,
-                  subject: `Package Reorder Successful - ${reports} EEG Reports Added!`,
+                  subject: `Package Reorder Successful - ${reports} EEG Reports Added`,
                   attachments: getLogoAttachment(),
                   html: `
                     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
@@ -3785,7 +3787,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                         <p style="color: #999; font-size: 12px; text-align: center;">Thank you for your continued trust in Limitless Brain Lab!</p>
                       </div>
                       <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-                        <p style="margin: 0; color: #94a3b8; font-size: 11px;">Limitless Brain Lab &bull; limitlessbrainlab@gmail.com</p>
+                        <p style="margin: 0; color: #94a3b8; font-size: 11px;">Limitless Brain Lab &bull; info@limitlessbrainlab.com</p>
                       </div>
                     </div>
                   `
@@ -3793,7 +3795,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
               : {
                   from: EMAIL_FROM,
                   to: session.customer_email,
-                  subject: `Payment Successful - ${reports} EEG Reports Added!`,
+                  subject: `Payment Successful - ${reports} EEG Reports Added`,
                   attachments: getLogoAttachment(),
                   html: `
                     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -3933,7 +3935,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           const mailOptions = {
             from: EMAIL_FROM,
             to: session.customer_email,
-            subject: `Your ${packName} is Ready! - Limitless Brain Lab`,
+            subject: `Your ${packName} is ready - Limitless Brain Lab`,
             attachments: getLogoAttachment(),
             html: `
               <!DOCTYPE html>
@@ -4012,7 +4014,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                         <tr>
                           <td style="background: #f8f9fc; padding: 20px 32px; border-top: 1px solid #e5e7eb;">
                             <p style="color: #888; margin: 0; font-size: 12px;">
-                              Thank you for your purchase! If you have any questions, contact us at limitlessbrainlab@gmail.com
+                              Thank you for your purchase! If you have any questions, contact us at info@limitlessbrainlab.com
                             </p>
                           </td>
                         </tr>
@@ -4565,6 +4567,7 @@ app.post('/api/clinic-credentials', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: email,
+      bcc: INTERNAL_COPY_EMAIL,
       subject: `Your Account created with LimitlessBrain Lab`,
       html: `
         <!DOCTYPE html>
@@ -4842,7 +4845,7 @@ app.post('/api/registration-confirmation', async (req, res) => {
       mailOptions = {
         from: EMAIL_FROM,
         to: email,
-        subject: `Registration Successful - Welcome to Limitless Brain Lab!`,
+        subject: `Registration Successful - Welcome to Limitless Brain Lab`,
         html: `
           <!DOCTYPE html>
           <html>
@@ -4912,7 +4915,7 @@ app.post('/api/registration-confirmation', async (req, res) => {
                       <td style="padding: 0 32px 24px;">
                         <div style="background: #eff6ff; border-radius: 12px; padding: 16px; text-align: center;">
                           <p style="color: #1e40af; margin: 0; font-size: 13px;">
-                            Need help? Contact us at <a href="mailto:limitlessbrainlab@gmail.com" style="color: #1e40af; font-weight: 600;">limitlessbrainlab@gmail.com</a>
+                            Need help? Contact us at <a href="mailto:info@limitlessbrainlab.com" style="color: #1e40af; font-weight: 600;">info@limitlessbrainlab.com</a>
                           </p>
                         </div>
                       </td>
@@ -6530,6 +6533,7 @@ app.post('/api/send-email-update-notification', async (req, res) => {
     const mailOptions = {
       from: fromEmail,
       to: newEmail,
+      bcc: INTERNAL_COPY_EMAIL,
       subject: 'Your login credentials were updated — Limitless Brain Lab Portal',
       attachments: getLogoAttachment(),
       html: `
@@ -6717,6 +6721,7 @@ app.post('/api/send-report-email', async (req, res) => {
     const patientMailOptions = {
       from: fromEmail,
       to: patientEmail,
+      bcc: INTERNAL_COPY_EMAIL,
       replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || EMAIL_FROM,
       headers: {
         'List-Unsubscribe': `<mailto:${process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || 'noreply@limitlessbrainlab.com'}?subject=unsubscribe>`,
@@ -6738,6 +6743,7 @@ app.post('/api/send-report-email', async (req, res) => {
       const clinicMailOptions = {
         from: fromEmail,
         to: clinicEmail,
+        bcc: INTERNAL_COPY_EMAIL,
         subject: `${reportLabel} — ${patientName || 'Patient'}`,
         text: `Hello ${clinicName || 'Clinic'},\n\nThe ${reportLabel} for ${patientName || 'your patient'} is ready for clinical review.\n\nDownload the report (PDF): ${reportUrl}\nLog in to your portal: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
         attachments: getLogoAttachment(),
@@ -7198,7 +7204,7 @@ app.post('/api/notify-patient-report', async (req, res) => {
               </div>
             </div>
             <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="margin: 0; color: #94a3b8; font-size: 11px;">Limitless Brain Lab &bull; limitlessbrainlab@gmail.com</p>
+              <p style="margin: 0; color: #94a3b8; font-size: 11px;">Limitless Brain Lab &bull; info@limitlessbrainlab.com</p>
             </div>
           </div>
         `
@@ -7233,7 +7239,7 @@ app.post('/api/notify-patient-report', async (req, res) => {
               </div>
             </div>
             <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="margin: 0; color: #94a3b8; font-size: 11px;">Limitless Brain Lab &bull; limitlessbrainlab@gmail.com</p>
+              <p style="margin: 0; color: #94a3b8; font-size: 11px;">Limitless Brain Lab &bull; info@limitlessbrainlab.com</p>
             </div>
           </div>
         `
@@ -7308,10 +7314,10 @@ app.post('/api/send-no-credit-email', async (req, res) => {
             <div style="text-align: center; margin: 28px 0;">
               <a href="${FRONTEND_URL}${dashboardPath}" style="display: inline-block; background: #323956; color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">Buy More Credits</a>
             </div>
-            <p style="color: #999; font-size: 12px; line-height: 1.6;">If you need assistance, please contact us at <a href="mailto:limitlessbrainlab@gmail.com" style="color: #323956;">limitlessbrainlab@gmail.com</a></p>
+            <p style="color: #999; font-size: 12px; line-height: 1.6;">If you need assistance, please contact us at <a href="mailto:info@limitlessbrainlab.com" style="color: #323956;">info@limitlessbrainlab.com</a></p>
           </div>
           <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-            <p style="margin: 0; color: #94a3b8; font-size: 11px;">Limitless Brain Lab &bull; limitlessbrainlab@gmail.com</p>
+            <p style="margin: 0; color: #94a3b8; font-size: 11px;">Limitless Brain Lab &bull; info@limitlessbrainlab.com</p>
           </div>
         </div>
       `
@@ -7724,6 +7730,7 @@ app.post('/api/send-partner-welcome-email', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: email,
+      bcc: INTERNAL_COPY_EMAIL,
       subject: 'Welcome to Limitless Brain Lab - Partner Account Activated',
       attachments: getLogoAttachment(),
       html: `
@@ -7779,7 +7786,7 @@ app.post('/api/send-partner-payment-success', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: partnerEmail,
-      subject: isReorder ? `Package Reorder Successful - ${reports} EEG Reports Added!` : `Payment Successful - ${reports} EEG Reports Added!`,
+      subject: isReorder ? `Package Reorder Successful - ${reports} EEG Reports Added` : `Payment Successful - ${reports} EEG Reports Added`,
       attachments: getLogoAttachment(),
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
@@ -7999,17 +8006,29 @@ app.post('/api/send-partner-patient-welcome', async (req, res) => {
 // 6. PARTNER EMAIL UPDATE
 app.post('/api/send-partner-email-update', async (req, res) => {
   try {
-    const { partnerName, newEmail } = req.body;
+    const { partnerName, oldEmail, newEmail, password } = req.body;
 
     if (!newEmail || !partnerName) {
       return res.status(400).json({ success: false, message: 'Required fields missing' });
     }
 
-    const newPassword = generateSystemPassword();
+    // Notify BOTH the previous and the updated address so whoever holds either
+    // inbox sees the change. De-duplicate in case old === new.
+    const recipients = [...new Set([newEmail, oldEmail].filter(Boolean))];
+
+    // Only render a password block when a plain-text password is available.
+    const passwordBlock = password
+      ? `
+              <div style="background: white; border-radius: 8px; padding: 13px 15px; border-left: 4px solid #2E5BA8; margin-top: 12px;">
+                <p style="color: #888; margin: 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Password</p>
+                <p style="color: #1E3A5F; margin: 5px 0 0; font-size: 14px; font-weight: 600; font-family: monospace;">${escapeHtml(password)}</p>
+              </div>`
+      : '';
 
     const mailOptions = {
       from: EMAIL_FROM,
-      to: newEmail,
+      to: recipients,
+      bcc: INTERNAL_COPY_EMAIL,
       subject: 'Your email ID updated — Limitless Brain Lab Partner Portal',
       attachments: getLogoAttachment(),
       html: `
@@ -8019,13 +8038,13 @@ app.post('/api/send-partner-email-update', async (req, res) => {
             <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 700;">Email Updated</h1>
           </div>
           <div style="padding: 35px 30px;">
-            <p style="color: #333; font-size: 15px; margin: 0 0 15px;">Hello <strong>${partnerName}</strong>,</p>
-            <p style="color: #555; font-size: 14px; line-height: 1.6; margin: 0 0 25px;">Your email address has been successfully updated.</p>
+            <p style="color: #333; font-size: 15px; margin: 0 0 15px;">Hello <strong>${escapeHtml(partnerName)}</strong>,</p>
+            <p style="color: #555; font-size: 14px; line-height: 1.6; margin: 0 0 25px;">This is your updated email ID and password for the Limitless Brain Lab Partner Portal. Please use these credentials to log in.</p>
             <div style="background: #f0f7ff; border-radius: 10px; padding: 18px 20px; margin: 25px 0; border: 1px solid #d4e9ff;">
               <div style="background: white; border-radius: 8px; padding: 13px 15px; border-left: 4px solid #2E5BA8;">
                 <p style="color: #888; margin: 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Updated Email</p>
-                <p style="color: #1E3A5F; margin: 5px 0 0; font-size: 14px; font-weight: 600;">${newEmail}</p>
-              </div>
+                <p style="color: #1E3A5F; margin: 5px 0 0; font-size: 14px; font-weight: 600;">${escapeHtml(newEmail)}</p>
+              </div>${passwordBlock}
             </div>
           </div>
           <div style="background: #f8fafc; padding: 18px 30px; text-align: center; border-top: 1px solid #e5e7eb;">
@@ -8036,7 +8055,7 @@ app.post('/api/send-partner-email-update', async (req, res) => {
     };
 
     await emailTransporter.sendMail(mailOptions);
-    // Do not return the generated password in the API response; it is delivered by email only.
+    // Do not return the password in the API response; it is delivered by email only.
     res.json({ success: true, message: 'Email update notification sent' });
 
   } catch (error) {

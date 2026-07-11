@@ -1,47 +1,72 @@
-# Email Deliverability Setup — Stop Mails Going to Spam
+# Email Deliverability Setup — Keeping Mail Out of Spam
 
-## Root cause (found 2026-06-10)
+> **History:** An earlier version of this doc described a **Brevo** setup with a
+> `@gmail.com` From address. That is obsolete. Brevo has been removed from the
+> code; all mail now sends via **Gmail / Google Workspace SMTP** from a domain
+> address. Do **not** re-add the Brevo SPF record (`include:spf.brevo.com`) — it
+> does not authorize Google's servers and would break authentication.
 
-Outbound mail was being sent through **Brevo SMTP** with a `@gmail.com` From
-address. A Gmail From address sent via non-Google servers fails SPF and DKIM
-alignment, so Gmail/Outlook treat it as spoofed mail and send it to spam.
-Additionally, `limitlessbrainlab.com` must have SPF, DKIM, and DMARC records in
-DNS before using a domain From address.
+## How mail is sent today
 
-Code-level mitigations (plain-text alternative part, Reply-To support) are
-already applied in `server/index.js`. The steps below are the actual fix and
-require the Brevo dashboard + the Vercel account that owns the domain DNS.
+- **Transport:** `smtp.gmail.com:465` (`secure: true`), authenticated as
+  `EMAIL_USER = info@limitlessbrainlab.com` — a real Google Workspace mailbox.
+  See `server/index.js` (`createTransport`) and `api/send-report-email.js`.
+- **From:** `"Limitless Brain Lab" <info@limitlessbrainlab.com>`
+  (constant `EMAIL_FROM`, `server/index.js`). Because the From domain and the
+  authenticated account share the domain, **SPF, DKIM, and DMARC all align.**
+- **Render must be on a paid plan** — the free tier blocks SMTP ports 25/465/587,
+  so mail would not send at all. See the boot warning in `server/index.js` and
+  `render.yaml`.
 
-## Step 1 — Authenticate the domain in Brevo
+## DNS (already live and correct — verify, don't change)
 
-Brevo dashboard → **Senders & Domains → Domains → Add a domain** →
-`limitlessbrainlab.com`. Brevo shows 2–3 DNS records (a `brevo-code` TXT and a
-DKIM TXT at `mail._domainkey`). Add them in Vercel DNS, then click
-**Authenticate** in Brevo.
+Current published records for `limitlessbrainlab.com`:
 
-## Step 2 — Add SPF + DMARC in Vercel DNS
+| Type | Name                 | Value |
+|------|----------------------|-------|
+| TXT  | `@`                  | `v=spf1 include:_spf.google.com ~all` |
+| TXT  | `google._domainkey`  | Google Workspace DKIM key (`v=DKIM1; k=rsa; p=…`) |
+| TXT  | `_dmarc`             | `v=DMARC1; p=quarantine; adkim=r; aspf=r; rua=mailto:…` |
+| MX   | `@`                  | `smtp.google.com` |
 
-The domain uses Vercel nameservers (`ns1/ns2.vercel-dns.com`). In the Vercel
-dashboard of the account that owns `limitlessbrainlab.com` (Domains → DNS):
+Verify any time with:
 
-| Type | Name     | Value |
-|------|----------|-------|
-| TXT  | `@`      | `v=spf1 include:spf.brevo.com ~all` |
-| TXT  | `_dmarc` | `v=DMARC1; p=none; rua=mailto:chatgptnotes@gmail.com` |
+```bash
+dig +short TXT limitlessbrainlab.com            # SPF
+dig +short TXT google._domainkey.limitlessbrainlab.com   # DKIM
+dig +short TXT _dmarc.limitlessbrainlab.com     # DMARC
+```
 
-After 2–4 weeks of clean DMARC reports, tighten `p=none` → `p=quarantine`.
+DKIM for Google Workspace is enabled in the **Google Admin console**
+(Apps → Google Workspace → Gmail → Authenticate email), which publishes the
+`google._domainkey` record above.
 
-## Step 3 — Switch the From address (Render env vars)
+## Code-level anti-spam measures (in the app)
 
-Only after Step 1 shows "Authenticated" in Brevo:
+These are applied automatically to every send by `enhanceMailOptions()` /
+`patchSendMail()` in `server/index.js`:
 
-- `EMAIL_FROM=info@limitlessbrainlab.com`
-- `EMAIL_REPLY_TO=<monitored inbox>` (optional — replies to noreply mail get
-  routed here; the code applies it automatically when set)
+- **Multipart:** a plain-text alternative is derived from every HTML body.
+- **From display name:** bare addresses are wrapped as `"Limitless Brain Lab" <…>`.
+- **`List-Unsubscribe`** header on every message (report/OTP flows set their own).
+- **`Reply-To`** applied from `EMAIL_REPLY_TO` when set.
+- **No remote images:** the shared footer uses text links for social media (not
+  hotlinked icons); the logo and signature are embedded as `cid:` attachments.
+  The Vercel report sender (`api/send-report-email.js`) can't read `/public`, so
+  it loads the logo from the brand domain `https://limitlessbrainlab.com/…`.
+- **No free-mail address in bodies:** contact copy uses `info@limitlessbrainlab.com`.
 
-Add `info@limitlessbrainlab.com` as a verified sender in Brevo if prompted.
+## Optional improvements
 
-## Step 4 — Verify
+- Point the DMARC `rua=` to a **monitored inbox** so authentication failures are
+  visible (it currently reports to a registrar default address).
+- Reputation is built by consistent, wanted mail over time — no code change fixes
+  a cold-domain reputation.
 
-Send any app email to the address shown at https://www.mail-tester.com and
-confirm SPF, DKIM, and DMARC all pass and the score is 9–10/10.
+## Verify a real send
+
+Send any app email (e.g. password reset or report-ready) to the address shown at
+<https://www.mail-tester.com> and confirm **SPF, DKIM, and DMARC all PASS** with a
+**9–10/10** score and no "contains remote images" / "reply-to a free address"
+penalties. In Gmail, use **Show original** to confirm `SPF: PASS`, `DKIM: PASS`,
+`DMARC: PASS`, and that a `List-Unsubscribe` header is present.

@@ -232,9 +232,10 @@ const SERVER_VERSION = DEPLOY_SIGNATURE;
 // Outbound email "From" address (all emails to users/patients/clinics)
 const EMAIL_FROM = `"Limitless Brain Lab" <${process.env.EMAIL_FROM || 'info@limitlessbrainlab.com'}>`;
 
-// Internal audit copy: specific credential + report emails are BCC'd here so the
-// business keeps a record of every login/credential/report mail sent to clinics,
-// partners, and patients. Applied per-template (not globally) — see plan.
+// Internal audit copy: specific credential + report emails are CC'd here (visible to
+// the recipient — deliberately CC, not BCC) so the business keeps a record of every
+// login/credential/report mail sent to clinics, partners, and patients.
+// Applied per-template (not globally) — see plan.
 const INTERNAL_COPY_EMAIL = process.env.INTERNAL_COPY_EMAIL || 'limitlessbrainlab@gmail.com';
 
 // Canonical production URL for user-facing navigation/login links in emails.
@@ -6384,6 +6385,7 @@ app.post('/api/send-welcome-email', async (req, res) => {
     const mailOptions = {
       from: fromEmail,
       to: email,
+      cc: INTERNAL_COPY_EMAIL,
       subject: 'Welcome to Limitless Brain Lab - Your Login Credentials',
       attachments: getLogoAttachment(),
       html: `
@@ -6693,7 +6695,7 @@ app.post('/api/send-email-update-notification', async (req, res) => {
         throw sendErr;
       }
     }
-    console.log('✅ Credentials update email sent successfully:', { to: newEmail, messageId: sendResult?.messageId, passwordChanged: hasNewPassword });
+    console.log('✅ Credentials update email sent successfully:', { to: newEmail, messageId: sendResult?.messageId, passwordChanged });
 
     // Also notify the clinic that a patient's login details changed (no password shown, non-fatal).
     if (clinicEmail) {

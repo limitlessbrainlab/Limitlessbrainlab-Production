@@ -53,7 +53,10 @@ const Landing = () => {
           customerName: bfsPaymentName.toUpperCase(),
           currency: 'USD',
           amount: 2.99,
-          assessmentLink: 'https://form.jotform.com/232184893262057'
+          assessmentLink: 'https://form.jotform.com/232184893262057',
+          source: 'landing',
+          successUrl: `${window.location.origin}/?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${window.location.origin}/?payment=cancelled`
         })
       });
       const data = await response.json();
@@ -106,6 +109,21 @@ const Landing = () => {
     });
 
     return () => observer.disconnect();
+  }, []);
+
+  // Handle return from Stripe checkout (Brain Fitness Score paid from the landing page).
+  // Buyer lands back on "/" instead of a protected dashboard route; the assessment link
+  // is emailed by the Stripe webhook, so we just confirm and clean the URL.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get('payment');
+    if (!payment) return;
+    if (payment === 'success') {
+      toast.success('Payment successful! Your assessment link has been emailed to you.');
+    } else if (payment === 'cancelled') {
+      toast('Payment cancelled.');
+    }
+    window.history.replaceState({}, '', window.location.pathname);
   }, []);
 
   // Stat Counter Animation with Intersection Observer
@@ -2030,7 +2048,7 @@ const Landing = () => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6 lg:gap-8 max-w-lg sm:max-w-3xl mx-auto px-2 sm:px-0 scroll-fade-up" data-scroll-section="bundle-cards">
-                {/* Brain Fitness Score - $4.99 */}
+                {/* Brain Fitness Score - USD 2.99 */}
                 <div className="group relative h-full">
                   <div className="absolute -inset-[1px] bg-gradient-to-b from-[#c9a227] via-[#c9a227]/40 to-transparent rounded-3xl opacity-0 group-hover:opacity-100 transition-all duration-700"></div>
                   <div className="relative bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-7 md:p-9 text-center transition-all duration-500 hover:-translate-y-2 border border-gray-200 hover:border-transparent shadow-sm hover:shadow-2xl hover:shadow-[#c9a227]/10 overflow-hidden h-full flex flex-col">
@@ -2044,8 +2062,8 @@ const Landing = () => {
                     <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-[#323956] mb-1.5 sm:mb-2"><span className="italic">Brain Fitness Score</span>™</h3>
                     <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">Quick assessment to understand your brain health</p>
                     <div className="mb-4 sm:mb-6 py-3 sm:py-4 bg-[#c9a227]/5 rounded-xl sm:rounded-2xl">
-                      <span className="text-gray-400 line-through text-sm sm:text-base block mb-1">$9.99</span>
-                      <span className="text-2xl sm:text-3xl md:text-5xl font-extrabold text-[#c9a227]">$2.99</span>
+                      <span className="text-gray-400 line-through text-sm sm:text-base block mb-1">USD 9.99</span>
+                      <span className="text-2xl sm:text-3xl md:text-5xl font-extrabold text-[#c9a227]">USD 2.99</span>
                     </div>
                     <ul className="text-left space-y-2.5 sm:space-y-3 mb-6 sm:mb-8 flex-grow">
                       {['Brain health questionnaire', 'Instant score & insights', 'No equipment needed'].map((t) => (
@@ -2457,8 +2475,8 @@ const Landing = () => {
                 <h3 className="font-bold text-gray-900 text-sm sm:text-base">Brain Fitness Score™</h3>
                 <p className="text-gray-500 text-xs sm:text-sm mt-1">Quick assessment to understand your brain health</p>
                 <div className="mt-2 sm:mt-3 flex items-baseline gap-2">
-                  <span className="text-gray-400 line-through text-xs sm:text-sm">USD $9.99</span>
-                  <span className="text-xl sm:text-2xl font-bold text-[#c9a227]">USD $2.99</span>
+                  <span className="text-gray-400 line-through text-xs sm:text-sm">USD 9.99</span>
+                  <span className="text-xl sm:text-2xl font-bold text-[#c9a227]">USD 2.99</span>
                 </div>
               </div>
 
@@ -2513,7 +2531,7 @@ const Landing = () => {
                     Processing...
                   </>
                 ) : (
-                  <>Pay USD $4.99 & Continue</>
+                  <>Pay USD 2.99 & Continue</>
                 )}
               </button>
             </div>

@@ -6,7 +6,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eigh
 const FROM_ADDRESS = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@limitlessbrainlab.com';
 const EMAIL_FROM = `"Limitless Brain Lab" <${FROM_ADDRESS}>`;
 const LOGO_URL = `${FRONTEND_URL}/IBW%20Logo.png`;
-const { getReportEmailHtml } = reportEmailTemplate;
+const { getReportEmailHtml, getNeuroSenseReportEmailHtml } = reportEmailTemplate;
 
 function getBody(req) {
   if (!req.body) return {};
@@ -45,7 +45,13 @@ export default async function handler(req, res) {
       return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
-    const { patientName, patientEmail, clinicName, clinicEmail, reportUrl, generatedAt } = getBody(req);
+    const { patientName, patientEmail, clinicName, clinicEmail, reportUrl, generatedAt, reportType } = getBody(req);
+
+    // NeuroSense Report (QEEG) uses its own template/subject; anything else keeps the
+    // existing Neuro Performance Report template unchanged.
+    const isNeuroSense = reportType === 'neurosense';
+    const reportLabel = isNeuroSense ? 'NeuroSense Report' : 'Neuro Performance Report';
+    const buildReportHtml = isNeuroSense ? getNeuroSenseReportEmailHtml : getReportEmailHtml;
 
     if (!patientEmail || !reportUrl) {
       return res.status(400).json({ success: false, message: 'Patient email and report URL are required' });
@@ -77,9 +83,9 @@ export default async function handler(req, res) {
         'List-Unsubscribe': `<mailto:${replyTo()}?subject=unsubscribe>`,
         'X-Mailer': 'Limitless Brain Lab Mailer'
       },
-      subject: 'Your Neuro Performance Report is Ready',
-      text: `Hi ${patientName || 'there'},\n\nYour Neuro Performance Report is ready.\n\nDownload your report: ${reportUrl}\nLog in: ${patientLoginUrl}\n\nThe Limitless Brain Lab Team`,
-      html: getReportEmailHtml({ isClinic: false, patientName, clinicName, reportUrl, loginUrl: patientLoginUrl, generatedAt, logoSrc: LOGO_URL }),
+      subject: `Your ${reportLabel} is Ready`,
+      text: `Hi ${patientName || 'there'},\n\nYour ${reportLabel} is ready.\n\nDownload your report: ${reportUrl}\nLog in: ${patientLoginUrl}\n\nThe Limitless Brain Lab Team`,
+      html: buildReportHtml({ isClinic: false, patientName, clinicName, reportUrl, loginUrl: patientLoginUrl, generatedAt, logoSrc: LOGO_URL }),
     });
 
     let clinicEmailSent = false;
@@ -89,9 +95,9 @@ export default async function handler(req, res) {
           from: fromEmail,
           to: clinicEmail,
           replyTo: replyTo(),
-          subject: `Neuro Performance Report - ${patientName || 'Patient'}`,
-          text: `Hello ${clinicName || 'Clinic'},\n\nThe Neuro Performance Report for ${patientName || 'your patient'} is ready.\n\nDownload: ${reportUrl}\nLog in: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
-          html: getReportEmailHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl: clinicLoginUrl, generatedAt, logoSrc: LOGO_URL }),
+          subject: `${reportLabel} - ${patientName || 'Patient'}`,
+          text: `Hello ${clinicName || 'Clinic'},\n\nThe ${reportLabel} for ${patientName || 'your patient'} is ready.\n\nDownload: ${reportUrl}\nLog in: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
+          html: buildReportHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl: clinicLoginUrl, generatedAt, logoSrc: LOGO_URL }),
         });
         clinicEmailSent = true;
       } catch (error) {

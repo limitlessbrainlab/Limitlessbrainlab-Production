@@ -12,7 +12,7 @@ const ssoRoutes = require('./routes/ssoRoutes');
 const claudeRoutes = require('./routes/claudeRoutes');
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcryptjs');
-const { getReportEmailHtml } = require('../shared/reportEmailTemplate.cjs');
+const { getReportEmailHtml, getNeuroSenseReportEmailHtml } = require('../shared/reportEmailTemplate.cjs');
 
 // Import middleware
 const { setupMiddleware, setupRateLimiters, protectedRoutes, setupErrorHandling, asyncHandler } = require('./middleware/setupMiddleware');
@@ -6668,7 +6668,8 @@ app.post('/api/send-report-email', async (req, res) => {
       clinicName,
       clinicEmail,
       reportUrl,
-      generatedAt
+      generatedAt,
+      reportType
     } = req.body;
 
     console.log('📧 send-report-email called:', {
@@ -6704,8 +6705,14 @@ app.post('/api/send-report-email', async (req, res) => {
     const patientLoginUrl = `${FRONTEND_URL}/patient/login`;
     const clinicLoginUrl = `${FRONTEND_URL}/clinic/login`;
 
-    const reportHtmlPatient = getReportEmailHtml({ isClinic: false, patientName, clinicName, reportUrl, loginUrl: patientLoginUrl, generatedAt });
-    const reportHtmlClinic = getReportEmailHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl: clinicLoginUrl, generatedAt });
+    // NeuroSense Report (QEEG) uses its own template/subject; everything else keeps the
+    // existing Neuro Performance Report template unchanged.
+    const isNeuroSense = reportType === 'neurosense';
+    const reportLabel = isNeuroSense ? 'NeuroSense Report' : 'Neuro Performance Report';
+    const buildReportHtml = isNeuroSense ? getNeuroSenseReportEmailHtml : getReportEmailHtml;
+
+    const reportHtmlPatient = buildReportHtml({ isClinic: false, patientName, clinicName, reportUrl, loginUrl: patientLoginUrl, generatedAt });
+    const reportHtmlClinic = buildReportHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl: clinicLoginUrl, generatedAt });
 
     const patientMailOptions = {
       from: fromEmail,
@@ -6715,8 +6722,8 @@ app.post('/api/send-report-email', async (req, res) => {
         'List-Unsubscribe': `<mailto:${process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || 'noreply@limitlessbrainlab.com'}?subject=unsubscribe>`,
         'X-Mailer': 'Limitless Brain Lab Mailer'
       },
-      subject: `Your Neuro Performance Report is Ready`,
-      text: `Hi ${patientName || 'there'},\n\nYour Neuro Performance Report is ready.\n\nDownload your report (PDF): ${reportUrl}\nLog in to your portal: ${patientLoginUrl}\n\nThe Limitless Brain Lab Team`,
+      subject: `Your ${reportLabel} is Ready`,
+      text: `Hi ${patientName || 'there'},\n\nYour ${reportLabel} is ready.\n\nDownload your report (PDF): ${reportUrl}\nLog in to your portal: ${patientLoginUrl}\n\nThe Limitless Brain Lab Team`,
       attachments: getLogoAttachment(),
       html: reportHtmlPatient
     };
@@ -6731,8 +6738,8 @@ app.post('/api/send-report-email', async (req, res) => {
       const clinicMailOptions = {
         from: fromEmail,
         to: clinicEmail,
-        subject: `Neuro Performance Report — ${patientName || 'Patient'}`,
-        text: `Hello ${clinicName || 'Clinic'},\n\nThe Neuro Performance Report for ${patientName || 'your patient'} is ready for clinical review.\n\nDownload the report (PDF): ${reportUrl}\nLog in to your portal: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
+        subject: `${reportLabel} — ${patientName || 'Patient'}`,
+        text: `Hello ${clinicName || 'Clinic'},\n\nThe ${reportLabel} for ${patientName || 'your patient'} is ready for clinical review.\n\nDownload the report (PDF): ${reportUrl}\nLog in to your portal: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
         attachments: getLogoAttachment(),
         html: reportHtmlClinic
       };

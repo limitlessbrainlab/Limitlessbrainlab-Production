@@ -245,9 +245,21 @@ const SystemSettings = () => {
   };
 
   const handleClinicFormChange = (field, value) => {
-    // Phone: keep digits only (country code is picked from the dropdown separately)
-    const nextValue = field === 'phone' ? value.replace(/\D/g, '') : value;
-    setClinicFormData(prev => ({ ...prev, [field]: nextValue }));
+    setClinicFormData(prev => {
+      if (field === 'phone') {
+        // Keep digits only and hard-cap to the selected country's max length
+        // (e.g. India +91 = 10). Enforced here in JS, not just via the input's
+        // maxLength attribute, which paste/autofill/voice input can bypass.
+        const maxLen = getCountryByCode(prev.countryCode)?.maxLength || 15;
+        return { ...prev, phone: value.replace(/\D/g, '').slice(0, maxLen) };
+      }
+      if (field === 'countryCode') {
+        // Re-truncate any already-entered number to the new country's max length.
+        const maxLen = getCountryByCode(value)?.maxLength || 15;
+        return { ...prev, countryCode: value, phone: (prev.phone || '').slice(0, maxLen) };
+      }
+      return { ...prev, [field]: value };
+    });
   };
 
   const handleClinicFormSubmit = async () => {

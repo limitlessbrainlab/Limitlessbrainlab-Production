@@ -207,11 +207,17 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const result = await response.json();
-      if (result.success) {
-        return result.data || [];
+      if (result.success && Array.isArray(result.data) && result.data.length > 0) {
+        return result.data;
       }
-      console.error(`Failed to fetch ${tableName}:`, result.message || result.error);
-      return [];
+      // Server responded but returned no rows (unsuccessful, empty, or missing data).
+      // Fall back to the frontend client — the same path the working Clinic Management
+      // list uses — so the clinic dropdown mirrors it instead of coming back empty.
+      if (!result.success) {
+        console.error(`Failed to fetch ${tableName}:`, result.message || result.error);
+      }
+      const fallbackData = await DatabaseService.get(tableName) || [];
+      return fallbackData.length > 0 ? fallbackData : (result.data || []);
     } catch (error) {
       console.error(`Error fetching ${tableName} from server:`, error);
       // Fallback to direct Supabase call
@@ -274,6 +280,13 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
       const normalizedClinics = clinicsData.map(normalizeClinic);
       const normalizedPatients = patientsData.map(normalizePatient);
       const normalizedSubscriptions = subscriptionsData.map(normalizeSubscription);
+
+      // Populate the clinic and patient lists immediately after fetching them, BEFORE the
+      // report-processing below. That processing can throw (name matching, validation, etc.),
+      // and if it does, the catch block must not leave the Upload modal's clinic dropdown empty.
+      // The clinic-filtered patient refinement further down overrides this initial patient set.
+      setClinics(normalizedClinics);
+      setPatients(normalizedPatients);
 
       // Convert clinical_documentation records into report format
       const clinicDocReports = [];
@@ -2652,7 +2665,7 @@ const UploadReportModal = ({
               >
                 <option value="">Choose a clinic...</option>
                 {clinics.map(clinic => (
-                  <option key={clinic.id} value={clinic.id}>{clinic.name}</option>
+                  <option key={clinic.id} value={clinic.id}>{clinic.name || clinic.email || 'Unnamed Clinic'}</option>
                 ))}
               </select>
               {errors.clinicId && <p className="text-red-500 text-xs mt-1">{errors.clinicId.message}</p>}

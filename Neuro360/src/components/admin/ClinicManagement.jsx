@@ -1359,7 +1359,7 @@ Please manually share these credentials with the clinic.`;
                   </div>
                   <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2">
                     <p className="text-gray-500 dark:text-gray-400">Subscription</p>
-                    <p className="font-medium text-purple-600">{clinic.subscriptionStatus || 'Trial'}</p>
+                    <p className="font-medium text-purple-600 capitalize">{clinic.subscriptionStatus || 'Trial'}</p>
                   </div>
                 </div>
 
@@ -1612,7 +1612,7 @@ Please manually share these credentials with the clinic.`;
 
                       {/* Subscription */}
                       <td className="px-4 py-3 whitespace-nowrap text-center hidden lg:table-cell">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize ${
                           clinic.subscriptionStatus === 'active' ? 'bg-green-100 text-green-700' :
                           clinic.subscriptionStatus === 'expired' ? 'bg-red-100 text-red-700' :
                           'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'

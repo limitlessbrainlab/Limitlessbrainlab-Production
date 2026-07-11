@@ -466,6 +466,7 @@ const ClinicManagement = ({ onUpdate }) => {
         // contract_agreed not saved — column not yet in DB
         // Use single password field for authentication
         password: await hashPassword(password), // Encrypted password for login
+        plain_password: password, // Plaintext kept so credentials email can re-show it (deliberate)
         // Remove confirmPassword from stored data
         confirmPassword: undefined
       };
@@ -559,12 +560,19 @@ const ClinicManagement = ({ onUpdate }) => {
 
       await DatabaseService.update('clinics', selectedClinic.id, updateData);
 
-      // Send "email updated" notification to the new address if the email changed
+      // Send "email updated" notification to BOTH the previous and new address if
+      // the email changed. Include the current plain-text password (the one just
+      // set if it was changed, otherwise the stored plaintext).
       if (emailChanged && normalizedEmail) {
         fetch(`${getBaseUrl()}/api/send-partner-email-update`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ partnerName: data.name, newEmail: normalizedEmail })
+          body: JSON.stringify({
+            partnerName: data.name,
+            oldEmail: selectedClinic?.email || '',
+            newEmail: normalizedEmail,
+            password: editPassword || selectedClinic?.plain_password || ''
+          })
         }).catch(err => console.error('Failed to send clinic email update notification:', err));
       }
 

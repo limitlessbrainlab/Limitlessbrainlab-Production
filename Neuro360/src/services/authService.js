@@ -471,6 +471,9 @@ export const authService = {
           city: city || '',
           clinic_type: clinicType || clinic_type || 'lbl_partner',
           password: hashedPwd,
+          // Kept in plaintext so the approval email can show the SAME password the
+          // clinic chose here (bcrypt hash above is not reversible). Deliberate product decision.
+          plain_password: String(password || '').trim(),
           logo_url: null,
           is_active: false, // Pending approval
           reports_used: 0,

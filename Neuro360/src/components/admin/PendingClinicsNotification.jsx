@@ -69,19 +69,11 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
       setLoading(true);
       setSelectedItem(clinic);
 
-      // Generate random password
-      const generatePassword = () => {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$';
-        let password = '';
-        for (let i = 0; i < 12; i++) {
-          password += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return password;
-      };
-
-      const newPassword = generatePassword();
-      const hashedPassword = await hashPassword(newPassword);
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+      // Prefer the password the clinic chose at registration (stored in plain_password),
+      // so the approval email shows THEIR password and it keeps working at login.
+      const existingPlain = String(clinic.plain_password || clinic.plainPassword || '').trim();
 
       // Update clinic data
       const updatedClinic = {
@@ -90,7 +82,6 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
         isActive: true,
         subscription_status: 'active',
         subscriptionStatus: 'active',
-        password: hashedPassword,
         trial_start_date: new Date().toISOString(),
         trial_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days trial
         reports_allowed: 10,
@@ -98,6 +89,26 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
         // contract_agreed not saved — column not yet in DB
         updated_at: new Date().toISOString()
       };
+
+      let emailPassword;
+      if (existingPlain) {
+        // Keep the clinic's own password — do NOT reset the bcrypt hash (they log in with it).
+        emailPassword = existingPlain;
+      } else {
+        // Legacy fallback: no stored plaintext (clinic registered before this change) —
+        // issue a fresh password and store both hash + plaintext.
+        const generatePassword = () => {
+          const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$';
+          let password = '';
+          for (let i = 0; i < 12; i++) {
+            password += chars.charAt(Math.floor(Math.random() * chars.length));
+          }
+          return password;
+        };
+        emailPassword = generatePassword();
+        updatedClinic.password = await hashPassword(emailPassword);
+        updatedClinic.plain_password = emailPassword;
+      }
 
       // Save updated clinic
       await DatabaseService.update('clinics', clinic.id, updatedClinic);
@@ -113,7 +124,7 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
             clinicName: clinic.name || clinic.clinic_name,
             email: (clinic.email || '').trim().toLowerCase(),
             contactPerson: clinic.contact_person || clinic.name,
-            password: newPassword,
+            password: emailPassword,
             otp: otp
           })
         });
@@ -167,6 +178,8 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
       setRejectLoading(true);
 
       // Send rejection email first
+      let emailSent = false;
+      let emailFailReason = '';
       try {
         const emailResponse = await fetch(`${API_BASE_URL}/clinic-rejection`, {
           method: 'POST',
@@ -179,17 +192,25 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
           })
         });
         const emailResult = await emailResponse.json();
-        if (!emailResult.success) {
-          console.error('Rejection email failed:', emailResult.message);
+        if (emailResult.success) {
+          emailSent = true;
+        } else {
+          emailFailReason = emailResult.message || `HTTP ${emailResponse.status}`;
+          console.error('Rejection email failed:', emailFailReason);
         }
       } catch (emailError) {
+        emailFailReason = emailError?.message || String(emailError);
         console.error('Rejection email error:', emailError);
       }
 
       // Delete the clinic record
       await DatabaseService.delete('clinics', clinic.id);
 
-      toast.success(`${clinic.name} registration rejected. Email sent to the clinic.`);
+      if (emailSent) {
+        toast.success(`${clinic.name} registration rejected. Email sent to the clinic.`);
+      } else {
+        toast.error(`${clinic.name} rejected, but the rejection email FAILED. Reason: ${emailFailReason}. Notify the clinic manually.`, { duration: 8000 });
+      }
 
       // Close detail view and refresh
       setDetailClinic(null);

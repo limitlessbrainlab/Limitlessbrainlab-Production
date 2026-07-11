@@ -1006,6 +1006,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
                           >
                             <Edit className="h-4 w-4" />
                           </button>
+                          {/* Delete Patient icon hidden per request
                           <button
                             onClick={() => handleDeletePatient(patient.id)}
                             className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
@@ -1013,6 +1014,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
+                          */}
                         </div>
                       </td>
                     </tr>

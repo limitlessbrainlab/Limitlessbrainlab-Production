@@ -10236,7 +10236,11 @@ const PatientDashboard = () => {
       case 'welcome':
         return <WelcomeSection />;
       case 'profile':
-        return <ProfileSection />;
+        // Render as a function call (not <ProfileSection />) so the edit inputs
+        // keep focus while typing. As a JSX element it is a new component type on
+        // every keystroke-driven re-render, which remounts the subtree and drops
+        // the cursor after one character.
+        return ProfileSection();
       case 'feedback':
         return <FeedbackSection />;
       case 'reports':

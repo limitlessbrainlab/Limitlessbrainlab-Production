@@ -290,7 +290,7 @@ function renderReportHtml(reportData, narrative = {}) {
     { label: 'WEEK 4 — ACTIVATE', title: 'Layer in performance work', body: 'A daily goal-activation routine — one small task-start, one intention, one thing you are looking forward to. Add spaced repetition for anything you are learning.' },
   ];
 
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><style>
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>NeuroSense Performance Report</title><style>
   @page { size: A4 portrait; margin: 0; }
   * { margin:0; padding:0; box-sizing:border-box; }
   img.emoji { height:1em; width:1em; margin:0 .05em; vertical-align:-.12em; display:inline-block; }

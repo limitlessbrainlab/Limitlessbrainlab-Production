@@ -98,6 +98,8 @@ class DatabaseService {
           trialEndDate: clinic.trial_end_date,
           originUrl: clinic.origin_url,
           origin_url: clinic.origin_url, // Keep snake_case for login env check
+          credentials_updated_at: clinic.credentials_updated_at, // Session-validity baseline (email/password change marker)
+          credentialsUpdatedAt: clinic.credentials_updated_at,   // camelCase alias
           createdAt: clinic.created_at,
           updatedAt: clinic.updated_at
         }));
@@ -217,6 +219,7 @@ class DatabaseService {
         'trial_start_date', 'trial_end_date', 'created_at', 'updated_at',
         'password', // ONLY use password field for authentication
         'plain_password', // Plaintext kept so the approval/credentials email can re-show the clinic's own password
+        'credentials_updated_at', // Bumped on email/password change → forces open sessions to re-login
         'smtp_email', 'smtp_password', // Clinic SMTP config for sending emails
         'origin_url' // Environment (production/staging URL) the clinic was created from
         // Note: avatar stored in logo_url field
@@ -239,6 +242,7 @@ class DatabaseService {
         'id', 'org_id', 'clinic_id', 'clinic_name', 'owner_user', 'external_id', 'name', 'full_name', 'date_of_birth',
         'gender', 'phone', 'country_code', 'email', 'password', 'address', 'medical_history', 'improvement_focus',
         'brain_fitness_score', 'is_active', 'created_at', 'updated_at',
+        'credentials_updated_at', // Bumped on email/password change → forces open sessions to re-login
         'avatar', 'profile_image', 'profileImage', 'avatar_url',
         'occupation', 'handedness', 'referred_by',
         'origin_url' // Environment (production/staging URL) the patient was created from

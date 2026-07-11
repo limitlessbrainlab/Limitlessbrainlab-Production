@@ -125,6 +125,40 @@ export const AuthProvider = ({ children }) => {
     };
 
     const check = async () => {
+      // Force-logout clinic/patient sessions whose email or password was changed server-side.
+      // Their session is a self-contained localStorage blob that is otherwise never re-checked;
+      // this reuses the same 60s poll. Fail-open — any error keeps the session (never lock out
+      // a valid user on a transient hiccup). Suppressed while returning from Stripe.
+      try {
+        const rawUser = localStorage.getItem('user');
+        const u = rawUser ? JSON.parse(rawUser) : null;
+        if (u && (u.role === 'clinic_admin' || u.role === 'patient') && !isPaymentReturn()) {
+          const root = BACKEND_API_URL.replace(/\/api$/, '');
+          const resp = await fetch(`${root}/api/validate-session?t=${Date.now()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            cache: 'no-store',
+            body: JSON.stringify({
+              userId: u.id,
+              role: u.role,
+              email: u.email,
+              credentialsUpdatedAt: u.credentialsUpdatedAt || null,
+            }),
+          });
+          if (!stopped && resp.ok) {
+            const j = await resp.json().catch(() => null);
+            if (j && j.valid === false) {
+              stopped = true;
+              try { await clearAllAndSignOut(); } catch (e) { /* ignore */ }
+              localStorage.setItem('app_build_id', APP_BUILD_ID); // keep on-load gate consistent
+              const loginPath = u.role === 'patient' ? '/patient/login' : '/clinic/login';
+              window.location.href = `${loginPath}?reason=credentials-updated`;
+              return;
+            }
+          }
+        }
+      } catch (e) { /* offline/transient → keep session */ }
+      if (stopped) return;
       try {
         const [f, b] = await Promise.allSettled([
           fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)),

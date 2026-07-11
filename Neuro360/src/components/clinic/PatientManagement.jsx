@@ -482,6 +482,11 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
         patientData.password = await hashPassword(data.password);
       }
 
+      // Bump on email OR password change so the patient's open session is force-logged-out
+      if (emailChanged || passwordChanged) {
+        patientData.credentials_updated_at = new Date().toISOString();
+      }
+
       await DatabaseService.update('patients', selectedPatient.id, patientData);
 
       // Email the patient their updated credentials whenever email and/or password changed.

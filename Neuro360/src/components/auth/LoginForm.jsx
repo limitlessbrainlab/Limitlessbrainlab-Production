@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
@@ -29,6 +30,16 @@ const LoginForm = ({ userType: userTypeProp } = {}) => {
   }
 
   const location = useLocation();
+
+  // Explain the forced logout when a credential change kicked the user out of an open session.
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('reason') === 'credentials-updated') {
+      toast('Your login details were updated. Please sign in again with your new credentials.', {
+        icon: 'ℹ️',
+        duration: 6000,
+      });
+    }
+  }, [location.search]);
 
   // Role scope: prefer the route prop (/patient/login, /clinic/login, /admin/login),
   // then navigation state (footer buttons), else generic /login (no scope).

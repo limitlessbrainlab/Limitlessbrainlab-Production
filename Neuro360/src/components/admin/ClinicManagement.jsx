@@ -554,7 +554,11 @@ const ClinicManagement = ({ onUpdate }) => {
         country_code: data.countryCode || '+91', // Snake_case for Supabase
         // contract_agreed not saved — column not yet in DB
         password: hashedPassword || undefined,
-        passwordResetAt: hashedPassword ? new Date().toISOString() : undefined
+        // Keep plaintext in sync so the credential emails always show the real current password
+        plain_password: editPassword || undefined,
+        passwordResetAt: hashedPassword ? new Date().toISOString() : undefined,
+        // Bump on email OR password change so the clinic's open session is force-logged-out
+        credentials_updated_at: (emailChanged || hashedPassword) ? new Date().toISOString() : undefined
       };
 
 
@@ -934,7 +938,11 @@ const ClinicManagement = ({ onUpdate }) => {
       const hashedPassword = await hashPassword(password);
       await DatabaseService.update('clinics', selectedClinic.id, {
         password: hashedPassword,
+        // Keep plaintext in sync so the credential emails always show the real current password
+        plain_password: password,
         passwordResetAt: new Date().toISOString(),
+        // Bump so the clinic's open session is force-logged-out after a password reset
+        credentials_updated_at: new Date().toISOString(),
         activationOTP: otpCode,
         otpExpiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString() // 15 minutes
       });

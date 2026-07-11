@@ -140,7 +140,10 @@ export const authService = {
               role: 'clinic_admin',
               avatar: clinicByEmail.logo_url || clinicByEmail.avatar,
               clinicId: clinicByEmail.id,
-              isActivated: isActive
+              isActivated: isActive,
+              // Baseline for the session-validity poll: if the DB value later advances
+              // (email/password changed by an admin), the open session is force-logged-out.
+              credentialsUpdatedAt: clinicByEmail.credentials_updated_at || null
             }
           };
         }
@@ -223,7 +226,10 @@ export const authService = {
                 clinicId: patient.clinic_id || patient.org_id,
                 patientId: patient.id,
                 externalId: patient.external_id,
-                isActivated: true
+                isActivated: true,
+                // Baseline for the session-validity poll: if the DB value later advances
+                // (email/password changed by the clinic), the open session is force-logged-out.
+                credentialsUpdatedAt: patient.credentials_updated_at || null
               }
             };
           }

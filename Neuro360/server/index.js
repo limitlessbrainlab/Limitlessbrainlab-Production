@@ -5956,7 +5956,13 @@ app.post('/api/reset-password', async (req, res) => {
       .from('clinics').select('id').eq('email', normalizedEmail).limit(1);
     if (clinicErr) throw clinicErr;
     if (clinicRows && clinicRows.length > 0) {
-      const { error: updErr } = await supabase.from('clinics').update({ password: hashed }).eq('id', clinicRows[0].id);
+      // Keep plaintext in sync so credential emails show the real current password, and bump
+      // credentials_updated_at so the clinic's open session is force-logged-out.
+      const { error: updErr } = await supabase.from('clinics').update({
+        password: hashed,
+        plain_password: newPassword,
+        credentials_updated_at: new Date().toISOString()
+      }).eq('id', clinicRows[0].id);
       if (updErr) throw updErr;
       role = 'clinic';
     }
@@ -5967,7 +5973,11 @@ app.post('/api/reset-password', async (req, res) => {
         .from('patients').select('id').eq('email', normalizedEmail);
       if (patientErr) throw patientErr;
       if (patientRows && patientRows.length > 0) {
-        const { error: updErr } = await supabase.from('patients').update({ password: hashed }).eq('email', normalizedEmail);
+        // Bump credentials_updated_at so the patient's open session is force-logged-out.
+        const { error: updErr } = await supabase.from('patients').update({
+          password: hashed,
+          credentials_updated_at: new Date().toISOString()
+        }).eq('email', normalizedEmail);
         if (updErr) throw updErr;
         await syncSupabaseAuth();
         role = 'patient';
@@ -6006,6 +6016,55 @@ app.post('/api/reset-password', async (req, res) => {
   } catch (error) {
     console.error('Error resetting password:', error?.message || error);
     res.status(500).json({ success: false, message: 'Failed to reset password. Please try again.' });
+  }
+});
+
+// =====================================================
+// SESSION VALIDITY CHECK (force-logout on credential change)
+// =====================================================
+// Clinic/patient sessions live only in the browser (fake local_token_/patient_token_) and are
+// never otherwise re-checked against the DB. The frontend polls this endpoint on the existing
+// version-poll interval; when an admin changes a clinic/partner's email or password (or a clinic
+// changes a patient's), credentials_updated_at advances (and/or the email no longer matches),
+// this returns { valid: false }, and the client wipes the session and sends the user to /login.
+app.post('/api/validate-session', async (req, res) => {
+  try {
+    const { userId, role, email, credentialsUpdatedAt } = req.body || {};
+
+    // Only clinic/patient sessions are validated here. Any other role (e.g. super_admin, which
+    // is re-validated against Supabase Auth on load) is treated as still valid.
+    const table = role === 'clinic_admin' ? 'clinics' : role === 'patient' ? 'patients' : null;
+    if (!table || !userId) {
+      return res.json({ valid: true });
+    }
+
+    const { data: row, error } = await supabase
+      .from(table)
+      .select('id, email, credentials_updated_at')
+      .eq('id', userId)
+      .maybeSingle();
+
+    // On a transient read error, keep the session (fail-open) so a blip never logs users out.
+    if (error) {
+      console.warn('validate-session read failed:', error?.message);
+      return res.json({ valid: true });
+    }
+
+    // Row deleted → session no longer valid.
+    if (!row) {
+      return res.json({ valid: false });
+    }
+
+    const emailChanged = (row.email || '').trim().toLowerCase() !== (email || '').trim().toLowerCase();
+    // A null baseline (session predates this feature) is "older than" any set DB value.
+    const credChanged = !!row.credentials_updated_at &&
+      (!credentialsUpdatedAt || new Date(row.credentials_updated_at) > new Date(credentialsUpdatedAt));
+
+    return res.json({ valid: !(emailChanged || credChanged) });
+  } catch (error) {
+    console.error('validate-session error:', error?.message || error);
+    // Fail-open on unexpected errors — never lock a valid user out on a server hiccup.
+    return res.json({ valid: true });
   }
 });
 

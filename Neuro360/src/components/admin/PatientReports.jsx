@@ -2091,7 +2091,7 @@ const PatientDetailModal = ({ patient, reports, clinics, onClose, onDownloadRepo
                         <div className="space-y-2">
                           {bp.map((param, i) => (
                             <div key={i} className="flex items-center justify-between bg-white rounded-lg p-3 border border-gray-200">
-                              <div className="text-sm font-medium text-gray-900">{param.name}</div>
+                              <div className="text-sm font-medium text-gray-900">{param.name || param.parameter || param.label || '—'}</div>
                               <div className="text-right">
                                 <span className={`text-lg font-bold ${param.status === 'normal' ? 'text-green-600' : param.status === 'borderline' ? 'text-orange-500' : 'text-red-500'}`}>
                                   {param.value || param.score || '--'}

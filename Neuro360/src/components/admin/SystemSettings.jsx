@@ -131,7 +131,10 @@ const SystemSettings = () => {
   };
 
   const handleAddLocation = async () => {
-    if (!newLocationName.trim()) return;
+    if (!newLocationName.trim()) {
+      toast.error('Please enter a location name first');
+      return;
+    }
     const result = await LocationService.addLocation(newLocationName);
     if (result.success) {
       toast.success(`Location "${newLocationName.toUpperCase()}" added`);
@@ -393,8 +396,7 @@ const SystemSettings = () => {
         />
         <button
           onClick={handleAddLocation}
-          disabled={!newLocationName.trim()}
-          className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium"
+          className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 flex items-center gap-2 text-sm font-medium"
         >
           <Plus className="h-4 w-4" />
           Add

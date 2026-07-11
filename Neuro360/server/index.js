@@ -2795,9 +2795,15 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
 
     const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
 
+    // Redirect back to the EXACT domain the payment was started from (req.headers.origin),
+    // so a patient paying on limitlessbrainlab.com is not bounced to the Vercel URL — where
+    // they have no session and get redirected to /login. Fall back to FRONTEND_URL only if
+    // the Origin header is absent (e.g. server-to-server calls).
+    const redirectBase = req.headers.origin || FRONTEND_URL;
+
     // Use custom URLs if provided (for public pages), otherwise default to dashboard
-    const finalSuccessUrl = successUrl || `${FRONTEND_URL}/dashboard/about-brain?payment=success&assessment=${assessmentId}&session_id={CHECKOUT_SESSION_ID}`;
-    const finalCancelUrl = cancelUrl || `${FRONTEND_URL}/dashboard/about-brain?payment=cancelled`;
+    const finalSuccessUrl = successUrl || `${redirectBase}/dashboard/about-brain?payment=success&assessment=${assessmentId}&session_id={CHECKOUT_SESSION_ID}`;
+    const finalCancelUrl = cancelUrl || `${redirectBase}/dashboard/about-brain?payment=cancelled`;
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({

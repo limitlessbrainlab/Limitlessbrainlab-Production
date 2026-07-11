@@ -408,7 +408,8 @@ const ProfileModal = ({ isOpen, onClose, onProfileUpdate }) => {
             />
           </div>
 
-          {/* Password Change Section - Only shown when editing */}
+          {/* Password change disabled per request — patients cannot change their
+              password from the profile modal. Kept as a comment for easy re-enable.
           {isEditing && (
             <>
               <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -488,6 +489,7 @@ const ProfileModal = ({ isOpen, onClose, onProfileUpdate }) => {
               </div>
             </>
           )}
+          */}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

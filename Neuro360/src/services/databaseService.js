@@ -70,6 +70,8 @@ class DatabaseService {
           name: clinic.name,
           email: clinic.email,
           password: clinic.password,  // SUCCESS: CRITICAL: Include password for login authentication
+          plain_password: clinic.plain_password,  // Plaintext retained so credential emails can re-show the current password
+          plainPassword: clinic.plain_password,   // camelCase alias for compatibility
           contactPerson: clinic.contact_person,
           contact_person: clinic.contact_person,  // Keep snake_case for compatibility
           clinicName: clinic.clinic_name,

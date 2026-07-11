@@ -1402,6 +1402,7 @@ app.get('/api/inquiries/:type', async (req, res) => {
       'contact': 'contact_inquiries',
       'clinic': 'clinic_enquiries',
       'partnership': 'franchise_inquiries',
+      'investment': 'franchise_inquiries',
       'professional': 'professional_onboarding',
       'program': 'program_inquiries',
       'feedback': 'patient_feedback'
@@ -1412,10 +1413,19 @@ app.get('/api/inquiries/:type', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid inquiry type' });
     }
 
-    const { data, error } = await supabase
+    // Partnership and investment share the franchise_inquiries table, split by inquiry_type.
+    let query = supabase
       .from(tableName)
       .select('*')
       .order('created_at', { ascending: false });
+    if (req.params.type === 'investment') {
+      query = query.eq('inquiry_type', 'investment');
+    } else if (req.params.type === 'partnership') {
+      // Treat legacy/NULL rows as partnership.
+      query = query.or('inquiry_type.eq.partnership,inquiry_type.is.null');
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error(`Error fetching ${req.params.type} inquiries:`, error);
@@ -1440,6 +1450,7 @@ app.delete('/api/inquiries/:type/:id', async (req, res) => {
       'contact': 'contact_inquiries',
       'clinic': 'clinic_enquiries',
       'partnership': 'franchise_inquiries',
+      'investment': 'franchise_inquiries',
       'professional': 'professional_onboarding',
       'program': 'program_inquiries'
     };

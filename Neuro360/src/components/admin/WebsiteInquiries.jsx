@@ -20,7 +20,8 @@ import {
   Award,
   Users,
   Brain,
-  Star
+  Star,
+  TrendingUp
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useRealtimeRefetch from '../../hooks/useRealtimeRefetch';
@@ -30,6 +31,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 const TABS = [
   { id: 'contact', label: 'Contact Inquiries', icon: Mail },
   { id: 'partnership', label: 'Partnership Inquiries', icon: HandMetal },
+  { id: 'investment', label: 'Investment Inquiries', icon: TrendingUp },
   { id: 'professional', label: 'Professional Inquiries', icon: UserPlus },
   { id: 'program', label: 'Program Inquiries', icon: GraduationCap },
   { id: 'feedback', label: 'Patient Feedback', icon: Star },
@@ -157,7 +159,7 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
   };
 
   const getEmail = (item) => {
-    if (activeTab === 'partnership') return item.name || 'N/A'; // partnership stores email in name field
+    if (activeTab === 'partnership' || activeTab === 'investment') return item.name || 'N/A'; // partnership/investment store email in name field
     return item.email || 'N/A';
   };
 
@@ -210,6 +212,7 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
           </tr>
         );
       case 'partnership':
+      case 'investment':
         return (
           <tr className="text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
             <th className="px-4 py-3">Email</th>
@@ -274,6 +277,7 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
           </tr>
         );
       case 'partnership':
+      case 'investment':
         return (
           <tr key={item.id} className="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
             <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{item.name || 'N/A'}</td>
@@ -386,7 +390,7 @@ const WebsiteInquiries = ({ subTab = 'contact' }) => {
                 <DetailRow icon={Calendar} label="Submitted On" value={formatDate(selectedItem.created_at)} />
               </>
             )}
-            {activeTab === 'partnership' && (
+            {(activeTab === 'partnership' || activeTab === 'investment') && (
               <>
                 <DetailRow icon={Mail} label="Email" value={selectedItem.name} />
                 <DetailRow icon={Phone} label="Contact Number" value={selectedItem.contact_number} />

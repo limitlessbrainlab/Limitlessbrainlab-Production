@@ -31,7 +31,7 @@ import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import { countryCodes, validatePhoneNumber, getCountryByCode } from '../../utils/countryCodes';
 
 const SystemSettings = () => {
-  const [activeSection, setActiveSection] = useState('general');
+  const [activeSection, setActiveSection] = useState('locations');
   const [backupLoading, setBackupLoading] = useState(false);
   const [lastBackup, setLastBackup] = useState(null);
 
@@ -90,10 +90,9 @@ const SystemSettings = () => {
   const [editingLocationName, setEditingLocationName] = useState('');
 
   const sections = [
-    { id: 'general', label: 'General', icon: Settings },
     { id: 'locations', label: 'Preferred Locations', icon: MapPin },
     { id: 'clinic-locations', label: 'Clinic Locations', icon: Building2 }
-    // Hidden: Security, Database, Notifications, User Management, API Settings
+    // Hidden: General, Security, Database, Notifications, User Management, API Settings
   ];
 
   // Clinic Locations management state
@@ -1044,7 +1043,7 @@ const SystemSettings = () => {
       case 'api':
         return <div className="p-8 text-center text-gray-500">API settings coming soon...</div>;
       default:
-        return renderGeneralSettings();
+        return renderLocationsSettings();
     }
   };
 

@@ -1337,7 +1337,7 @@ app.post('/api/upload-image', async (req, res) => {
 // Partnership Inquiry API endpoint
 app.post('/api/partnership-inquiry', async (req, res) => {
   try {
-    const { email, contact_number } = req.body;
+    const { email, contact_number, inquiry_type } = req.body;
 
     if (!email || !contact_number) {
       return res.status(400).json({
@@ -1346,14 +1346,17 @@ app.post('/api/partnership-inquiry', async (req, res) => {
       });
     }
 
+    const inquiryLabel = inquiry_type === 'investment' ? 'Investment Inquiry' : 'Partnership Inquiry';
+
     // Send email notification
     const mailOptions = {
       from: EMAIL_FROM,
       to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-      subject: `Partnership Inquiry - Limitless Brain Lab`,
-      html: getAdminNotificationHtml('Partnership Inquiry', [
+      subject: `${inquiryLabel} - Limitless Brain Lab`,
+      html: getAdminNotificationHtml(inquiryLabel, [
         { label: 'Email', value: email },
-        { label: 'Contact Number', value: contact_number }
+        { label: 'Contact Number', value: contact_number },
+        { label: 'Inquiry Type', value: inquiryLabel }
       ]),
       attachments: getLogoAttachment()
     };

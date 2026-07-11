@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
-import { clearAppDataCachesKeepSession } from '../../utils/sessionCleanup';
+import { clearAppDataCachesKeepSession, REMEMBER_KEY } from '../../utils/sessionCleanup';
 
 const LoginForm = ({ userType: userTypeProp } = {}) => {
   const [showPassword, setShowPassword] = useState(false);
@@ -30,6 +30,7 @@ const LoginForm = ({ userType: userTypeProp } = {}) => {
   }
 
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Explain the forced logout when a credential change kicked the user out of an open session.
   useEffect(() => {
@@ -45,12 +46,24 @@ const LoginForm = ({ userType: userTypeProp } = {}) => {
   // then navigation state (footer buttons), else generic /login (no scope).
   const userTypeFromState = userTypeProp || location.state?.userType;
 
+  // "Remember me": seed the form from previously saved credentials (survives logout wipes).
+  const remembered = (() => {
+    try { return JSON.parse(localStorage.getItem(REMEMBER_KEY) || 'null'); }
+    catch { return null; }
+  })();
+
   const {
     register,
     handleSubmit,
     formState: { errors },
     setError,
-  } = useForm();
+  } = useForm({
+    defaultValues: {
+      email: remembered?.email || '',
+      password: remembered?.password || '',
+      rememberMe: !!remembered,
+    },
+  });
 
   const onSubmit = async (data) => {
     
@@ -108,13 +121,27 @@ const LoginForm = ({ userType: userTypeProp } = {}) => {
         // Check if there's a payment return URL (user was redirected from Stripe).
         // Payment/coach flows are patient-only, so only honor this for patients —
         // otherwise a stale paymentReturnUrl sends an admin/clinic user to a patient page.
+        // "Remember me": save email+password on success (never store creds that failed to
+        // authenticate), or forget them when the box is unchecked.
+        if (data.rememberMe) {
+          localStorage.setItem(REMEMBER_KEY, JSON.stringify({ email: data.email, password: data.password }));
+        } else {
+          localStorage.removeItem(REMEMBER_KEY);
+        }
+
         const paymentReturnUrl = localStorage.getItem('paymentReturnUrl');
         const target = (paymentReturnUrl && userRole === 'patient') ? paymentReturnUrl : redirectPath;
-        // Clear stale return URL + wipe cached app data/Cache Storage (keep the new session),
-        // then hard-navigate so the dashboard loads completely fresh.
+        // Clear stale return URL + wipe cached app data/Cache Storage (keep the new session).
         localStorage.removeItem('paymentReturnUrl');
         await clearAppDataCachesKeepSession();
-        window.location.assign(target);
+        // In-app SPA navigation for internal routes (no full reload / bundle re-download /
+        // re-auth). AuthContext state is already set by login(), so the dashboard renders
+        // directly. An absolute paymentReturnUrl (patient Stripe return) still hard-navigates.
+        if (/^https?:\/\//i.test(target)) {
+          window.location.assign(target);
+        } else {
+          navigate(target, { replace: true });
+        }
       } else {
         setError('root', {
           type: 'manual',
@@ -224,21 +251,19 @@ const LoginForm = ({ userType: userTypeProp } = {}) => {
             )}
           </div>
 
-          {/* Forgot Password (Remember Me hidden) */}
-          <div className="flex items-center justify-end animate-slide-up" style={{ animationDelay: '0.3s' }}>
-            {/* "Remember me" hidden — it was non-functional. To re-enable, restore this block:
+          {/* Remember Me + Forgot Password */}
+          <div className="flex items-center justify-between animate-slide-up" style={{ animationDelay: '0.3s' }}>
             <div className="flex items-center group">
               <input
                 id="remember-me"
-                name="remember-me"
                 type="checkbox"
                 className="h-4 w-4 text-[#323956] focus:ring-[#323956] border-gray-300 rounded transition-transform duration-200 group-hover:scale-110"
+                {...register('rememberMe')}
               />
               <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 font-medium group-hover:text-gray-900 transition-colors duration-200">
                 Remember me
               </label>
             </div>
-            */}
             <Link
               to="/forgot-password"
               className="text-sm text-[#323956] hover:text-[#232D3C] font-semibold transition-all duration-200 hover:underline hover:underline-offset-4"

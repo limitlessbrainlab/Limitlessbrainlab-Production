@@ -3,6 +3,10 @@
 import Cookies from 'js-cookie';
 import { supabase } from '../lib/supabaseClient';
 
+// Key under which "Remember me" stores { email, password }. Deliberately preserved
+// across every session wipe so remembered credentials survive logout.
+export const REMEMBER_KEY = 'rememberedCredentials';
+
 // Best-effort wipe of the browser's Cache Storage and any service workers.
 // (JS cannot purge the HTTP disk cache directly; this + a reload loads fresh assets.)
 export async function wipeBrowserCaches() {
@@ -24,7 +28,11 @@ export async function wipeBrowserCaches() {
 export async function clearAllAndSignOut() {
   try { if (supabase) await supabase.auth.signOut(); } catch (e) { /* ignore */ }
   try { Cookies.remove('authToken'); Cookies.remove('authToken', { path: '/' }); } catch (e) { /* ignore */ }
-  try { localStorage.clear(); } catch (e) { /* ignore */ }
+  try {
+    const remembered = localStorage.getItem(REMEMBER_KEY); // survive the wipe (Remember me)
+    localStorage.clear();
+    if (remembered !== null) localStorage.setItem(REMEMBER_KEY, remembered);
+  } catch (e) { /* ignore */ }
   try { sessionStorage.clear(); } catch (e) { /* ignore */ }
   await wipeBrowserCaches();
 }

@@ -97,7 +97,9 @@ export const authService = {
       const checkClinicsTable = async () => {
         let clinics;
         try {
-          clinics = await DatabaseService.get('clinics', { throwOnError: true }) || [];
+          // Filter by email server-side (was a full-table scan). Case-insensitive to
+          // match the previous client-side .trim().toLowerCase() comparison.
+          clinics = await DatabaseService.get('clinics', { throwOnError: true, email: normalizedEmail }) || [];
         } catch (readErr) {
           console.error('ALERT: clinics read failed during login:', readErr?.message);
           throw new Error(SERVER_UNREACHABLE);
@@ -267,12 +269,14 @@ export const authService = {
       // (same email may be registered as both a clinic applicant and a super admin)
       let superAdmins;
       try {
-        superAdmins = await DatabaseService.get('superAdmins', { throwOnError: true }) || [];
+        // Filter the profiles table by email server-side (was a full-table scan of
+        // every patient/clinic/admin row). Case-insensitive email match.
+        superAdmins = await DatabaseService.get('superAdmins', { throwOnError: true, email: normalizedEmail }) || [];
       } catch (readErr) {
         console.error('ALERT: superAdmins read failed during login:', readErr?.message);
         throw new Error(SERVER_UNREACHABLE);
       }
-      const superAdminProfile = superAdmins.find(a => a.email === normalizedEmail && a.role === 'super_admin');
+      const superAdminProfile = superAdmins.find(a => (a.email || '').trim().toLowerCase() === normalizedEmail && a.role === 'super_admin');
 
       if (superAdminProfile) {
         let adminPasswordMatch = false;

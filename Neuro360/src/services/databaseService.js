@@ -46,10 +46,13 @@ class DatabaseService {
   }
 
   // Generic CRUD operations
-  async get(table, { throwOnError = false } = {}) {
+  // opts (email/columns/limit) are forwarded to supabaseService.get so callers can
+  // filter/limit/project server-side instead of scanning whole tables — see login
+  // (email filter) and the admin dashboards (columns/limit).
+  async get(table, { throwOnError = false, email = null, columns = '*', limit = null } = {}) {
     try {
       const actualTable = this.mapTableName(table);
-      const data = await this.supabaseService.get(actualTable, { throwOnError });
+      const data = await this.supabaseService.get(actualTable, { throwOnError, email, columns, limit });
 
       // Ensure data is always an array
       if (!data) {
@@ -179,6 +182,12 @@ class DatabaseService {
   // throw "getAll is not a function" and silently render empty data.
   async getAll(table) {
     return this.get(table);
+  }
+
+  // Row count without downloading rows — for dashboard counters. Reuses table mapping.
+  async count(table, { throwOnError = false } = {}) {
+    const actualTable = this.mapTableName(table);
+    return this.supabaseService.count(actualTable, { throwOnError });
   }
 
   async add(table, item) {

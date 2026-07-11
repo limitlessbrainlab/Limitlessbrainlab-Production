@@ -461,12 +461,9 @@ export const AuthProvider = ({ children }) => {
         // Fetch the latest user data from database to get updated profile picture
         let latestUserData = response.user;
         try {
-          if (response.user.role === 'super_admin') {
-            const superAdminData = await DatabaseService.findById('superAdmins', response.user.id);
-            if (superAdminData) {
-              latestUserData = { ...response.user, ...superAdminData };
-            }
-          } else if (response.user.role === 'clinic_admin') {
+          // super_admin: authService already returns name + avatar (full_name/avatar_url)
+          // from the profiles row it fetched, so no extra findById round-trip is needed here.
+          if (response.user.role === 'clinic_admin') {
 
             // Try to find clinic by ID first
             let clinicData = await DatabaseService.findById('clinics', response.user.id);

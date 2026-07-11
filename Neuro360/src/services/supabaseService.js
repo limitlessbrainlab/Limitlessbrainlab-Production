@@ -185,13 +185,42 @@ class SupabaseService {
   }
 
   // Generic CRUD operations with demo fallback
-  async get(table, { throwOnError = false } = {}) {
+  // opts:
+  //   throwOnError - surface read failures instead of flattening to [] (login uses this)
+  //   email        - server-side case-insensitive email filter (avoids full-table scans)
+  //   columns      - select only these columns (e.g. 'amount') instead of '*'
+  //   limit        - cap the result and skip the pagination loop (e.g. recent rows)
+  async get(table, { throwOnError = false, email = null, columns = '*', limit = null } = {}) {
     if (!this.isAvailable()) {
       // Login relies on being able to tell "no matching row" apart from "could not
       // read the table". When the caller asks, surface the unavailable client as an
       // error instead of an empty result that reads as bad credentials.
       if (throwOnError) throw new Error('Supabase client is not available');
       return [];
+    }
+
+    // Filtered or limited reads don't need the drain-the-whole-table pagination loop.
+    if (email !== null || limit !== null) {
+      try {
+        let query = this.supabase
+          .from(table)
+          .select(columns)
+          .order('created_at', { ascending: false });
+        if (email !== null) query = query.ilike('email', email);
+        if (limit !== null) query = query.limit(limit);
+
+        const { data, error } = await query;
+        if (error) {
+          console.error(`ERROR: Error fetching from ${table}:`, error);
+          if (throwOnError) throw error;
+          return [];
+        }
+        return data || [];
+      } catch (error) {
+        console.error(`ERROR: Error in get operation for ${table}:`, error);
+        if (throwOnError) throw error;
+        return [];
+      }
     }
 
     try {
@@ -204,7 +233,7 @@ class SupabaseService {
       while (hasMore) {
         const { data, error } = await this.supabase
           .from(table)
-          .select('*')
+          .select(columns)
           .order('created_at', { ascending: false })
           .range(from, from + pageSize - 1);
 
@@ -230,6 +259,29 @@ class SupabaseService {
       console.error(`ERROR: Error in get operation for ${table}:`, error);
       if (throwOnError) throw error;
       return [];
+    }
+  }
+
+  // Row count without downloading any rows (head:true). Returns a number.
+  async count(table, { throwOnError = false } = {}) {
+    if (!this.isAvailable()) {
+      if (throwOnError) throw new Error('Supabase client is not available');
+      return 0;
+    }
+    try {
+      const { count, error } = await this.supabase
+        .from(table)
+        .select('*', { count: 'exact', head: true });
+      if (error) {
+        console.error(`ERROR: Error counting ${table}:`, error);
+        if (throwOnError) throw error;
+        return 0;
+      }
+      return count || 0;
+    } catch (error) {
+      console.error(`ERROR: Error in count operation for ${table}:`, error);
+      if (throwOnError) throw error;
+      return 0;
     }
   }
 

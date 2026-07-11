@@ -49,8 +49,9 @@ const SuperAdminPanel = () => {
 
   useEffect(() => {
     try {
+      // loadAnalytics also populates the clinic selector list (setClinics), so the
+      // previous separate loadClinics() full-table fetch is no longer needed.
       loadAnalytics();
-      loadClinics();
     } catch (error) {
       console.error('Error initializing SuperAdminPanel:', error);
       if (isMounted) {
@@ -78,41 +79,31 @@ const SuperAdminPanel = () => {
     }
   }, [urlClinic]);
 
-  const loadClinics = async () => {
-    try {
-      const clinicsData = await DatabaseService.get('clinics');
-      
-      // Only update state if component is still mounted
-      if (isMounted) {
-        setClinics(clinicsData);
-      }
-    } catch (error) {
-      console.error('ERROR: Error loading clinics:', error);
-      if (isMounted) {
-        setError(getFriendlyErrorMessage(error, 'Failed to load clinics. Please try again.'));
-        setClinics([]); // Set empty array to prevent further errors
-      }
-    }
-  };
-
   const loadAnalytics = async () => {
     try {
-      // SuperAdmin gets all system analytics
-      const clinics = await DatabaseService.get('clinics');
-      const patients = await DatabaseService.get('patients');
-      const reports = await DatabaseService.get('reports');
-      const payments = await DatabaseService.get('payments');
-      
+      // Counters used to scan whole tables (patients/reports/payments) just for
+      // .length/sum — reports pulled the full report_data JSONB per row, blocking
+      // the spinner. Now: keep the small clinics list (also feeds the selector),
+      // use head-only count() for patients/reports, and select only payments.amount.
+      // All in parallel.
+      const [clinics, totalPatients, totalReports, payments] = await Promise.all([
+        DatabaseService.get('clinics'),
+        DatabaseService.count('patients'),
+        DatabaseService.count('reports'),
+        DatabaseService.get('payments', { columns: 'amount' })
+      ]);
+
       const data = {
         activeClinics: clinics.filter(c => c.isActive).length,
         totalClinics: clinics.length,
-        totalPatients: patients.length,
-        totalReports: reports.length,
+        totalPatients,
+        totalReports,
         monthlyRevenue: payments.reduce((sum, payment) => sum + (payment.amount || 0), 0)
       };
-      
+
       // Only update state if component is still mounted
       if (isMounted) {
+        setClinics(clinics);
         setAnalytics(data);
       }
     } catch (error) {

@@ -27,45 +27,38 @@ const AdminDashboard = ({ analytics = {} }) => {
   useEffect(() => {
     loadRealTimeData();
     // Near-real-time: new clinic registrations and payments land in the DB via
-    // the backend (signup + Stripe webhook). Refresh periodically and whenever
-    // the admin returns to the tab so they reflect in the portal without a
-    // manual reload. 30s is conservative to avoid Supabase request overload.
+    // the backend (signup + Stripe webhook). Refresh periodically so they reflect
+    // in the portal without a manual reload. Counters are now cheap head-count
+    // queries, so the interval is inexpensive; the extra window-focus refetch was
+    // dropped to cut sustained load.
     const interval = setInterval(loadRealTimeData, 30000);
-    const onFocus = () => loadRealTimeData();
-    window.addEventListener('focus', onFocus);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', onFocus);
-    };
+    return () => clearInterval(interval);
   }, []);
 
   const loadRealTimeData = async () => {
     try {
-      
-      // Get all data from DatabaseService - SuperAdmin can see everything
-      const clinics = await DatabaseService.get('clinics');
-      const patients = await DatabaseService.get('patients');
-      const reports = await DatabaseService.get('reports');
-      const payments = await DatabaseService.get('payments');
-      const superAdmins = await DatabaseService.get('superAdmins');
-
-      console.log('DATA: SuperAdmin system overview:', {
-        clinics: clinics.length,
-        patients: patients.length,
-        reports: reports.length,
-        payments: payments.length,
-        superAdmins: superAdmins.length
-      });
+      // Counters used to scan whole tables (patients/reports/payments) — reports
+      // pulled the full report_data JSONB per row. Now: head-only count() for
+      // patients/reports, payments.amount only for the revenue sum, a small clinics
+      // fetch (feeds active-count + the "total registered" subtitle + recent
+      // activity), and just the 6 most-recent reports/payments for the activity
+      // widget. All in parallel.
+      const [clinics, totalPatientsCount, totalReportsCount, paymentAmounts, recentReports, recentPayments] = await Promise.all([
+        DatabaseService.get('clinics'),
+        DatabaseService.count('patients'),
+        DatabaseService.count('reports'),
+        DatabaseService.get('payments', { columns: 'amount' }),
+        DatabaseService.get('reports', { limit: 6 }),
+        DatabaseService.get('payments', { limit: 6 })
+      ]);
 
       setAllClinics(clinics);
-      setAllReports(reports);
-      setAllPayments(payments);
+      setAllReports(recentReports);
+      setAllPayments(recentPayments);
 
       // Calculate real-time analytics
       const activeClinicCount = clinics.filter(c => c.isActive).length;
-      const totalPatientsCount = patients.length;
-      const totalReportsCount = reports.length;
-      const totalRevenue = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+      const totalRevenue = paymentAmounts.reduce((sum, payment) => sum + (payment.amount || 0), 0);
 
       setRealTimeData({
         totalClinics: activeClinicCount,

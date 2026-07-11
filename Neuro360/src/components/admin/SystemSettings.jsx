@@ -101,12 +101,8 @@ const SystemSettings = () => {
   const sections = [
     { id: 'general', label: 'General', icon: Settings },
     { id: 'locations', label: 'Preferred Locations', icon: MapPin },
-    { id: 'clinic-locations', label: 'Clinic Locations', icon: Building2 },
-    { id: 'security', label: 'Security', icon: Shield },
-    { id: 'database', label: 'Database', icon: Database },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'users', label: 'User Management', icon: Users },
-    { id: 'api', label: 'API Settings', icon: Key }
+    { id: 'clinic-locations', label: 'Clinic Locations', icon: Building2 }
+    // Hidden: Security, Database, Notifications, User Management, API Settings
   ];
 
   // Clinic Locations management state

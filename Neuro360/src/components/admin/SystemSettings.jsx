@@ -598,6 +598,16 @@ const SystemSettings = () => {
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Location Image</label>
             <div className="flex gap-2">
+              {clinicFormData.image_url && (
+                <button
+                  type="button"
+                  onClick={() => handleClinicFormChange('image_url', '')}
+                  title="Remove image"
+                  className="px-3 py-2 rounded-lg text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 flex items-center"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
               <input
                 type="text"
                 value={clinicFormData.image_url}

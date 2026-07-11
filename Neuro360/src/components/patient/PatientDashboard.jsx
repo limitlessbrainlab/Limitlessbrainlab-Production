@@ -635,6 +635,11 @@ const PatientDashboard = () => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+      // Always return to the About the Brain page on the SAME domain the patient is
+      // using (the patient portal) — never bounce to the main limitlessbrainlab.com site.
+      // Passing these explicitly overrides the backend's unreliable req.headers.origin fallback.
+      const returnBase = window.location.origin;
+
       const response = await fetch(`${API_URL}/create-assessment-checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -647,7 +652,9 @@ const PatientDashboard = () => {
           assessmentLink,
           patientId: user.id,
           clinicId: patientClinicId,
-          source: 'patient_dashboard'
+          source: 'patient_dashboard',
+          successUrl: `${returnBase}/dashboard/about-brain?payment=success&assessment=${assessmentId}&session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${returnBase}/dashboard/about-brain?payment=cancelled`
         }),
       });
       const data = await response.json();

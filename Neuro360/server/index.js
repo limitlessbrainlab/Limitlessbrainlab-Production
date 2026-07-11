@@ -56,108 +56,11 @@ if (process.env.STRIPE_SECRET_KEY) {
   stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 }
 
-// Email transporter — Brevo HTTP API preferred (proven delivery, no SMTP port issues),
-// then Brevo SMTP relay (port 2525), then Gmail (local-dev fallback).
-// Assembled fallback ensures all backends use the API path even without the env var.
-const _bk = ['xkeysib-6d62f211', 'edb82ad5f7efee69e724fcca', '1729a3c58eb37447bb036cb1', 'f7defcec-ENG92zSBenUMyNub'];
-const BREVO_API_FALLBACK_KEY = process.env.BREVO_API_KEY || _bk.join('');
-const brevoApiConfigured = !!BREVO_API_FALLBACK_KEY;
-const brevoConfigured = !!(process.env.BREVO_SMTP_USER && process.env.BREVO_SMTP_KEY);
+// Email transporter — Gmail SMTP (info@limitlessbrainlab.com via app password).
+// Requires SMTP port 465 to be reachable: Render paid plan (free tier blocks 25/465/587).
 const gmailConfigured = !!(process.env.EMAIL_USER && process.env.EMAIL_PASS);
 
-// Parse a nodemailer-style address ("Name" <email> or email) into {name,email}.
-function parseAddress(addr) {
-  if (!addr) return null;
-  const s = String(addr).trim();
-  const m = s.match(/^"?([^"<]*?)"?\s*<([^>]+)>$/);
-  if (m) return { name: m[1].trim(), email: m[2].trim().toLowerCase() };
-  return { email: s.toLowerCase() };
-}
-function toAddressList(v) {
-  if (!v) return [];
-  return String(v).split(',').map(parseAddress).filter(Boolean);
-}
-
-// Brevo HTTP API transporter — implements nodemailer's sendMail(mailOptions, cb) shape
-// so every existing emailTransporter.sendMail() call works unchanged.
-function createBrevoApiTransporter(apiKey) {
-  const endpoint = 'https://api.brevo.com/v3/smtp/email';
-  const transporter = {
-    sendMail: async (mailOptions) => {
-      // enhanceMailOptions has already run (patched below), so html/text/footer are final.
-      const sender = parseAddress(mailOptions.from) || { email: process.env.EMAIL_FROM || process.env.EMAIL_USER };
-      const to = toAddressList(mailOptions.to);
-      if (to.length === 0) throw new Error('No recipients defined');
-
-      const payload = {
-        sender,
-        to,
-        subject: mailOptions.subject || '(no subject)',
-        htmlContent: mailOptions.html || '',
-      };
-      if (mailOptions.text) payload.textContent = mailOptions.text;
-      const cc = toAddressList(mailOptions.cc); if (cc.length) payload.cc = cc;
-      const bcc = toAddressList(mailOptions.bcc); if (bcc.length) payload.bcc = bcc;
-      const replyTo = parseAddress(mailOptions.replyTo); if (replyTo) payload.replyTo = replyTo;
-
-      // Convert attachments: nodemailer {filename, path, content, cid} → Brevo {name, content(base64)}
-      if (Array.isArray(mailOptions.attachments) && mailOptions.attachments.length) {
-        const atts = [];
-        for (const a of mailOptions.attachments) {
-          let buf = null;
-          if (Buffer.isBuffer(a.content)) buf = a.content;
-          else if (typeof a.content === 'string') buf = Buffer.from(a.content);
-          else if (a.path) { try { buf = fs.readFileSync(a.path); } catch (_) { /* skip missing */ } }
-          if (buf) {
-            const entry = { name: a.filename || a.name || 'attachment', content: buf.toString('base64') };
-            if (a.cid) entry.content_id = a.cid; // inline image referenced as cid:... in HTML
-            atts.push(entry);
-          }
-        }
-        if (atts.length) payload.attachment = atts;
-      }
-
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'api-key': apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const err = new Error(data.message || `Brevo API error: HTTP ${res.status}`);
-        err.code = data.code; throw err;
-      }
-      return {
-        accepted: to.map(r => r.email),
-        rejected: [],
-        messageId: data.messageId || '',
-        response: data.messageId ? '250 2.0.0 Ok (Brevo API)' : '',
-      };
-    },
-    verify: (cb) => cb(null, true),
-  };
-  return transporter;
-}
-
 const activeTransporter = (() => {
-  if (brevoApiConfigured) {
-    return createBrevoApiTransporter(BREVO_API_FALLBACK_KEY);
-  }
-  if (brevoConfigured) {
-    return nodemailer.createTransport({
-      host: 'smtp-relay.brevo.com',
-      port: Number(process.env.BREVO_SMTP_PORT) || 2525,
-      secure: false,
-      requireTLS: true,
-      auth: {
-        user: process.env.BREVO_SMTP_USER,
-        pass: process.env.BREVO_SMTP_KEY
-      },
-      connectionTimeout: 30000,
-      greetingTimeout: 30000,
-      socketTimeout: 30000
-    });
-  }
   if (gmailConfigured) {
     return nodemailer.createTransport({
       host: 'smtp.gmail.com',
@@ -177,8 +80,8 @@ const activeTransporter = (() => {
 })();
 
 const emailTransporter = activeTransporter;
-const mailerConfigured = brevoApiConfigured || brevoConfigured || gmailConfigured;
-const ACTIVE_MAIL_PROVIDER = brevoApiConfigured ? 'brevo-api' : (brevoConfigured ? 'brevo-smtp' : (gmailConfigured ? 'gmail' : 'none'));
+const mailerConfigured = gmailConfigured;
+const ACTIVE_MAIL_PROVIDER = gmailConfigured ? 'gmail' : 'none';
 
 // Deliverability: HTML-only mail scores worse with spam filters, so derive a
 // plain-text alternative for every outbound mail, and set Reply-To so replies
@@ -280,9 +183,7 @@ if (emailTransporter) {
     if (error) {
       console.error('EMAIL TRANSPORTER ERROR:', error.message);
       console.error('Active provider:', ACTIVE_MAIL_PROVIDER);
-      if (ACTIVE_MAIL_PROVIDER === 'gmail') {
-        console.error('NOTE: Render free tier BLOCKS SMTP ports 25/465/587. Set BREVO_SMTP_USER + BREVO_SMTP_KEY to use the port-2525 relay.');
-      }
+      console.error('NOTE: Gmail SMTP needs port 465 reachable. Render free tier BLOCKS SMTP ports 25/465/587 — a paid plan is required.');
       console.error('EMAIL_USER:', process.env.EMAIL_USER);
       console.error('EMAIL_PASS length:', (process.env.EMAIL_PASS || '').length);
       console.error('EMAIL_PASS has spaces:', (process.env.EMAIL_PASS || '').includes(' '));
@@ -291,7 +192,7 @@ if (emailTransporter) {
     }
   });
 } else {
-  console.warn('Email transporter not configured. Set BREVO_SMTP_USER/BREVO_SMTP_KEY (Render-safe) or EMAIL_USER/EMAIL_PASS (local).');
+  console.warn('Email transporter not configured. Set EMAIL_USER and EMAIL_PASS (Gmail app password).');
 }
 
 const app = express();

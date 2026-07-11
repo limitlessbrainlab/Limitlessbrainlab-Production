@@ -520,7 +520,7 @@ const ProfileModal = ({ isOpen, onClose, onProfileUpdate }) => {
           </div>
         )}
 
-        {/* Actions */}
+        {/* Actions block hidden — Edit Profile disabled so the header profile popup is view-only
         <div className="p-6 border-t border-gray-100 dark:border-gray-700 flex space-x-3">
           {!isEditing ? (
             <button
@@ -555,6 +555,7 @@ const ProfileModal = ({ isOpen, onClose, onProfileUpdate }) => {
             </>
           )}
         </div>
+        */}
       </div>
     </div>
   );

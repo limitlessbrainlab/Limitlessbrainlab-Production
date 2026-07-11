@@ -813,7 +813,7 @@ const ClinicManagement = ({ onUpdate }) => {
         city: clinic.city || '',
         email: clinic.email || '',
         contactPerson: clinic.contactPerson || clinic.contact_person || '',
-        countryCode: clinic.countryCode || clinic.country_code || '+91',
+        countryCode: '+91', // Always default to IN +91 for every clinic/partner
         phone: clinic.phone || clinic.phone_number || '',
         address: clinic.address || '',
       });
@@ -1907,7 +1907,7 @@ const ClinicModal = ({ clinic, clinics, user, onSubmit, onClose, register, handl
         city: clinic.city || '',
         email: clinic.email || '',
         contactPerson: clinic.contactPerson || clinic.contact_person || '',
-        countryCode: clinic.countryCode || clinic.country_code || '+91',
+        countryCode: '+91', // Always default to IN +91 for every clinic/partner
         phone: clinic.phone || clinic.phone_number || '',
         address: clinic.address || '',
         editPassword: '',

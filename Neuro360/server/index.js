@@ -1945,8 +1945,12 @@ app.post('/api/create-frequency-checkout', async (req, res) => {
       ],
       mode: 'payment',
       customer_email: customerEmail,
-      success_url: `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/frequencies?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/frequencies?payment=cancelled`,
+      // Honor the caller's return URLs (patient portal on its own origin, e.g.
+      // /dashboard/frequencies) instead of hardcoding the Vercel production URL.
+      success_url: (req.body.successUrl && req.body.successUrl.includes('{CHECKOUT_SESSION_ID}'))
+        ? req.body.successUrl
+        : `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard/frequencies?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: req.body.cancelUrl || `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard/frequencies?payment=cancelled`,
       metadata: {
         pack_id: packId,
         customer_email: customerEmail,

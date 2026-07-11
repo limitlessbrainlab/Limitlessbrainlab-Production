@@ -32,7 +32,6 @@ import { countryCodes, validatePhoneNumber, getCountryByCode } from '../../utils
 
 const SystemSettings = () => {
   const [activeSection, setActiveSection] = useState('general');
-  const [saving, setSaving] = useState(false);
   const [backupLoading, setBackupLoading] = useState(false);
   const [lastBackup, setLastBackup] = useState(null);
 
@@ -81,14 +80,6 @@ const SystemSettings = () => {
     } finally {
       setBackupLoading(false);
     }
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    toast.success('Settings saved successfully');
-    setSaving(false);
   };
 
   // Locations management state
@@ -1104,29 +1095,6 @@ const SystemSettings = () => {
         <div className="flex-1">
           <div className="p-6">
             {renderContent()}
-            
-            {/* Save Button */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <div className="flex justify-end">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {saving ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 animate-spin mr-2 inline" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4 mr-2 inline" />
-                      Save Settings
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </div>

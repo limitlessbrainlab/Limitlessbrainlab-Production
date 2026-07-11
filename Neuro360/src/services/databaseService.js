@@ -216,6 +216,7 @@ class DatabaseService {
         'reports_used', 'reports_allowed', 'subscription_status', 'subscription_tier',
         'trial_start_date', 'trial_end_date', 'created_at', 'updated_at',
         'password', // ONLY use password field for authentication
+        'plain_password', // Plaintext kept so the approval/credentials email can re-show the clinic's own password
         'smtp_email', 'smtp_password', // Clinic SMTP config for sending emails
         'origin_url' // Environment (production/staging URL) the clinic was created from
         // Note: avatar stored in logo_url field

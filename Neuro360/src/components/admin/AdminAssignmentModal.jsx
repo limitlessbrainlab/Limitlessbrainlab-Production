@@ -148,7 +148,7 @@ const AdminAssignmentModal = ({ clinic, isOpen, onClose, onUpdate }) => {
   };
 
   const sendInvitationEmail = async (admin) => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
     await fetch(`${apiUrl}/email/clinic-invitation`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

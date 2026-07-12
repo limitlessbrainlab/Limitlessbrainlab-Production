@@ -7,7 +7,7 @@ import SupabaseService from '../../services/supabaseService';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import toast from 'react-hot-toast';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
 const ForgotPasswordForm = () => {
   const [step, setStep] = useState(1); // 1=email, 2=otp, 3=new password

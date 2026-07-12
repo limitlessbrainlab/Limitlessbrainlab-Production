@@ -22,7 +22,7 @@ const MyBookings = ({ limit, showTitle = true, compact = false }) => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('upcoming'); // upcoming, past, all
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
   useEffect(() => {
     if (user?.email) {

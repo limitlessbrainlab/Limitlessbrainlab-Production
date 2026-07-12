@@ -171,7 +171,7 @@ const FrequenciesMusic = () => {
     if (!selectedPack) return;
     setIsProcessingPayment(selectedPack.id);
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
       // Save return URL so auth can redirect back after Stripe
       localStorage.setItem('paymentReturnUrl', `/dashboard/frequencies?payment=success&pack=${selectedPack.id}`);
 
@@ -320,7 +320,7 @@ const FrequenciesMusic = () => {
 
           // Send emails (patient + admin)
           try {
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+            const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
             await fetch(`${API_URL}/send-assessment-email`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -581,7 +581,7 @@ const FrequenciesMusic = () => {
   // Google Drive Audio Player Functions - Using backend proxy to bypass CORS
   const getGoogleDriveAudioUrl = (driveId) => {
     if (!driveId) return null;
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
     return `${API_URL}/audio/stream/${driveId}`;
   };
 

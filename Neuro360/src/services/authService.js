@@ -12,7 +12,7 @@ import SupabaseService from './supabaseService';
 const supabase = SupabaseService.supabase;
 
 // Base API URL - replace with your actual API endpoint
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
 // Create axios instance
 const api = axios.create({
@@ -509,7 +509,7 @@ export const authService = {
 
         // Send confirmation email to clinic via backend API
         try {
-          const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+          const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
           const emailResponse = await fetch(`${API_BASE_URL}/registration-confirmation`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -582,7 +582,7 @@ export const authService = {
 
         // Send welcome email to patient via backend API
         try {
-          const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+          const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
           const emailResponse = await fetch(`${API_BASE_URL}/registration-confirmation`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -647,7 +647,7 @@ export const authService = {
 
         // Send welcome email to super admin via backend API
         try {
-          const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+          const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
           const emailResponse = await fetch(`${API_BASE_URL}/registration-confirmation`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

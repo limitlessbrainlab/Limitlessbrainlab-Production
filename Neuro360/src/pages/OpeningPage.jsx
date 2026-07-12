@@ -399,7 +399,7 @@ const OpeningPage = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
-                onClick={() => navigate('/booking')}
+                onClick={() => navigate('/neurosense-booking')}
                 className="px-6 py-3 bg-white text-[#323956] font-semibold rounded-xl hover:bg-blue-50 transition-colors flex items-center justify-center"
               >
                 <Zap className="h-5 w-5 mr-2" />

@@ -214,7 +214,7 @@ const AlgorithmDataProcessor = () => {
 
         // Step 1: Try to fetch PDFs from Supabase bucket
         try {
-          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+          const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
           const token = await getFreshToken();
           const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
@@ -283,7 +283,7 @@ const AlgorithmDataProcessor = () => {
             const timestamp = new Date(processedTime).getTime();
             const sanitizedName = patientName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
             const possibleFilename = `neurosense-report-${sanitizedName}-${timestamp}.pdf`;
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+            const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
             const backendBaseUrl = apiUrl.replace('/api', '');
             const testUrl = `${backendBaseUrl}/uploads/${possibleFilename}`;
 
@@ -343,7 +343,7 @@ const AlgorithmDataProcessor = () => {
   // Fetch QEEG files (Eyes Open & Eyes Closed) from Supabase bucket
   const fetchPatientQeegFiles = async (patientId) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
       const token = await getFreshToken();
       const response = await fetch(`${apiUrl}/qeeg/patient-qeeg-files/${patientId}`, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
@@ -363,7 +363,7 @@ const AlgorithmDataProcessor = () => {
   // Notify the clinic + super admin that generation was blocked for lack of credits.
   const notifyNoCredits = (clinic) => {
     if (!clinic?.email) return;
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
     const baseUrl = apiUrl.replace(/\/api\/?$/, '');
     fetch(`${baseUrl}/api/send-no-credit-email`, {
       method: 'POST',
@@ -395,7 +395,7 @@ const AlgorithmDataProcessor = () => {
   // (half / one-left / exhausted) to BOTH the clinic and the admin. Fire-and-forget.
   const checkCreditAlert = (clinicId) => {
     if (!clinicId) return;
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
     const baseUrl = apiUrl.replace(/\/api\/?$/, '');
     fetch(`${baseUrl}/api/send-credit-alert`, {
       method: 'POST',
@@ -591,7 +591,7 @@ const AlgorithmDataProcessor = () => {
     setProcessedDocName('');
     try {
       toast.loading('Replacing logo...', { id: 'doc-process' });
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
       const formData = new FormData();
       formData.append('document', file);
 
@@ -704,7 +704,7 @@ const AlgorithmDataProcessor = () => {
       // IMPORTANT: Use VITE_DIRECT_BACKEND_URL for this long-running call to bypass the
       // Vercel proxy (Hobby plan has a 30s hard timeout on rewrites to external URLs).
       // VITE_DIRECT_BACKEND_URL = https://limitlessbrainlab-backend.onrender.com  (set on Vercel)
-      const proxyApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const proxyApiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
       const directBackendUrl = import.meta.env.VITE_DIRECT_BACKEND_URL;
       const apiUrl = directBackendUrl ? `${directBackendUrl}/api` : proxyApiUrl;
       const controller = new AbortController();
@@ -1156,7 +1156,7 @@ const AlgorithmDataProcessor = () => {
       };
 
       // Call backend API to generate PDF with saved notes
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
       const token = await getFreshToken();
 
       const headers = { 'Content-Type': 'application/json' };
@@ -1285,7 +1285,7 @@ const AlgorithmDataProcessor = () => {
     // Pre-flight: check sidecar is alive before starting the long upload.
     // A single transient failure (429 from the API rate limiter, brief network blip) must not
     // hard-block report generation, so we time-box each attempt and retry once before giving up.
-    const preflightApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const preflightApiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
     setConsoleLog(prev => [...prev, '🔍 Checking sidecar health...']);
     const checkSidecarHealth = async () => {
       const controller = new AbortController();
@@ -1335,7 +1335,7 @@ const AlgorithmDataProcessor = () => {
     // stream throws before the inline clearInterval runs).
     let sidecarMonitor = null;
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
       const token = import.meta.env.VITE_CLAUDE_REPORT_TOKEN;
       console.log('[Claude Report] Step 1: fetching the generated NeuroSense PDF…', pdfUrl);
       // Fetch the just-generated NeuroSense PDF and forward it to the Claude endpoint.
@@ -1611,7 +1611,7 @@ const AlgorithmDataProcessor = () => {
         fullUrl = pdfUrl;
       } else if (pdfUrl.startsWith('/uploads/') || pdfUrl.includes('/uploads/')) {
         // Local URL - need to construct full URL for download
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
         const backendBaseUrl = apiUrl.replace('/api', '');
 
         // Extract just the /uploads/... part
@@ -1677,7 +1677,7 @@ const AlgorithmDataProcessor = () => {
 
       // Send report emails to clinic and patient
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
         const baseUrl = apiUrl.replace(/\/api\/?$/, '');
 
         const { clinicEmail, clinicName } = await resolveClinicForEmail({ patientId: selectedPatient?.id, clinicId: selectedPatient.clinicId || selectedPatient.clinic_id || selectedPatient.org_id });
@@ -1780,7 +1780,7 @@ const AlgorithmDataProcessor = () => {
         fullUrl = claudeReportUrl;
       } else if (claudeReportUrl.startsWith('/uploads/') || claudeReportUrl.includes('/uploads/')) {
         // Local URL - need to construct full URL for download
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
         const backendBaseUrl = apiUrl.replace('/api', '');
         const uploadsIndex = claudeReportUrl.indexOf('/uploads/');
         const localPath = uploadsIndex >= 0 ? claudeReportUrl.substring(uploadsIndex) : claudeReportUrl;
@@ -1845,7 +1845,7 @@ const AlgorithmDataProcessor = () => {
 
       // Send report emails to clinic and patient
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
         const baseUrl = apiUrl.replace(/\/api\/?$/, '');
 
         const { clinicEmail, clinicName } = await resolveClinicForEmail({ patientId: selectedPatient?.id, clinicId: selectedPatient.clinicId || selectedPatient.clinic_id || selectedPatient.org_id });
@@ -1941,7 +1941,7 @@ const AlgorithmDataProcessor = () => {
       await DatabaseService.addReport(reportData);
       checkCreditAlert(clinicId); // credit consumed → maybe alert clinic + admin
 
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
       const baseUrl = apiUrl.replace(/\/api\/?$/, '');
       const token = await getFreshToken();
       const emailHeaders = { 'Content-Type': 'application/json' };
@@ -2021,7 +2021,7 @@ const AlgorithmDataProcessor = () => {
       await DatabaseService.addReport(reportData);
       checkCreditAlert(clinicId); // credit consumed → maybe alert clinic + admin
 
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
       const baseUrl = apiUrl.replace(/\/api\/?$/, '');
       const token = await getFreshToken();
       const emailHeaders = { 'Content-Type': 'application/json' };
@@ -2137,7 +2137,7 @@ const AlgorithmDataProcessor = () => {
       };
 
       // Call backend API to generate PDF
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
       const pdfEndpoint = `${apiUrl}/qeeg/generate-pdf`;
 
 
@@ -2321,7 +2321,7 @@ const AlgorithmDataProcessor = () => {
       toast.loading('Downloading PDF...', { id: 'download-pdf' });
 
       // Construct full backend URL
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:3001/api');
       const backendBaseUrl = apiUrl.replace('/api', ''); // Remove /api to get base URL
 
       // Handle both Supabase URLs and local URLs
@@ -3049,7 +3049,7 @@ const AlgorithmDataProcessor = () => {
                     let downloadFromUrl = eyesOpenUrl;
                     if (!downloadFromUrl) { toast.error('No Eyes Open PDF available', { id: 'eo-main-download' }); return; }
                     if (downloadFromUrl.startsWith('/')) {
-                      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                      const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
                       downloadFromUrl = apiUrl.replace(/\/api\/?$/, '') + downloadFromUrl;
                     }
                     downloadViaBlob(downloadFromUrl, `EyesOpen-${selectedPatient?.firstName || 'patient'}.pdf`, 'eo-main-download');
@@ -3067,7 +3067,7 @@ const AlgorithmDataProcessor = () => {
                     let downloadFromUrl = eyesClosedUrl;
                     if (!downloadFromUrl) { toast.error('No Eyes Closed PDF available', { id: 'ec-main-download' }); return; }
                     if (downloadFromUrl.startsWith('/')) {
-                      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                      const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
                       downloadFromUrl = apiUrl.replace(/\/api\/?$/, '') + downloadFromUrl;
                     }
                     downloadViaBlob(downloadFromUrl, `EyesClosed-${selectedPatient?.firstName || 'patient'}.pdf`, 'ec-main-download');
@@ -3558,7 +3558,7 @@ const AlgorithmDataProcessor = () => {
                         if (record.pdfUrl) {
                           let url = record.pdfUrl;
                           if (url.startsWith('/')) {
-                            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                            const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
                             url = apiUrl.replace(/\/api\/?$/, '') + url;
                           }
                           const fname = `neurosense-report-${(record.inputData?.patientName || 'patient').replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
@@ -3631,7 +3631,7 @@ const AlgorithmDataProcessor = () => {
                           };
 
                           // Call backend API - now returns PDF directly
-                          const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                          const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
                           const token = await getFreshToken();
 
                           const headers = { 'Content-Type': 'application/json' };
@@ -3695,7 +3695,7 @@ const AlgorithmDataProcessor = () => {
                           let downloadFromUrl = record.inputData?.eyesOpenUrl || patientQeegFiles.eyesOpen[0]?.url;
                           if (!downloadFromUrl) { toast.error('No Eyes Open PDF URL available', { id: 'eo-download' }); return; }
                           if (downloadFromUrl.startsWith('/')) {
-                            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                            const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
                             downloadFromUrl = apiUrl.replace(/\/api\/?$/, '') + downloadFromUrl;
                           }
                           downloadViaBlob(downloadFromUrl, `EyesOpen-${record.inputData?.patientName || 'patient'}.pdf`, 'eo-download');
@@ -3716,7 +3716,7 @@ const AlgorithmDataProcessor = () => {
                           let downloadFromUrl = record.inputData?.eyesClosedUrl || patientQeegFiles.eyesClosed[0]?.url;
                           if (!downloadFromUrl) { toast.error('No Eyes Closed PDF URL available', { id: 'ec-download' }); return; }
                           if (downloadFromUrl.startsWith('/')) {
-                            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                            const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
                             downloadFromUrl = apiUrl.replace(/\/api\/?$/, '') + downloadFromUrl;
                           }
                           downloadViaBlob(downloadFromUrl, `EyesClosed-${record.inputData?.patientName || 'patient'}.pdf`, 'ec-download');

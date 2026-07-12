@@ -4,7 +4,6 @@ import { X, UploadCloud, FileText, Loader2, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DatabaseService from '../../services/databaseService';
 import StorageService from '../../services/storageService';
-import ReportWorkflowService from '../../services/reportWorkflowService';
 import { useAuth } from '../../contexts/AuthContext';
 import { logUploadAttempt, logUploadError } from '../../utils/uploadErrorChecker';
 import SubscriptionPopup from '../admin/SubscriptionPopup';
@@ -338,7 +337,7 @@ const UploadReportModal = ({ clinicId, patient, onUpload, onClose }) => {
 
       // Send notifications about the uploaded report (non-blocking).
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
         const baseUrl = apiUrl.replace(/\/api\/?$/, '');
 
         // 1) Admin notification (correct endpoint + fields).

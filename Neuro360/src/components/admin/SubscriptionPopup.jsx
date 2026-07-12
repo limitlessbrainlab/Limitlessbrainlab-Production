@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import PaymentSuccessModal from '../payment/PaymentSuccessModal';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
 // Report packages configuration
 const REPORT_PACKAGES = [

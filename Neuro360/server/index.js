@@ -3245,9 +3245,12 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
     // the Origin header is absent (e.g. server-to-server calls).
     const redirectBase = req.headers.origin || FRONTEND_URL;
 
-    // Use custom URLs if provided (for public pages), otherwise default to dashboard
-    const finalSuccessUrl = successUrl || `${redirectBase}/dashboard/about-brain?payment=success&assessment=${assessmentId}&session_id={CHECKOUT_SESSION_ID}`;
-    const finalCancelUrl = cancelUrl || `${redirectBase}/dashboard/about-brain?payment=cancelled`;
+    // Default return must be a PUBLIC page — /dashboard/* is login-protected,
+    // so a guest buyer would be bounced to /login with no confirmation. The
+    // booking page has a payment=success handler (verify-session + thank-you
+    // modal). Authenticated callers (patient portal) pass their own successUrl.
+    const finalSuccessUrl = successUrl || `${redirectBase}/neurosense-booking?payment=success&assessment=${assessmentId}&session_id={CHECKOUT_SESSION_ID}`;
+    const finalCancelUrl = cancelUrl || `${redirectBase}/neurosense-booking?payment=cancelled`;
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
@@ -3693,90 +3696,6 @@ app.post('/api/send-assessment-email', async (req, res) => {
   }
 });
 
-// Create Stripe Checkout Session for Frequency Pack Purchases
-app.post('/api/create-frequency-checkout', async (req, res) => {
-  try {
-    if (!stripe) {
-      return res.status(500).json({
-        success: false,
-        message: 'Stripe is not configured. Please set STRIPE_SECRET_KEY.'
-      });
-    }
-
-    const { packId, packName, customerEmail, currency = 'USD', amount, successUrl, cancelUrl } = req.body;
-
-    if (!customerEmail || !amount || !packId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Customer email, amount, and pack ID are required'
-      });
-    }
-
-    const currencyMultipliers = { 'INR': 100, 'USD': 100, 'GBP': 100, 'EUR': 100, 'AED': 100 };
-    const multiplier = currencyMultipliers[currency] || 100;
-    const amountInSmallestUnit = Math.round(amount * multiplier);
-
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: currency.toLowerCase(),
-            product_data: {
-              name: `${packName} Binaural Beats - Frequency Pack`,
-              description: `Unlock ${packName} frequency audio for brain optimization.`,
-              images: [`${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/IBW%20Logo.png`],
-              metadata: { pack_id: packId, type: 'frequency' }
-            },
-            unit_amount: amountInSmallestUnit,
-          },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      customer_email: customerEmail,
-      success_url: successUrl && successUrl.includes('{CHECKOUT_SESSION_ID}')
-        ? successUrl
-        : `${(successUrl || '').split('?')[0] || FRONTEND_URL + '/dashboard/frequencies'}?payment=success&pack=${packId}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: cancelUrl || `${FRONTEND_URL}/dashboard/frequencies?payment=cancelled`,
-      metadata: {
-        pack_id: packId,
-        pack_name: packName,
-        customer_email: customerEmail,
-        type: 'frequency'
-      }
-    });
-
-    // Save purchase record to Supabase after session creation
-    if (supabase) {
-      supabase.from('frequency_purchases').insert([{
-        patient_email: customerEmail.toLowerCase(),
-        pack_id: packId,
-        stripe_session_id: session.id,
-        status: 'pending'
-      }]).then(({ error }) => {
-        if (error) console.error('Error saving frequency purchase:', error.message);
-      });
-    }
-
-
-    res.json({
-      success: true,
-      checkoutUrl: session.url,
-      sessionId: session.id
-    });
-
-  } catch (error) {
-    console.error('Frequency checkout error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create checkout session',
-      error: error.message
-    });
-  }
-});
 
 // Create Customer Portal Session (for managing subscriptions)
 app.post('/api/stripe/create-portal-session', async (req, res) => {
@@ -4930,22 +4849,6 @@ app.post('/api/coaching-credits/use', async (req, res) => {
   }
 });
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    message: 'Neuro360 Backend Server is running',
-    timestamp: new Date().toISOString(),
-    env: {
-      geminiApiKey: !!process.env.GEMINI_API_KEY,
-      openaiApiKey: !!process.env.OPENAI_API_KEY,
-      supabaseUrl: !!process.env.SUPABASE_URL,
-      stripeConfigured: !!process.env.STRIPE_SECRET_KEY,
-      stripeKeyPreview: process.env.STRIPE_SECRET_KEY ? process.env.STRIPE_SECRET_KEY.substring(0, 8) + '...' : 'NOT SET',
-      allStripeEnvKeys: Object.keys(process.env).filter(k => k.toLowerCase().includes('stripe'))
-    }
-  });
-});
 
 // Gemini API test endpoint
 app.get('/api/test-gemini', async (req, res) => {

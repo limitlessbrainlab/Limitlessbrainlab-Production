@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import StorageService from '../../services/storageService';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
 const ProfileModal = ({ isOpen, onClose, onProfileUpdate }) => {
   const { user, updateUser } = useAuth();
@@ -99,7 +99,7 @@ const ProfileModal = ({ isOpen, onClose, onProfileUpdate }) => {
             reader.readAsDataURL(selectedFile);
           });
 
-          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+          const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
           const response = await fetch(`${API_URL}/upload-avatar`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

@@ -308,7 +308,7 @@ const AddPatientForm = () => {
 
       // Send welcome email in background (don't block the UI)
       if (authCreated) {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
         const baseUrl = apiUrl.replace(/\/api\/?$/, '');
 
         // Get clinic SMTP config

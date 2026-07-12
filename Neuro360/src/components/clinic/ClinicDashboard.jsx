@@ -14,7 +14,7 @@ import ClinicAdminPanel from './ClinicAdminPanel';
 import toast from 'react-hot-toast';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
 // Minimal package selection gate for first-time clinic login
 const PendingSubscriptionGate = ({ user, clinic, onPaymentSuccess }) => {
@@ -85,7 +85,7 @@ const PendingSubscriptionGate = ({ user, clinic, onPaymentSuccess }) => {
       window.history.replaceState({}, document.title, window.location.pathname);
 
       try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
         await fetch(`${API_URL}/confirm-report-credits`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

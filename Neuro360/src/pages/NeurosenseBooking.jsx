@@ -10,7 +10,7 @@ import { countryCodes, validatePhoneNumber, getCountryByCode } from '../utils/co
 import LocationService, { DEFAULT_LOCATIONS } from '../services/locationService';
 
 // API Base URL for backend email
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
 const NeurosenseBooking = () => {
   const location = useLocation();

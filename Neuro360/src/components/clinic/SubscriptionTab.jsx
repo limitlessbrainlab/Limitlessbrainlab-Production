@@ -20,7 +20,7 @@ import PaymentSuccessModal from '../payment/PaymentSuccessModal';
 import toast from 'react-hot-toast';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
 // Fallback credit packages (used if DB fetch fails)
 const FALLBACK_PACKAGES = {
@@ -101,7 +101,7 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
       // Credits are applied authoritatively + idempotently on the backend
       // (service-role key, verifies the Stripe payment, dedupes by session).
       try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
         await fetch(`${API_URL}/confirm-report-credits`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -662,7 +662,7 @@ const PatientDashboard = () => {
     }
     setIsProcessingAssessmentPayment(assessmentId);
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
       // Always return to the About the Brain page on the SAME domain the patient is
       // using (the patient portal) — never bounce to the main limitlessbrainlab.com site.
@@ -824,7 +824,7 @@ const PatientDashboard = () => {
           }
           // Send JotForm link email to patient
           try {
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+            const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
             const emailAssessmentLink = assessmentDetails.link;
             const emailAmountPaid = assessmentDetails.price.toFixed(2);
 
@@ -935,7 +935,7 @@ const PatientDashboard = () => {
       }
 
       // Send email notification via API
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
       try {
         const response = await fetch(`${API_BASE_URL}/feedback`, {
           method: 'POST',
@@ -2060,7 +2060,7 @@ const PatientDashboard = () => {
     const [bcForm, setBcForm] = React.useState({ firstName: '', lastName: '', email: user?.email || '', countryCode: '+971', phone: '', city: '', message: '' });
     const [bcSubmitting, setBcSubmitting] = React.useState(false);
 
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
     React.useEffect(() => {
       const fetchData = async () => {
@@ -7934,7 +7934,7 @@ const PatientDashboard = () => {
     // Get Google Drive audio URL via backend proxy
     const getGoogleDriveAudioUrl = (driveId) => {
       if (!driveId) return null;
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
       return `${API_URL}/audio/stream/${driveId}`;
     };
 
@@ -8166,7 +8166,7 @@ const PatientDashboard = () => {
       if (!selectedMedPack) return;
       setIsProcessingPayment(selectedMedPack.id);
       try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
         const response = await fetch(`${API_URL}/create-frequency-checkout`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -8301,7 +8301,7 @@ const PatientDashboard = () => {
 
           // Send emails
           try {
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+            const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
             await fetch(`${API_URL}/send-assessment-email`, {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

@@ -689,7 +689,7 @@ const Wallet = () => {
   // Email invoice — render server-side and send via the backend mailer
   const handleEmailInvoice = async (inv) => {
     if (!patientEmail) { toast.error('Please log in to email your invoice'); return; }
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
     const t = toast.loading(`Emailing invoice ${inv.id}...`);
     try {
       const res = await fetch(`${API_URL}/wallet/invoice-email`, {

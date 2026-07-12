@@ -78,7 +78,7 @@ const RegisterForm = () => {
           const { latitude, longitude } = position.coords;
 
           // Call server API to get address from coordinates
-          const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+          const baseUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
           const response = await fetch(`${baseUrl}/geocode`, {
             method: 'POST',
             headers: {

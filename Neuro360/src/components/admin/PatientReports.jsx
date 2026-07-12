@@ -200,7 +200,7 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
   // Fetch all data from a table via server API (bypasses RLS)
   const fetchAdminTable = async (tableName) => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
       const baseUrl = apiUrl.replace(/\/api\/?$/, '');
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
@@ -720,7 +720,7 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
       const patientEmail = selectedPatientObj?.email;
       const clinicEmail = selectedClinicObj?.email;
       if (patientEmail || clinicEmail) {
-        fetch(`${(import.meta.env.VITE_API_URL || 'http://localhost:5000/api')}/notify-patient-report`, {
+        fetch(`${(import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api'))}/notify-patient-report`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

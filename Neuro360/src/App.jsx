@@ -40,17 +40,7 @@ const ContactForm                = lazy(() => import('./pages/ContactForm.jsx'))
 const NeurosenseBooking          = lazy(() => import('./pages/NeurosenseBooking.jsx'));
 const TakeAssessment             = lazy(() => import('./pages/TakeAssessment.jsx'));
 const Pricing                    = lazy(() => import('./pages/Pricing.jsx'));
-const MoversSection              = lazy(() => import('./pages/MoversSection.jsx'));
-const ANSResetProtocol           = lazy(() => import('./pages/ANSResetProtocol.jsx'));
-const FrequenciesMusic           = lazy(() => import('./pages/FrequenciesMusic.jsx'));
-const SupplementsNootropics      = lazy(() => import('./pages/SupplementsNootropics.jsx'));
-const FivePillars                = lazy(() => import('./pages/FivePillars.jsx'));
 const CoachCertification         = lazy(() => import('./pages/CoachCertification.jsx'));
-const BrainCoach                 = lazy(() => import('./pages/BrainCoach.jsx'));
-const HomeNeurofeedback          = lazy(() => import('./pages/HomeNeurofeedback.jsx'));
-const Wallet                     = lazy(() => import('./pages/Wallet.jsx'));
-const OpeningPage                = lazy(() => import('./pages/OpeningPage.jsx'));
-const InteractiveBrain           = lazy(() => import('./pages/InteractiveBrain.jsx'));
 const Locations                  = lazy(() => import('./pages/Locations.jsx'));
 const StaticPage                 = lazy(() => import('./pages/StaticPage'));
 const SuperAdminPanel            = lazy(() => import('./components/admin/SuperAdminPanel'));

@@ -911,7 +911,7 @@ const ClinicManagement = ({ onUpdate }) => {
 
   // Get base URL for API calls
   const getBaseUrl = () => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
     return apiUrl.replace(/\/api\/?$/, '');
   };
 
@@ -2741,7 +2741,7 @@ const ClinicDetails = ({ clinic, onBack, navigate }) => {
                 onClick={async () => {
                   setSendingNotification(true);
                   try {
-                    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+                    const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
                     const { data: notifSession } = await supabase.auth.getSession();
                     const notifToken = notifSession?.session?.access_token;
                     const notifHeaders = { 'Content-Type': 'application/json' };

@@ -166,7 +166,7 @@ const BrainCoach = () => {
           localStorage.removeItem('pendingCoachPayment');
 
           // Send admin notification
-          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+          const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
           await fetch(`${API_URL}/send-assessment-email`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -325,7 +325,7 @@ const BrainCoach = () => {
   const fetchCoachingCredits = async () => {
     if (user?.email) {
       try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
         const response = await fetch(`${API_URL}/coaching-credits/${encodeURIComponent(user.email)}`);
         const data = await response.json();
         if (data.success) {
@@ -456,7 +456,7 @@ const BrainCoach = () => {
   async function fetchPaidCoaches() {
     if (!user?.email) return;
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
       const response = await fetch(`${API_URL}/bookings/${encodeURIComponent(user.email)}`);
       const data = await response.json();
       if (data.success && data.bookings) {
@@ -934,7 +934,7 @@ const BrainCoach = () => {
 
     setIsProcessingPayment(true);
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
       // Get numeric price
       const priceStr = paymentCoach.price?.toString() || '2500';
@@ -981,7 +981,7 @@ const BrainCoach = () => {
   // Used for the free-credit flow; the paid flow is handled in the payment-success callback.
   async function proceedToBooking(coach, useFreeCredit = false) {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
       // Coach's real session price (parsed from the display value, e.g. "₹6,500/session")
       const coachPriceNum = parseInt(String(coach.price ?? '').replace(/[^0-9]/g, ''), 10);

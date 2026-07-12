@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { CheckCircle, AlertCircle, Clock, ExternalLink, ArrowLeft } from 'lucide-react';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
 // One-time assessment gate. Buyers receive /assessment/take/<token> instead of
 // the raw JotForm URL; this page validates the token server-side, embeds the

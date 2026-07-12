@@ -26,7 +26,7 @@ import {
 import toast from 'react-hot-toast';
 import useRealtimeRefetch from '../../hooks/useRealtimeRefetch';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
 const TABS = [
   { id: 'contact', label: 'Contact Inquiries', icon: Mail },

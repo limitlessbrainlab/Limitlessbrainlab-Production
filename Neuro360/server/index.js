@@ -2399,6 +2399,117 @@ app.post('/api/create-report-checkout', async (req, res) => {
 // claimNotificationOnce guard (keyed by session id) ensures credits are added
 // exactly once no matter how many callers fire (two dashboard components +
 // webhook + retries).
+// Clinic report-purchase confirmation emails (to the clinic + internal copy).
+// Called from BOTH fulfillment paths via applyReportCredits (Stripe webhook and
+// the frontend /api/confirm-report-credits fallback); the dedupe claim
+// guarantees the pair is sent exactly once per checkout session regardless of
+// which path (or how many retries) get here.
+async function sendClinicReportPurchaseEmails(session, previousAllowed) {
+  if (!mailerConfigured || !session?.customer_email) return;
+  const firstTime = await claimNotificationOnce(`clinic_report:${session.id}:emails`);
+  if (!firstTime) return;
+
+  const clinicId = session.metadata?.clinic_id;
+  const reports = parseInt(session.metadata?.reports || '0', 10);
+  const customerName = session.metadata?.customer_name || '';
+  const isReorder = previousAllowed > 0;
+  const FRONTEND_URL = APP_URL;
+
+  const clinicMailOptions = isReorder
+    ? {
+        from: EMAIL_FROM,
+        to: session.customer_email,
+        subject: `Package Reorder Successful - ${reports} EEG Reports Added`,
+        attachments: getLogoAttachment(),
+        html: `
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
+            <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 24px 32px; text-align: center;">
+              <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover;" />
+              <h1 style="color: #ffffff; margin: 12px 0 0; font-size: 20px;">Package Reorder Successful!</h1>
+            </div>
+            <div style="padding: 28px 32px;">
+              <p style="color: #333; font-size: 15px; line-height: 1.6;">Dear <strong>${customerName || 'Clinic Admin'}</strong>,</p>
+              <p style="color: #555; font-size: 15px; line-height: 1.6;">Thank you for reordering! Your payment of <strong>${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</strong> has been processed successfully.</p>
+              <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px 20px; margin: 20px 0;">
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="color: #555; font-size: 14px; padding: 6px 0;">Credits Added</td>
+                    <td style="color: #166534; font-weight: 700; font-size: 14px; text-align: right;">+${reports} Reports</td>
+                  </tr>
+                  <tr>
+                    <td style="color: #555; font-size: 14px; padding: 6px 0;">Previous Balance</td>
+                    <td style="color: #374151; font-weight: 600; font-size: 14px; text-align: right;">${previousAllowed} Reports</td>
+                  </tr>
+                  <tr style="border-top: 1px solid #bbf7d0;">
+                    <td style="color: #333; font-size: 15px; font-weight: 700; padding: 8px 0;">New Total Balance</td>
+                    <td style="color: #166534; font-weight: 700; font-size: 15px; text-align: right;">${previousAllowed + reports} Reports</td>
+                  </tr>
+                </table>
+              </div>
+              <p style="color: #555; font-size: 14px; line-height: 1.6;">You can now continue adding patients and generating reports from your dashboard.</p>
+              <div style="text-align: center; margin: 28px 0;">
+                <a href="${FRONTEND_URL}/clinic" style="display: inline-block; background: #323956; color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">Go to Dashboard</a>
+              </div>
+              <p style="color: #999; font-size: 12px; text-align: center;">Thank you for your continued trust in Limitless Brain Lab!</p>
+            </div>
+            <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; color: #94a3b8; font-size: 11px;">Limitless Brain Lab &bull; info@limitlessbrainlab.com</p>
+            </div>
+          </div>
+        `
+      }
+    : {
+        from: EMAIL_FROM,
+        to: session.customer_email,
+        subject: `Payment Successful - ${reports} EEG Reports Added`,
+        attachments: getLogoAttachment(),
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+              <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover;" />
+              <h1 style="color: #ffffff; margin: 10px 0 0; font-size: 20px;">Payment Successful!</h1>
+            </div>
+            <div style="padding: 24px; background: #ffffff; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+              <p style="color: #333;">Hi ${customerName || 'Clinic Admin'},</p>
+              <p style="color: #555;">Your payment of <strong>${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</strong> has been processed successfully.</p>
+              <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin: 16px 0;">
+                <p style="margin: 0; color: #166534; font-weight: 600;">${reports} EEG Report Credits have been added to your account.</p>
+              </div>
+              <p style="color: #555; font-size: 13px;">You can now access your clinic dashboard and start generating reports.</p>
+              <div style="text-align: center; margin: 24px 0;">
+                <a href="${FRONTEND_URL}/clinic" style="display: inline-block; background: #323956; color: #fff; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-weight: 600;">Go to Dashboard</a>
+              </div>
+              <p style="color: #999; font-size: 12px; text-align: center;">Thank you for choosing Limitless Brain Lab!</p>
+            </div>
+          </div>
+        `
+      };
+
+  emailTransporter.sendMail(clinicMailOptions)
+    .catch(err => console.error('Clinic payment email failed:', err.message));
+
+  // Notify admin (Limitless Brain Lab) about clinic report purchase
+  const adminClinicMailOptions = {
+    from: EMAIL_FROM,
+    to: process.env.EMAIL_TO || process.env.EMAIL_USER,
+    subject: `New Clinic Report Purchase: ${reports} Reports`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 500px;">
+        <h2 style="color: #323956;">New Clinic Report Purchase</h2>
+        <p><strong>Clinic ID:</strong> ${clinicId}</p>
+        <p><strong>Customer:</strong> ${customerName || 'N/A'} (${session.customer_email})</p>
+        <p><strong>Reports:</strong> ${reports} EEG Reports</p>
+        <p><strong>Amount:</strong> ${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</p>
+        <p><strong>Session ID:</strong> ${session.id}</p>
+        <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+      </div>
+    `
+  };
+
+  emailTransporter.sendMail(adminClinicMailOptions)
+    .catch(err => console.error('Admin clinic report email failed:', err.message));
+}
+
 async function applyReportCredits(sessionId) {
   if (!sessionId) return { ok: false, status: 400, message: 'sessionId required' };
   if (!stripe) return { ok: false, status: 500, message: 'Stripe not configured' };
@@ -2444,7 +2555,13 @@ async function applyReportCredits(sessionId) {
   const firstTime = await claimNotificationOnce(`clinic_report:${sessionId}:credits`);
   if (!firstTime) {
     const { data } = await supabase.from('clinics').select('reports_allowed').eq('id', clinicId).single();
-    return { ok: true, alreadyApplied: true, reportsAllowed: data?.reports_allowed ?? null, added: 0 };
+    const allowedNow = data?.reports_allowed ?? null;
+    // Credits were applied by the other path — still attempt the confirmation
+    // emails (claimed independently), so a purchase credited by a path that
+    // never emailed still gets them here.
+    sendClinicReportPurchaseEmails(session, Math.max(0, (allowedNow ?? reports) - reports))
+      .catch(err => console.error('Clinic report purchase emails failed:', err.message));
+    return { ok: true, alreadyApplied: true, reportsAllowed: allowedNow, added: 0 };
   }
 
   const { data: clinicData } = await supabase.from('clinics').select('reports_allowed').eq('id', clinicId).single();
@@ -2457,10 +2574,18 @@ async function applyReportCredits(sessionId) {
     console.error('applyReportCredits clinics update error:', updErr.message);
     return { ok: false, status: 500, message: updErr.message };
   }
-  await supabase.from('organizations')
-    .update({ reports_allowed: newAllowed, subscription_status: 'active', updated_at: new Date().toISOString() })
-    .eq('id', clinicId)
-    .catch(err => console.warn('applyReportCredits organizations update skipped:', err.message));
+  // Mirror to organizations. NOTE: supabase-js reports failures via the
+  // returned { error }, not by throwing — a .catch() here would never fire.
+  // organizations has no subscription_status column, so only mirror the credits.
+  const { error: orgErr } = await supabase.from('organizations')
+    .update({ reports_allowed: newAllowed, updated_at: new Date().toISOString() })
+    .eq('id', clinicId);
+  if (orgErr) {
+    console.warn('applyReportCredits organizations mirror failed:', orgErr.message);
+  }
+
+  sendClinicReportPurchaseEmails(session, clinicData?.reports_allowed || 0)
+    .catch(err => console.error('Clinic report purchase emails failed:', err.message));
 
   console.log(`SUCCESS: applyReportCredits clinic ${clinicId} reports_allowed -> ${newAllowed} (+${reports})`);
   return { ok: true, reportsAllowed: newAllowed, added: reports };
@@ -3704,18 +3829,10 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           const reports = parseInt(session.metadata?.reports || '0', 10);
           const packageId = session.metadata?.package_id;
           const clinicTypeFromMeta = session.metadata?.clinic_type || 'lbl_partner';
-          const customerName = session.metadata?.customer_name || '';
-          let currentAllowed = 0; // prior allowance, used to pick reorder vs first-purchase email
 
           console.log(`PAYMENT: Clinic report purchase - clinicId: ${clinicId}, reports: ${reports}, amount: ${session.amount_total / 100}`);
 
           if (clinicId) {
-            // Capture the allowance BEFORE crediting (for the reorder-vs-first email below).
-            try {
-              const { data: priorClinic } = await supabase.from('clinics').select('reports_allowed').eq('id', clinicId).single();
-              currentAllowed = priorClinic?.reports_allowed || 0;
-            } catch (_) {}
-
             // 1. Add report credits (idempotent + service-role). Shared with the
             // /api/confirm-report-credits frontend path; only one of them actually
             // applies the credits for a given session. Does NOT reset reports_used
@@ -3734,107 +3851,11 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             // 2. The payments-table record is written inside applyReportCredits
             // (idempotently, shared with the frontend confirm path) so it lands
             // even when this webhook does not reach the deployment.
+            // 3. The clinic confirmation + internal-copy emails are sent by
+            // sendClinicReportPurchaseEmails inside applyReportCredits, claimed
+            // once per session across this webhook and the frontend confirm path.
           }
 
-          // Send confirmation email to clinic — reorder vs first purchase
-          if (mailerConfigured && session.customer_email) {
-            const isReorder = currentAllowed > 0;
-            const FRONTEND_URL = APP_URL;
-
-            const clinicMailOptions = isReorder
-              ? {
-                  from: EMAIL_FROM,
-                  to: session.customer_email,
-                  subject: `Package Reorder Successful - ${reports} EEG Reports Added`,
-                  attachments: getLogoAttachment(),
-                  html: `
-                    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
-                      <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 24px 32px; text-align: center;">
-                        <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover;" />
-                        <h1 style="color: #ffffff; margin: 12px 0 0; font-size: 20px;">Package Reorder Successful!</h1>
-                      </div>
-                      <div style="padding: 28px 32px;">
-                        <p style="color: #333; font-size: 15px; line-height: 1.6;">Dear <strong>${customerName || 'Clinic Admin'}</strong>,</p>
-                        <p style="color: #555; font-size: 15px; line-height: 1.6;">Thank you for reordering! Your payment of <strong>${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</strong> has been processed successfully.</p>
-                        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px 20px; margin: 20px 0;">
-                          <table style="width: 100%; border-collapse: collapse;">
-                            <tr>
-                              <td style="color: #555; font-size: 14px; padding: 6px 0;">Credits Added</td>
-                              <td style="color: #166534; font-weight: 700; font-size: 14px; text-align: right;">+${reports} Reports</td>
-                            </tr>
-                            <tr>
-                              <td style="color: #555; font-size: 14px; padding: 6px 0;">Previous Balance</td>
-                              <td style="color: #374151; font-weight: 600; font-size: 14px; text-align: right;">${currentAllowed} Reports</td>
-                            </tr>
-                            <tr style="border-top: 1px solid #bbf7d0;">
-                              <td style="color: #333; font-size: 15px; font-weight: 700; padding: 8px 0;">New Total Balance</td>
-                              <td style="color: #166534; font-weight: 700; font-size: 15px; text-align: right;">${currentAllowed + reports} Reports</td>
-                            </tr>
-                          </table>
-                        </div>
-                        <p style="color: #555; font-size: 14px; line-height: 1.6;">You can now continue adding patients and generating reports from your dashboard.</p>
-                        <div style="text-align: center; margin: 28px 0;">
-                          <a href="${FRONTEND_URL}/clinic" style="display: inline-block; background: #323956; color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">Go to Dashboard</a>
-                        </div>
-                        <p style="color: #999; font-size: 12px; text-align: center;">Thank you for your continued trust in Limitless Brain Lab!</p>
-                      </div>
-                      <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-                        <p style="margin: 0; color: #94a3b8; font-size: 11px;">Limitless Brain Lab &bull; info@limitlessbrainlab.com</p>
-                      </div>
-                    </div>
-                  `
-                }
-              : {
-                  from: EMAIL_FROM,
-                  to: session.customer_email,
-                  subject: `Payment Successful - ${reports} EEG Reports Added`,
-                  attachments: getLogoAttachment(),
-                  html: `
-                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                      <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-                        <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover;" />
-                        <h1 style="color: #ffffff; margin: 10px 0 0; font-size: 20px;">Payment Successful!</h1>
-                      </div>
-                      <div style="padding: 24px; background: #ffffff; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
-                        <p style="color: #333;">Hi ${customerName || 'Clinic Admin'},</p>
-                        <p style="color: #555;">Your payment of <strong>${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</strong> has been processed successfully.</p>
-                        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin: 16px 0;">
-                          <p style="margin: 0; color: #166534; font-weight: 600;">${reports} EEG Report Credits have been added to your account.</p>
-                        </div>
-                        <p style="color: #555; font-size: 13px;">You can now access your clinic dashboard and start generating reports.</p>
-                        <div style="text-align: center; margin: 24px 0;">
-                          <a href="${FRONTEND_URL}/clinic" style="display: inline-block; background: #323956; color: #fff; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-weight: 600;">Go to Dashboard</a>
-                        </div>
-                        <p style="color: #999; font-size: 12px; text-align: center;">Thank you for choosing Limitless Brain Lab!</p>
-                      </div>
-                    </div>
-                  `
-                };
-
-            emailTransporter.sendMail(clinicMailOptions)
-              .catch(err => console.error('Clinic payment email failed:', err.message));
-
-            // Notify admin (Limitless Brain Lab) about clinic report purchase
-            const adminClinicMailOptions = {
-              from: EMAIL_FROM,
-              to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-              subject: `New Clinic Report Purchase: ${reports} Reports`,
-              html: `
-                <div style="font-family: Arial, sans-serif; max-width: 500px;">
-                  <h2 style="color: #323956;">New Clinic Report Purchase</h2>
-                  <p><strong>Clinic ID:</strong> ${clinicId}</p>
-                  <p><strong>Customer:</strong> ${customerName || 'N/A'} (${session.customer_email})</p>
-                  <p><strong>Reports:</strong> ${reports} EEG Reports</p>
-                  <p><strong>Amount:</strong> ${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</p>
-                  <p><strong>Session ID:</strong> ${session.id}</p>
-                  <p><strong>Date:</strong> ${new Date().toISOString()}</p>
-                </div>
-              `
-            };
-
-            emailTransporter.sendMail(adminClinicMailOptions)
-              .catch(err => console.error('Admin clinic report email failed:', err.message));
-          }
 
         } else {
           // Handle frequency/meditation purchases

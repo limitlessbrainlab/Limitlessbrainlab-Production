@@ -147,9 +147,17 @@ const ClinicManagement = ({ onUpdate }) => {
     const timer = setTimeout(() => {
       initializeClinics();
     }, 100);
+    // Silent re-fetch so the table reflects clinic-side changes (approvals,
+    // credit purchases) without a manual reload — same 30s cadence as the
+    // PendingClinicsNotification poll it sits next to. loadClinics(true)
+    // doesn't touch the loading spinner, so rows update in place.
+    const refreshInterval = setInterval(() => {
+      loadClinics(true).catch(err => console.warn('Clinic list refresh failed:', err?.message));
+    }, 30000);
     // Cleanup function
     return () => {
       clearTimeout(timer);
+      clearInterval(refreshInterval);
       setIsMounted(false);
     };
   }, []);

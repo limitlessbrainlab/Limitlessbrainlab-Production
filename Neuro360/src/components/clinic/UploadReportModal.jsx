@@ -27,26 +27,27 @@ const UploadReportModal = ({ clinicId, patient, onUpload, onClose }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showSubscriptionPopup, setShowSubscriptionPopup] = useState(false);
-  const [subscription, setSubscription] = useState(null);
-  const [currentReports, setCurrentReports] = useState(0);
+  // Credit usage from clinics.reports_used/reports_allowed — the single source
+  // of truth (same as checkReportLimit and every other credit gate)
+  const [clinicUsage, setClinicUsage] = useState(null);
   const selectedFile = watch('reportFile');
   const selectedFile2 = watch('reportFile2');
   const selectedReportType = watch('reportType');
 
-  // Load subscription and usage data
+  // Load credit usage (legacy `subscriptions` table is NOT maintained by
+  // credit purchases — reading it here used to show a wrong used/10 counter)
   useEffect(() => {
     const loadUsageData = async () => {
       if (!clinicId) return; // Guard clause
 
       try {
-        // Load current reports count
-        const reports = await DatabaseService.getReportsByClinic(clinicId);
-        setCurrentReports(reports.length);
-
-        // Load subscription data
-        const subscriptions = await DatabaseService.get('subscriptions') || [];
-        const clinicSubscription = subscriptions.find(sub => sub.clinicId === clinicId);
-        setSubscription(clinicSubscription);
+        const clinic = await DatabaseService.findById('clinics', clinicId);
+        if (clinic) {
+          setClinicUsage({
+            used: Number(clinic.reportsUsed ?? clinic.reports_used ?? 0),
+            allowed: Number(clinic.reportsAllowed ?? clinic.reports_allowed ?? 0)
+          });
+        }
       } catch (error) {
         console.error('Error loading usage data:', error);
       }
@@ -150,14 +151,15 @@ const UploadReportModal = ({ clinicId, patient, onUpload, onClose }) => {
         reportsAllowed: subscriptionData.reportsAllowed
       });
       
-      // Reload usage data
-      const reports = await DatabaseService.getReportsByClinic(clinicId);
-      setCurrentReports(reports.length);
-      
-      const subscriptions = await DatabaseService.get('subscriptions') || [];
-      const clinicSubscription = subscriptions.find(sub => sub.clinicId === clinicId);
-      setSubscription(clinicSubscription);
-      
+      // Reload usage data from the source of truth
+      const clinic = await DatabaseService.findById('clinics', clinicId);
+      if (clinic) {
+        setClinicUsage({
+          used: Number(clinic.reportsUsed ?? clinic.reports_used ?? 0),
+          allowed: Number(clinic.reportsAllowed ?? clinic.reports_allowed ?? 0)
+        });
+      }
+
       toast.success('Subscription updated successfully!');
     } catch (error) {
       console.error('Error updating subscription:', error);
@@ -399,9 +401,13 @@ const UploadReportModal = ({ clinicId, patient, onUpload, onClose }) => {
 
         {/* Usage Warning */}
         {(() => {
-          const usageInfo = subscription && subscription.status === 'active' 
-            ? { used: currentReports, allowed: subscription.reportsAllowed, remaining: subscription.reportsAllowed - currentReports, isTrial: false }
-            : { used: currentReports, allowed: 10, remaining: 10 - currentReports, isTrial: true };
+          // clinics.reports_used/reports_allowed — matches checkReportLimit
+          if (!clinicUsage || clinicUsage.allowed <= 0) return null;
+          const usageInfo = {
+            used: clinicUsage.used,
+            allowed: clinicUsage.allowed,
+            remaining: clinicUsage.allowed - clinicUsage.used
+          };
           
           if (usageInfo.remaining <= 2) {
             return (
@@ -637,7 +643,7 @@ const UploadReportModal = ({ clinicId, patient, onUpload, onClose }) => {
         isOpen={showSubscriptionPopup}
         onClose={() => setShowSubscriptionPopup(false)}
         clinicId={clinicId}
-        currentUsage={currentReports}
+        currentUsage={clinicUsage?.used ?? 0}
         onSubscribe={handleSubscription}
         clinicInfo={{
           name: user?.clinicName || user?.name || 'Clinic',

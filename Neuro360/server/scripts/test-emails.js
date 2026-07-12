@@ -50,8 +50,6 @@ const CASES = [
     body: { email: TEST_EMAIL, name: 'EMAIL TEST' } },
   { name: 'Password changed confirmation', path: '/api/send-password-email', recipient: 'user',
     body: { email: TEST_EMAIL, password: 'TestPass@123', name: 'EMAIL TEST' } },
-  { name: 'Password reset link', path: '/api/send-password-reset', recipient: 'user',
-    body: { email: TEST_EMAIL, name: 'EMAIL TEST', resetLink: 'https://example.com/reset?token=test' } },
   { name: 'Email ID updated notification', path: '/api/send-email-update-notification', recipient: 'user',
     body: { patientName: 'EMAIL TEST', newEmail: TEST_EMAIL } },
 

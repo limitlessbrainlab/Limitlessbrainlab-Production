@@ -859,8 +859,8 @@ app.use('/api/qeeg', protectedRoutes.authRequired, qeegRoutes);
 // SSO routes - Optional auth
 app.use('/api/sso', protectedRoutes.optionalAuth, ssoRoutes);
 
-// Claude API test endpoint - NO AUTH (for testing VPS connection)
-app.use('/api/test', claudeRoutes);
+// (claudeRoutes is mounted once under /api below — the old duplicate
+// /api/test mount exposed the same handlers at a second path for no reason)
 
 // Contact Form API endpoint - PUBLIC (no auth required)
 app.post('/api/contact', async (req, res) => {
@@ -2676,14 +2676,27 @@ async function applyReportCredits(sessionId) {
   }
 
   const { data: clinicData } = await supabase.from('clinics').select('reports_allowed').eq('id', clinicId).single();
-  const newAllowed = (clinicData?.reports_allowed || 0) + reports;
 
-  const { error: updErr } = await supabase.from('clinics')
-    .update({ reports_allowed: newAllowed, subscription_status: 'active', is_active: true, updated_at: new Date().toISOString() })
-    .eq('id', clinicId);
-  if (updErr) {
-    console.error('applyReportCredits clinics update error:', updErr.message);
-    return { ok: false, status: 500, message: updErr.message };
+  // Atomic increment via the DB function (reports_allowed = reports_allowed + N,
+  // also sets subscription_status/is_active) — a read-modify-write here could
+  // lose an increment when two purchases for the same clinic fulfill
+  // concurrently. Falls back to the old read-modify-write if the rpc is
+  // unavailable (deploy-order safety).
+  let newAllowed;
+  const { data: rpcAllowed, error: rpcErr } = await supabase
+    .rpc('increment_clinic_report_credits', { p_clinic_id: clinicId, p_delta: reports });
+  if (!rpcErr && rpcAllowed !== null && rpcAllowed !== undefined) {
+    newAllowed = rpcAllowed;
+  } else {
+    if (rpcErr) console.warn('increment_clinic_report_credits rpc unavailable, falling back:', rpcErr.message);
+    newAllowed = (clinicData?.reports_allowed || 0) + reports;
+    const { error: updErr } = await supabase.from('clinics')
+      .update({ reports_allowed: newAllowed, subscription_status: 'active', is_active: true, updated_at: new Date().toISOString() })
+      .eq('id', clinicId);
+    if (updErr) {
+      console.error('applyReportCredits clinics update error:', updErr.message);
+      return { ok: false, status: 500, message: updErr.message };
+    }
   }
   // Mirror to organizations. NOTE: supabase-js reports failures via the
   // returned { error }, not by throwing — a .catch() here would never fire.

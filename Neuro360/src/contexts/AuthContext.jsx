@@ -694,35 +694,7 @@ export const AuthProvider = ({ children }) => {
     window.location.href = '/';
   };
 
-  const forgotPassword = async (email) => {
-    try {
-      setLoading(true);
-      await authService.forgotPassword(email);
-      toast.success('Password reset email sent!');
-      return { success: true };
-    } catch (error) {
-      console.error('Forgot password failed:', error);
-      toast.error(getFriendlyErrorMessage(error, 'We could not send the password reset email. Please try again.'));
-      return { success: false, error: error.message };
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const resetPassword = async (token, newPassword) => {
-    try {
-      setLoading(true);
-      await authService.resetPassword(token, newPassword);
-      toast.success('Password reset successful!');
-      return { success: true };
-    } catch (error) {
-      console.error('Password reset failed:', error);
-      toast.error(getFriendlyErrorMessage(error, 'We could not reset your password. Please try again.'));
-      return { success: false, error: error.message };
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const updateUser = async (userData) => {
     try {
@@ -856,8 +828,6 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
-    forgotPassword,
-    resetPassword,
     updateUser,
     checkAuthStatus,
   };

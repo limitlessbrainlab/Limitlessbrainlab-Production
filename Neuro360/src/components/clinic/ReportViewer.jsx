@@ -11,7 +11,6 @@ import {
   X,
   AlertTriangle,
   CheckCircle,
-  Lock,
   Paperclip
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -37,7 +36,6 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
   const [subscription, setSubscription] = useState(null);
   const [clinicRecord, setClinicRecord] = useState(null); // authoritative credit source (clinics.reports_used/allowed)
   const [error, setError] = useState(null);
-  const [isLimitReached, setIsLimitReached] = useState(false);
   const [otherDocuments, setOtherDocuments] = useState([]);
 
   // Log props on mount
@@ -59,15 +57,6 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
   useEffect(() => {
     loadReports();
   }, [clinicId]);
-
-  // Check limit status whenever reports or clinicId changes
-  useEffect(() => {
-    const checkLimit = async () => {
-      const limitCheck = await checkReportLimit();
-      setIsLimitReached(limitCheck.limitReached);
-    };
-    checkLimit();
-  }, [reports, clinicId]);
 
   // Also use initialReports if provided
   useEffect(() => {
@@ -299,18 +288,8 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
         return;
       }
 
-      // Check if clinic has reached report limit
-      const limitCheck = await checkReportLimit();
-      if (limitCheck.limitReached) {
-        setShowSubscriptionPopup(true);
-        if (limitCheck.reason === 'trial_expired') {
-          toast.error('Your trial has expired. Please upgrade to continue downloading reports.');
-        } else {
-          toast.error('Report limit reached. Please upgrade your plan to continue downloading reports.');
-        }
-        return;
-      }
-
+      // No quota check here — downloads never consume a credit, so
+      // already-generated reports stay downloadable at 0 credits / expired trial.
       setLoading(true);
 
       // Get file name from multiple possible sources

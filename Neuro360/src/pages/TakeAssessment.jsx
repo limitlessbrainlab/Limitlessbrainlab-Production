@@ -13,6 +13,7 @@ const TakeAssessment = () => {
   const [state, setState] = useState({ status: 'loading' });
   const [activeLink, setActiveLink] = useState(null); // the embedded form URL
   const [justCompleted, setJustCompleted] = useState(false);
+  const [partDone, setPartDone] = useState(false); // bundle: a part was just submitted
 
   useEffect(() => {
     let cancelled = false;
@@ -34,6 +35,15 @@ const TakeAssessment = () => {
   }, [token]);
 
   const markCompleted = useCallback(() => {
+    // Bundles must NOT be expired by a single sub-form submission — the buyer
+    // still has the remaining parts to take. Return them to the parts list;
+    // the bundle link stays valid (consume never grace-expires bundles) until
+    // the 30-day expiry or a true completion signal.
+    if (state.isBundle) {
+      setPartDone(true);
+      setActiveLink(null);
+      return;
+    }
     fetch(`${API_BASE_URL}/assessment-link/complete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -41,7 +51,7 @@ const TakeAssessment = () => {
     }).catch(() => {});
     setJustCompleted(true);
     setActiveLink(null);
-  }, [token]);
+  }, [token, state.isBundle]);
 
   // The embedded JotForm posts messages to the parent window; a submission
   // lands on the thank-you screen and emits an event containing
@@ -147,6 +157,9 @@ const TakeAssessment = () => {
           </>
         ) : (
           <>
+            {partDone && (
+              <p className="text-green-600 text-sm font-semibold mb-2">✓ Part completed — continue with your next assessment.</p>
+            )}
             <p className="text-gray-600 text-sm mb-4">Your bundle includes {links.length} assessments — complete each one:</p>
             {links.map((link, i) => (
               <button

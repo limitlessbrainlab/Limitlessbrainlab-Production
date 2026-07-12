@@ -764,24 +764,8 @@ export const authService = {
   },
 
   // Forgot Password
-  async forgotPassword(email) {
-    try {
-      const response = await api.post('/auth/forgot-password', { email });
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to send reset email');
-    }
-  },
 
   // Reset Password
-  async resetPassword(token, newPassword) {
-    try {
-      const response = await api.post('/auth/reset-password', { token, password: newPassword });
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Password reset failed');
-    }
-  }
 };
 
 export default authService;

@@ -2945,6 +2945,35 @@ app.post('/api/assessment-link/consume', async (req, res) => {
   }
 });
 
+// Client-side completion signal from the gate page: when the embedded JotForm
+// reports submission-completed, the page spends the one-time link immediately
+// (works with zero JotForm-account configuration). Only the link holder knows
+// the token, and the only effect is expiring their own link. The JotForm
+// webhook below remains the richer path (it also captures the answers).
+app.post('/api/assessment-link/complete', async (req, res) => {
+  try {
+    if (!supabase) return res.status(500).json({ status: 'error' });
+    const token = String(req.body?.token || '').trim();
+    if (!/^[a-f0-9]{24,64}$/.test(token)) return res.json({ status: 'invalid' });
+
+    const { data: rows } = await supabase.from('assessment_purchases')
+      .select('id, assessment_completed_at')
+      .eq('link_token', token)
+      .limit(1);
+    const row = rows?.[0];
+    if (!row) return res.json({ status: 'invalid' });
+    if (!row.assessment_completed_at) {
+      await supabase.from('assessment_purchases')
+        .update({ assessment_completed_at: new Date().toISOString() })
+        .eq('id', row.id);
+    }
+    return res.json({ status: 'completed' });
+  } catch (e) {
+    console.error('assessment-link complete error:', e.message);
+    res.status(500).json({ status: 'error' });
+  }
+});
+
 // JotForm submission webhook. Add https://limitlessbrainlab.com/api/jotform-webhook
 // under each form's Settings → Integrations → WebHooks. JotForm POSTs
 // multipart/form-data with formID, submissionID, pretty ("Q:A, Q:A") and

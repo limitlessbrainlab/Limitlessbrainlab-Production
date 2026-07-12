@@ -1,15 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { CheckCircle, AlertCircle, Clock, ExternalLink } from 'lucide-react';
+import { CheckCircle, AlertCircle, Clock, ExternalLink, ArrowLeft } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // One-time assessment gate. Buyers receive /assessment/take/<token> instead of
-// the raw JotForm URL; this page validates the token server-side and only then
-// redirects to (or lists, for bundles) the underlying assessment form(s).
+// the raw JotForm URL; this page validates the token server-side, embeds the
+// form, and — when the embedded JotForm reports submission-completed — spends
+// the link immediately so it can never be reused.
 const TakeAssessment = () => {
   const { token } = useParams();
   const [state, setState] = useState({ status: 'loading' });
+  const [activeLink, setActiveLink] = useState(null); // the embedded form URL
+  const [justCompleted, setJustCompleted] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -23,13 +26,43 @@ const TakeAssessment = () => {
         if (cancelled) return;
         setState(data || { status: 'error' });
         if (data?.status === 'ok' && !data.isBundle && data.links?.length === 1) {
-          // Single assessment: hand the user straight to the form
-          setTimeout(() => { window.location.href = data.links[0]; }, 1200);
+          setActiveLink(data.links[0]);
         }
       })
       .catch(() => !cancelled && setState({ status: 'error' }));
     return () => { cancelled = true; };
   }, [token]);
+
+  const markCompleted = useCallback(() => {
+    fetch(`${API_BASE_URL}/assessment-link/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    }).catch(() => {});
+    setJustCompleted(true);
+    setActiveLink(null);
+  }, [token]);
+
+  // The embedded JotForm posts messages to the parent window; a submission
+  // lands on the thank-you screen and emits an event containing
+  // "submission-completed". Payload shape varies by form theme, so match
+  // loosely on any *.jotform.com message mentioning it.
+  useEffect(() => {
+    if (!activeLink) return;
+    const onMessage = (event) => {
+      try {
+        if (!/(^|\.)jotform\.com$/.test(new URL(event.origin).hostname)) return;
+      } catch {
+        return;
+      }
+      const payload = typeof event.data === 'string' ? event.data : JSON.stringify(event.data || {});
+      if (payload.includes('submission-completed') || payload.includes('submissionCompleted') || payload.includes('formSubmitted')) {
+        markCompleted();
+      }
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [activeLink, markCompleted]);
 
   const Card = ({ icon, title, children }) => (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-4">
@@ -45,6 +78,40 @@ const TakeAssessment = () => {
     </div>
   );
 
+  // Embedded form view (single assessment, or one part of a bundle)
+  if (activeLink && state.status === 'ok') {
+    return (
+      <div className="min-h-screen flex flex-col bg-gray-50">
+        <div className="bg-gradient-to-r from-[#323956] to-[#4a5578] px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            {state.isBundle && (
+              <button onClick={() => setActiveLink(null)} className="text-white/80 hover:text-white" title="Back to bundle">
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+            )}
+            <p className="text-white text-sm font-semibold truncate">
+              {state.assessmentName || 'Your Assessment'} — complete the form below
+            </p>
+          </div>
+          <a
+            href={activeLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-white/80 hover:text-white text-xs whitespace-nowrap"
+          >
+            <ExternalLink className="h-3.5 w-3.5" /> Open in new tab
+          </a>
+        </div>
+        <iframe
+          src={activeLink}
+          title={state.assessmentName || 'Assessment'}
+          className="flex-1 w-full border-0"
+          allow="camera; microphone; geolocation"
+        />
+      </div>
+    );
+  }
+
   if (state.status === 'loading') {
     return (
       <Card icon={<Clock className="h-8 w-8 text-white" />} title="Checking your assessment link…">
@@ -55,34 +122,41 @@ const TakeAssessment = () => {
     );
   }
 
+  if (justCompleted) {
+    return (
+      <Card icon={<CheckCircle className="h-8 w-8 text-white" />} title="Assessment completed — thank you!">
+        <p className="text-gray-600 text-sm">Your responses have been submitted. Our team will review your results.</p>
+        <Link to="/" className="inline-block mt-5 px-8 py-3 bg-gradient-to-r from-[#323956] to-[#4a5578] text-white font-bold rounded-xl hover:shadow-lg transition-all">Back to Home</Link>
+      </Card>
+    );
+  }
+
   if (state.status === 'ok') {
     const links = state.links || [];
     return (
       <Card icon={<CheckCircle className="h-8 w-8 text-white" />} title={state.assessmentName || 'Your Assessment'}>
         {links.length === 1 ? (
           <>
-            <p className="text-gray-600 text-sm">Taking you to your assessment…</p>
-            <a
-              href={links[0]}
+            <p className="text-gray-600 text-sm">Your assessment is ready.</p>
+            <button
+              onClick={() => setActiveLink(links[0])}
               className="inline-block mt-5 px-8 py-3 bg-gradient-to-r from-[#323956] to-[#4a5578] text-white font-bold rounded-xl hover:shadow-lg transition-all"
             >
-              Open Assessment
-            </a>
+              Start Assessment
+            </button>
           </>
         ) : (
           <>
             <p className="text-gray-600 text-sm mb-4">Your bundle includes {links.length} assessments — complete each one:</p>
             {links.map((link, i) => (
-              <a
+              <button
                 key={i}
-                href={link}
-                target="_blank"
-                rel="noopener noreferrer"
+                onClick={() => setActiveLink(link)}
                 className="flex items-center justify-center gap-2 w-full mb-3 px-6 py-3 bg-gradient-to-r from-[#323956] to-[#4a5578] text-white font-semibold rounded-xl hover:shadow-lg transition-all"
               >
                 <ExternalLink className="h-4 w-4" />
                 Assessment {i + 1}
-              </a>
+              </button>
             ))}
           </>
         )}

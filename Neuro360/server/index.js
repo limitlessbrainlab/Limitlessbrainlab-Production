@@ -2983,6 +2983,17 @@ app.post('/api/jotform-webhook', require('multer')().none(), async (req, res) =>
         || (submitterEmail && candidates.find(c => c.patient_email === submitterEmail.toLowerCase()))
         || open[0] || null;
     }
+    // Fallback: stored links may use a named JotForm alias while webhooks send
+    // the numeric form id — match the submitter's newest open purchase instead.
+    if (!purchase && submitterEmail) {
+      const { data: byEmail } = await supabase.from('assessment_purchases')
+        .select('id, patient_email, assessment_name, assessment_completed_at')
+        .eq('patient_email', submitterEmail.toLowerCase())
+        .is('assessment_completed_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      purchase = byEmail?.[0] || null;
+    }
 
     if (purchase) {
       const { error } = await supabase.from('assessment_purchases')

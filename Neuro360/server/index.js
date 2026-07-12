@@ -2173,22 +2173,50 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
       if (supabase) {
         try {
           if (paymentType === 'assessment') {
-            const { error } = await supabase
+            // assessment_purchases has NO unique constraint on stripe_session_id,
+            // so upsert(onConflict) always errored and the row was silently
+            // dropped — check-then-insert keeps this webhook-fallback path
+            // idempotent without a schema migration.
+            const { data: existingAssessment } = await supabase
               .from('assessment_purchases')
-              .upsert({
-                patient_email: customerEmail?.toLowerCase(),
-                assessment_id: session.metadata?.assessment_id,
-                assessment_name: session.metadata?.assessment_name,
-                assessment_link: session.metadata?.assessment_link || '',
-                stripe_session_id: sessionId,
-                stripe_payment_intent: session.payment_intent,
-                amount_paid: session.amount_total / 100,
-                currency: session.currency?.toUpperCase(),
-                status: 'completed',
-                purchased_at: new Date().toISOString()
-              }, { onConflict: 'stripe_session_id' });
+              .select('id')
+              .eq('stripe_session_id', sessionId)
+              .limit(1);
+            if (!existingAssessment?.length) {
+              const { error } = await supabase
+                .from('assessment_purchases')
+                .insert({
+                  patient_email: customerEmail?.toLowerCase(),
+                  assessment_id: session.metadata?.assessment_id,
+                  assessment_name: session.metadata?.assessment_name,
+                  assessment_link: session.metadata?.assessment_link || '',
+                  stripe_session_id: sessionId,
+                  stripe_payment_intent: session.payment_intent,
+                  amount_paid: session.amount_total / 100,
+                  currency: session.currency?.toUpperCase(),
+                  status: 'completed',
+                  purchased_at: new Date().toISOString()
+                });
+              if (error) console.error('DB save error (assessment):', error.message);
+            }
 
-            if (error) console.error('DB save error (assessment):', error.message);
+            // payments row for the SuperAdmin dashboard (unique stripe_session_id)
+            const { error: assessPayErr } = await supabase.from('payments').upsert({
+              clinic_id: session.metadata?.clinic_id || null,
+              patient_email: customerEmail?.toLowerCase(),
+              amount: session.amount_total / 100,
+              currency: session.currency?.toUpperCase() || 'USD',
+              status: 'completed',
+              type: 'assessment',
+              package_name: session.metadata?.assessment_name || 'Brain Assessment',
+              payment_method: 'stripe',
+              payment_id: session.payment_intent || sessionId,
+              stripe_payment_id: session.payment_intent || sessionId,
+              stripe_session_id: sessionId,
+              source: session.metadata?.source || 'website',
+              created_at: new Date().toISOString()
+            }, { onConflict: 'stripe_session_id', ignoreDuplicates: true });
+            if (assessPayErr) console.error('DB save error (payments/assessment):', assessPayErr.message);
           } else if (paymentType === 'subscription') {
             // Full grant (patients tier/status/dashboard_access) + all payment
             // rows + welcome/admin emails — idempotent, shared with the webhook.
@@ -2197,26 +2225,59 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
             const subResult = await applySubscriptionPurchase(session);
             if (!subResult.ok) console.error('verify-session applySubscriptionPurchase failed:', subResult.message);
           } else {
-            // Frequency or meditation
-            const tableName = (session.metadata?.pack_id?.startsWith('solfeggio_') || session.metadata?.pack_id?.includes('meditation'))
-              ? 'meditation_purchases' : 'frequency_purchases';
+            // Frequency or meditation. The live tables are minimal —
+            // meditation_purchases(patient_email, meditation_id, purchased_at)
+            // and frequency_purchases(patient_email, frequency_id, pack_id,
+            // purchased_at) — the old upsert used columns that don't exist and
+            // always errored. The payments row (unique stripe_session_id) is
+            // the idempotency anchor.
+            const isMeditation = session.metadata?.pack_id?.startsWith('solfeggio_') || session.metadata?.pack_id?.includes('meditation');
+            const packEmail = customerEmail?.toLowerCase();
 
-            const { error } = await supabase
-              .from(tableName)
-              .upsert({
-                patient_email: customerEmail?.toLowerCase(),
-                pack_id: session.metadata?.pack_id,
-                pack_name: session.metadata?.pack_id,
-                is_bundle: session.metadata?.is_bundle === 'true',
-                stripe_session_id: sessionId,
-                stripe_payment_intent: session.payment_intent,
-                amount_paid: session.amount_total / 100,
-                currency: session.currency?.toUpperCase(),
-                status: 'completed',
-                purchased_at: new Date().toISOString()
-              }, { onConflict: 'stripe_session_id' });
+            if (isMeditation) {
+              const { error } = await supabase
+                .from('meditation_purchases')
+                .upsert({
+                  patient_email: packEmail,
+                  meditation_id: session.metadata?.pack_id,
+                  purchased_at: new Date().toISOString()
+                }, { onConflict: 'patient_email,meditation_id', ignoreDuplicates: true });
+              if (error) console.error('DB save error (meditation_purchases):', error.message);
+            } else {
+              const { data: existingPack } = await supabase
+                .from('frequency_purchases')
+                .select('id')
+                .eq('patient_email', packEmail)
+                .eq('pack_id', session.metadata?.pack_id)
+                .limit(1);
+              if (!existingPack?.length) {
+                const { error } = await supabase
+                  .from('frequency_purchases')
+                  .insert({
+                    patient_email: packEmail,
+                    pack_id: session.metadata?.pack_id,
+                    frequency_id: session.metadata?.pack_id,
+                    purchased_at: new Date().toISOString()
+                  });
+                if (error) console.error('DB save error (frequency_purchases):', error.message);
+              }
+            }
 
-            if (error) console.error(`DB save error (${tableName}):`, error.message);
+            const { error: packPayErr } = await supabase.from('payments').upsert({
+              clinic_id: null,
+              patient_email: packEmail,
+              amount: session.amount_total / 100,
+              currency: session.currency?.toUpperCase() || 'USD',
+              status: 'completed',
+              type: isMeditation ? 'meditation' : 'frequency',
+              package_name: session.metadata?.pack_id?.replace(/_/g, ' ') || 'Pack',
+              payment_method: 'stripe',
+              payment_id: session.payment_intent || sessionId,
+              stripe_payment_id: session.payment_intent || sessionId,
+              stripe_session_id: sessionId,
+              created_at: new Date().toISOString()
+            }, { onConflict: 'stripe_session_id', ignoreDuplicates: true });
+            if (packPayErr) console.error('DB save error (payments/pack):', packPayErr.message);
           }
         } catch (dbErr) {
           console.error('DB save error:', dbErr.message);
@@ -3880,21 +3941,20 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                                        session.metadata?.pack_id?.includes('meditation');
 
           if (isMeditationPurchase) {
-            // Save to meditation_purchases table
+            // Save to meditation_purchases table. Columns must match the live
+            // table (patient_email, meditation_id, purchased_at) or the insert
+            // fails and the purchase is never recorded — same trap as the
+            // frequency branch below. Idempotent via the (patient_email,
+            // meditation_id) unique key.
             const meditationPurchaseData = {
               patient_email: session.customer_email.toLowerCase(),
               meditation_id: session.metadata.pack_id,
-              is_bundle: session.metadata.is_bundle === 'true',
-              stripe_session_id: session.id,
-              stripe_payment_intent: session.payment_intent,
-              amount_paid: session.amount_total / 100,
-              currency: session.currency.toUpperCase(),
               purchased_at: new Date().toISOString()
             };
 
             const { error: medError } = await supabase
               .from('meditation_purchases')
-              .insert(meditationPurchaseData);
+              .upsert(meditationPurchaseData, { onConflict: 'patient_email,meditation_id', ignoreDuplicates: true });
 
             if (medError) {
               console.error('Error saving meditation purchase to database:', medError);

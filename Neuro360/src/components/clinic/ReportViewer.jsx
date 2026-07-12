@@ -107,50 +107,12 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
         console.warn('Could not load clinic credit record:', e?.message);
       }
 
-      // Ensure reportsData is an array
-      let validReports = Array.isArray(reportsData) ? reportsData : [];
-
-      // Filter out reports whose files don't exist in storage
-      if (validReports.length > 0) {
-        const { default: StorageService } = await import('../../services/storageService');
-        const verifiedReports = await Promise.all(
-          validReports.map(async (report) => {
-            const reportData = report.reportData || report.report_data || {};
-            const fileUrl = reportData.fileUrl || reportData.file_url || report.fileUrl || report.file_url;
-            const filePath = report.filePath || report.file_path || reportData.filePath || reportData.file_path;
-
-            // If report has a direct URL, check if it's accessible
-            if (fileUrl) {
-              try {
-                const res = await fetch(fileUrl, { method: 'HEAD' });
-                if (res.ok) return report;
-              } catch { /* check storage path */ }
-            }
-
-            // Check if file exists in storage bucket
-            if (filePath) {
-              try {
-                const { data, error } = await supabase.storage
-                  .from('neurosense-reports')
-                  .createSignedUrl(filePath, 10);
-                if (!error && data?.signedUrl) return report;
-              } catch { /* not found */ }
-
-              // Also try edf-files bucket
-              try {
-                const { data, error } = await supabase.storage
-                  .from('edf-files')
-                  .createSignedUrl(filePath, 10);
-                if (!error && data?.signedUrl) return report;
-              } catch { /* not found */ }
-            }
-
-            console.warn('STORAGE: File missing for report:', report.id, filePath || fileUrl);
-            return null;
-          })
-        );
-        validReports = verifiedReports.filter(Boolean);
-      }
+      // Ensure reportsData is an array. Do NOT drop rows on storage
+      // verification failures — a transient HEAD/CORS error used to make
+      // paid-for reports silently vanish from this list. Every report row is
+      // shown; download/preview generate fresh signed URLs on demand and
+      // surface their own errors.
+      const validReports = Array.isArray(reportsData) ? reportsData : [];
 
       setReports(validReports);
 
@@ -269,10 +231,11 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
     if (clinicId) {
       try {
         const clinic = await DatabaseService.findById('clinics', clinicId);
-        if (clinic && clinic.trialEndDate) {
-          const trialEndDate = new Date(clinic.trialEndDate);
+        const trialEnd = clinic && (clinic.trialEndDate || clinic.trial_end_date);
+        if (trialEnd) {
+          const trialEndDate = new Date(trialEnd);
           const now = new Date();
-          if (now > trialEndDate && clinic.subscriptionStatus === 'trial') {
+          if (now > trialEndDate && (clinic.subscriptionStatus || clinic.subscription_status) === 'trial') {
             // Trial expired - update status
             await DatabaseService.update('clinics', clinicId, {
               subscriptionStatus: 'expired',
@@ -327,11 +290,8 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
 
   const handleDownloadReport = async (report) => {
     try {
-      // Block if credits exhausted
-      if (creditsExhausted) {
-        toast.error('Report credits exhausted. Please purchase more credits to download reports.');
-        return;
-      }
+      // NOTE: downloads do not consume a credit — already-generated reports
+      // stay downloadable even when credits are exhausted.
 
       // Validate report object
       if (!report) {
@@ -1026,24 +986,16 @@ const ReportViewer = ({ clinicId, patients = [], reports: initialReports, onUpda
                       >
                         <Eye className="h-5 w-5" />
                       </button>
-                      {isLimitReached ? (
-                        <button
-                          onClick={() => setShowSubscriptionPopup(true)}
-                          className="p-2 text-orange-600 hover:text-orange-800 hover:bg-orange-50 rounded-lg transition-colors"
-                          title="Upgrade required to download"
-                        >
-                          <Lock className="h-5 w-5" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleDownloadReport(report)}
-                          disabled={loading}
-                          className="p-2 text-[#323956] hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
-                          title="Download Report"
-                        >
-                          <Download className="h-5 w-5" />
-                        </button>
-                      )}
+                      {/* Downloads never consume a credit — already-generated
+                          reports stay retrievable even at 0 credits */}
+                      <button
+                        onClick={() => handleDownloadReport(report)}
+                        disabled={loading}
+                        className="p-2 text-[#323956] hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
+                        title="Download Report"
+                      >
+                        <Download className="h-5 w-5" />
+                      </button>
                     </div>
                   </div>
                 </div>

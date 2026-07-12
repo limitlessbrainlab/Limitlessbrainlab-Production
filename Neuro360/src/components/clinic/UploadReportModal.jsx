@@ -105,43 +105,39 @@ const UploadReportModal = ({ clinicId, patient, onUpload, onClose }) => {
     );
   }
 
-  // Check if clinic has reached report limit
+  // Check if clinic has reached report limit.
+  // Quota source of truth is clinics.reports_used/reports_allowed — the same
+  // fields every other gate uses (AddPatientForm, ClinicDashboard,
+  // ReportViewer.getClinicUsageInfo). The old check read a `subscriptions`
+  // table row that credit purchases never create, so paid clinics were capped
+  // at a hardcoded 10 regardless of purchased credits.
   const checkReportLimit = async () => {
-    // Check trial expiry first
-    if (clinicId) {
-      try {
-        const clinic = await DatabaseService.findById('clinics', clinicId);
-        if (clinic && clinic.trialEndDate) {
-          const trialEndDate = new Date(clinic.trialEndDate);
-          const now = new Date();
-          if (now > trialEndDate && clinic.subscriptionStatus === 'trial') {
-            // Trial expired - update status
-            await DatabaseService.update('clinics', clinicId, {
-              subscriptionStatus: 'expired',
-              isActive: false
-            });
-            return { limitReached: true, reason: 'trial_expired' };
-          }
-        }
-      } catch (error) {
-        console.error('Error checking trial expiry:', error);
-      }
-    }
+    if (!clinicId) return { limitReached: false, reason: null };
+    try {
+      const clinic = await DatabaseService.findById('clinics', clinicId);
+      if (!clinic) return { limitReached: false, reason: null };
 
-    // Check report quota
-    if (subscription && subscription.status === 'active') {
-      // Paid subscription - check against plan limit
-      if (currentReports >= subscription.reportsAllowed) {
+      // Trial expiry (only meaningful while still on trial)
+      const trialEnd = clinic.trialEndDate || clinic.trial_end_date;
+      const status = clinic.subscriptionStatus || clinic.subscription_status;
+      if (trialEnd && status === 'trial' && new Date() > new Date(trialEnd)) {
+        await DatabaseService.update('clinics', clinicId, {
+          subscriptionStatus: 'expired',
+          isActive: false
+        });
+        return { limitReached: true, reason: 'trial_expired' };
+      }
+
+      const used = Number(clinic.reportsUsed ?? clinic.reports_used ?? 0);
+      const allowed = Number(clinic.reportsAllowed ?? clinic.reports_allowed ?? 0);
+      if (allowed > 0 && used >= allowed) {
         return { limitReached: true, reason: 'quota_exceeded' };
       }
-    } else {
-      // Trial subscription - 10 report limit
-      if (currentReports >= 10) {
-        return { limitReached: true, reason: 'quota_exceeded' };
-      }
+      return { limitReached: false, reason: null };
+    } catch (error) {
+      console.error('Error checking report limit:', error);
+      return { limitReached: false, reason: null };
     }
-
-    return { limitReached: false, reason: null };
   };
 
   const handleSubscription = async (subscriptionData) => {

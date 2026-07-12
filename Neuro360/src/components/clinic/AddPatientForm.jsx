@@ -200,6 +200,14 @@ const AddPatientForm = () => {
         .or(`clinic_id.eq.${clinicId},org_id.eq.${clinicId}`)
         .limit(1);
 
+      // A failed duplicate check must not fail OPEN — that used to create
+      // duplicate patients whenever the query errored
+      if (patientError) {
+        toast.error('Could not verify whether this email already exists. Please try again.');
+        setIsSubmitting(false);
+        return;
+      }
+
       if (existingPatient && existingPatient.length > 0) {
         toast.error('A patient with this email already exists in your clinic.');
         setIsSubmitting(false);
@@ -269,6 +277,13 @@ const AddPatientForm = () => {
           setIsSubmitting(false);
           return;
         }
+
+        // Any other auth failure: abort. Proceeding used to create a patient
+        // row with NO login account and NO credentials email, while showing
+        // the clinic a success toast — a patient who could never log in.
+        toast.error("Could not create the patient's login account — the patient was NOT created. Please try again.");
+        setIsSubmitting(false);
+        return;
       }
 
       // Generate patient UID in format CLINICCODE-YYYYMM-XXXX

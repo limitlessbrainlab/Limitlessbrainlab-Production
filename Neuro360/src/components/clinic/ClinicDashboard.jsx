@@ -482,7 +482,7 @@ const CreditsExhaustedPopup = ({ user, clinic, onDismiss, onPaymentSuccess }) =>
 };
 
 const ClinicDashboard = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   const [clinic, setClinic] = useState(null);
   const [patients, setPatients] = useState([]);
@@ -971,23 +971,22 @@ const ClinicSettings = ({ clinic }) => {
         return `${fieldNames[field]}: "${changes[field].old}" → "${changes[field].new}"`;
       }).join('\n');
 
-      const alert = {
-        id: `alert_${Date.now()}`,
+      // Write to admin_notifications (what the super-admin portal reads).
+      // The old 'alerts' table name was mapped to `organizations`, so every
+      // insert silently failed and admins were never notified.
+      const { error } = await supabase.from('admin_notifications').insert({
         type: 'profile_change',
-        severity: 'info',
+        category: 'clinic',
         title: `Profile Updated - ${clinic?.name}`,
         message: `Clinic "${clinic?.name}" has updated their profile information:\n\n${changesList}`,
-        clinicId: clinic?.id,
-        clinicName: clinic?.name,
-        changes: changes,
-        createdAt: new Date().toISOString(),
-        read: false,
-        actionRequired: false
-      };
+        clinic_id: clinic?.id,
+        clinic_name: clinic?.name,
+        is_read: false,
+        created_by: clinic?.email || 'clinic',
+        created_at: new Date().toISOString()
+      });
+      if (error) throw error;
 
-      // Add alert to database
-      await DatabaseService.add('alerts', alert);
-      
       return true;
     } catch (error) {
       console.error('ERROR: Failed to create profile change alert:', error);
@@ -1014,20 +1013,29 @@ const ClinicSettings = ({ clinic }) => {
 
       // Update clinic profile in database
       await DatabaseService.update('clinics', clinic.id, formData);
-      
+
       // Create alert for super admin
       const alertCreated = await createProfileChangeAlert(changes);
-      
+
       // Update original data to reflect saved state
       setOriginalData({ ...formData });
-      
+
       // Success message
       if (alertCreated) {
         toast.success('Profile updated successfully! Super Admin has been notified of the changes.');
       } else {
         toast.success('Profile updated successfully!');
       }
-      
+
+      // Changing the login email invalidates the current session on the next
+      // validity poll — log out predictably with an explanation instead of a
+      // silent mid-session kick 60 seconds later.
+      if (changes.email) {
+        await DatabaseService.update('clinics', clinic.id, { credentials_updated_at: new Date().toISOString() });
+        toast('Your login email changed — please sign in again with the new email.', { icon: '🔐', duration: 5000 });
+        setTimeout(() => logout(), 2500);
+      }
+
     } catch (error) {
       console.error('Error updating profile:', error);
       toast.error('Failed to update profile. Please try again.');

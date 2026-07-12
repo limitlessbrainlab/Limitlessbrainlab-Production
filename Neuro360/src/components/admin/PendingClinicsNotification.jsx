@@ -80,8 +80,11 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
         ...clinic,
         is_active: true,
         isActive: true,
-        subscription_status: 'active',
-        subscriptionStatus: 'active',
+        // 'trial' (not 'active') so the 30-day trial_end_date below is actually
+        // enforced — the other approval path (ClinicManagement) already uses
+        // 'trial'; 'active' clinics never expire
+        subscription_status: 'trial',
+        subscriptionStatus: 'trial',
         trial_start_date: new Date().toISOString(),
         trial_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days trial
         reports_allowed: 10,

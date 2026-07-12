@@ -646,6 +646,29 @@ class DatabaseService {
     return await this.findBy('patients', 'org_id', clinicId);
   }
 
+  // Resolve the patients row for a logged-in portal user.
+  // Prefer the row id captured at login (patientId = the password-matched row);
+  // fall back to the newest row for the email (server-side filter, created_at DESC).
+  // Every portal read path (login, ProfileGate, dashboard) must use this same
+  // rule so duplicate-email rows always resolve to the same record.
+  async resolvePatientForUser(user) {
+    if (!user) return null;
+    const rowId = user.patientId || user.id;
+    if (rowId) {
+      try {
+        const byId = await this.findById('patients', rowId);
+        if (byId) return byId;
+      } catch (e) {
+        // Supabase-Auth UIDs won't match a patients.id — fall through to email
+      }
+    }
+    if (user.email) {
+      const rows = await this.get('patients', { email: user.email.trim() });
+      return rows[0] || null;
+    }
+    return null;
+  }
+
   // Reports specific methods
   async getReportsByClinic(clinicId) {
     try {

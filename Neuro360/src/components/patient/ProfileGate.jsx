@@ -44,13 +44,10 @@ const ProfileGate = ({ children }) => {
       }
 
       try {
-        // Get patient record from database
-        const allPatients = await DatabaseService.get('patients');
-        const userEmailLower = user.email.trim().toLowerCase();
-        const patientRecord = allPatients.find(p => {
-          if (!p.email) return false;
-          return p.email.trim().toLowerCase() === userEmailLower;
-        });
+        // Get patient record from database — same resolution rule as login and
+        // the dashboard (patientId from login first, then newest email match),
+        // so duplicate-email rows can't make the gate read a different record.
+        const patientRecord = await DatabaseService.resolvePatientForUser(user);
 
         if (!patientRecord) {
           setIsProfileComplete(false);
@@ -83,11 +80,8 @@ const ProfileGate = ({ children }) => {
         // Check if Clinical Report exists
         let clinicalReportExists = false;
         try {
-          const clinicalReports = await DatabaseService.get('clinical_reports');
-          const patientClinicalReport = clinicalReports?.find(r =>
-            r.patient_email?.trim().toLowerCase() === userEmailLower ||
-            r.patientEmail?.trim().toLowerCase() === userEmailLower
-          );
+          const clinicalReports = await DatabaseService.findBy('clinical_reports', 'patient_id', patientRecord.id);
+          const patientClinicalReport = clinicalReports?.[0];
 
           if (patientClinicalReport) {
             // Check if essential clinical fields are filled

@@ -625,6 +625,23 @@ const PatientDashboard = () => {
     }
   }, [activeTab, loading, clinicalReport]);
 
+  // When the ProfileGate sends an incomplete patient here, open the edit form
+  // pre-filled with the clinic-entered data instead of the read-only view.
+  // Fires at most once per mount so it never clobbers in-progress typing or
+  // re-opens after Cancel/Save.
+  const autoEditFiredRef = useRef(false);
+  useEffect(() => {
+    if (activeTab !== 'profile' || loading || isEditingProfile || autoEditFiredRef.current) return;
+    if (!patientDbId) return; // patient record not resolved yet
+    const p = patientData?.profile || {};
+    const incomplete = !cleanProfileValue(p.name) || !cleanProfileValue(p.dateOfBirth)
+      || !cleanProfileValue(p.gender) || !cleanProfileValue(p.phone);
+    if (incomplete) {
+      autoEditFiredRef.current = true;
+      handleEditProfile();
+    }
+  }, [activeTab, loading, patientDbId, patientData?.profile]);
+
   // Handle assessment purchase
   const handleAssessmentPurchase = async (assessmentId, assessmentTitle, price, assessmentLink = '') => {
     if (!user?.email) {
@@ -931,19 +948,27 @@ const PatientDashboard = () => {
     }
   };
 
+  // Guard against placeholder strings previously saved to the DB — they must
+  // never prefill (or be re-saved from) the edit form
+  const cleanProfileValue = (v) => (!v || v === 'Not provided' || v === 'N/A') ? '' : v;
+
+  // DB stores gender/handedness lowercase ('male', 'right'); the selects use
+  // title-case option values, so normalize for display
+  const titleCase = (v) => v ? v.charAt(0).toUpperCase() + v.slice(1).toLowerCase() : '';
+
   // Handle profile edit - populate form with current data
   // Also check clinicalReport for fields like handedness, occupation, referral_reason
   const handleEditProfile = () => {
     setProfileFormData({
-      name: patientProfile.name || clinicalReport?.full_name || '',
-      phone: patientProfile.phone || '',
-      dateOfBirth: patientProfile.dateOfBirth || clinicalReport?.date_of_birth || '',
-      address: patientProfile.address || '',
-      emergencyContact: patientProfile.emergencyContact || '',
-      gender: patientProfile.gender || clinicalReport?.gender || '',
-      handedness: patientProfile.handedness || clinicalReport?.handedness || '',
-      occupation: patientProfile.occupation || clinicalReport?.occupation || '',
-      referral_reason: patientProfile.referral_reason || clinicalReport?.referral_reason || ''
+      name: cleanProfileValue(patientProfile.name) || clinicalReport?.full_name || '',
+      phone: cleanProfileValue(patientProfile.phone),
+      dateOfBirth: (cleanProfileValue(patientProfile.dateOfBirth) || clinicalReport?.date_of_birth || '').slice(0, 10),
+      address: cleanProfileValue(patientProfile.address),
+      emergencyContact: cleanProfileValue(patientProfile.emergencyContact),
+      gender: titleCase(cleanProfileValue(patientProfile.gender) || clinicalReport?.gender || ''),
+      handedness: titleCase(cleanProfileValue(patientProfile.handedness) || clinicalReport?.handedness || ''),
+      occupation: cleanProfileValue(patientProfile.occupation) || clinicalReport?.occupation || '',
+      referral_reason: cleanProfileValue(patientProfile.referral_reason) || clinicalReport?.referral_reason || ''
     });
     setIsEditingProfile(true);
   };
@@ -961,11 +986,14 @@ const PatientDashboard = () => {
   const handleSaveProfile = async () => {
     setIsSavingProfile(true);
     try {
-      // Find patient record by email
-      const patients = await DatabaseService.get('patients');
-      const patientRecord = patients.find(p =>
-        p.email?.trim().toLowerCase() === user.email?.trim().toLowerCase()
-      );
+      // Update the exact row the dashboard displayed (set by loadPatientData) —
+      // an email lookup could hit a different row when duplicates exist
+      if (!patientDbId) {
+        toast.error('Patient record not found');
+        setIsSavingProfile(false);
+        return;
+      }
+      const patientRecord = await DatabaseService.findById('patients', patientDbId);
 
       if (!patientRecord) {
         toast.error('Patient record not found');
@@ -977,13 +1005,14 @@ const PatientDashboard = () => {
       // These fields don't exist as columns in the patients table
       const extraProfileData = {
         emergency_contact: profileFormData.emergencyContact || '',
-        handedness: profileFormData.handedness || '',
+        handedness: profileFormData.handedness?.toLowerCase() || '',
         occupation: profileFormData.occupation || '',
         referral_reason: profileFormData.referral_reason || ''
       };
 
       // Get existing medical_history and merge with extra profile data
-      const existingMedicalHistory = patientRecord.medical_history || {};
+      // (findById returns camelCase keys; keep snake_case for safety)
+      const existingMedicalHistory = patientRecord.medicalHistory || patientRecord.medical_history || {};
       const updatedMedicalHistory = {
         ...existingMedicalHistory,
         profile_details: extraProfileData
@@ -996,7 +1025,7 @@ const PatientDashboard = () => {
         name: profileFormData.name,
         full_name: profileFormData.name,
         phone: profileFormData.phone,
-        date_of_birth: profileFormData.dateOfBirth,
+        date_of_birth: profileFormData.dateOfBirth || null,
         address: profileFormData.address,
         gender: profileFormData.gender?.toLowerCase() || null,
         medical_history: updatedMedicalHistory,
@@ -1020,13 +1049,13 @@ const PatientDashboard = () => {
           } else {
             const clinicalReportData = {
               patient_id: patientRecord.id,
-              patient_uid: patientUid || patientRecord.external_id,
-              org_id: patientRecord.org_id,
-              clinic_name: patientRecord.clinic_name,
+              patient_uid: patientUid || patientRecord.externalId || patientRecord.external_id,
+              org_id: patientRecord.orgId || patientRecord.org_id,
+              clinic_name: patientRecord.clinicName || patientRecord.clinic_name,
               full_name: profileFormData.name,
               date_of_birth: profileFormData.dateOfBirth || null,
               gender: profileFormData.gender?.toLowerCase() || null,
-              handedness: profileFormData.handedness || null,
+              handedness: profileFormData.handedness?.toLowerCase() || null,
               occupation: profileFormData.occupation || null,
               referral_reason: profileFormData.referral_reason || null,
               updated_at: new Date().toISOString()
@@ -1402,8 +1431,10 @@ const PatientDashboard = () => {
         // Import DatabaseService
         const DatabaseService = (await import('../../services/databaseService')).default;
 
-        // First, try to find patient by ID
-        let patientRecord = await DatabaseService.findById('patients', user.id);
+        // First, try to find patient by ID — prefer patientId (the row login
+        // password-matched) over user.id, which is an auth UID on
+        // Supabase-session-restored logins and never matches a patients.id
+        let patientRecord = await DatabaseService.findById('patients', user.patientId || user.id);
 
         // If not found by ID, try to find by email
         if (!patientRecord && user.email) {
@@ -1474,14 +1505,17 @@ const PatientDashboard = () => {
           const profileDetails = patientRecord.medical_history?.profile_details || {};
 
           // Update patient data state with real data from database
+          // Keep raw values in state ('' when empty) — the view JSX renders its
+          // own 'Not provided' fallback, and placeholder strings stored here
+          // would leak into the edit form and get saved back to the DB.
           const updatedData = {
             profile: {
-              name: patientRecord.fullName || patientRecord.full_name || patientRecord.name || user.name || 'N/A',
+              name: patientRecord.fullName || patientRecord.full_name || patientRecord.name || user.name || '',
               email: patientRecord.email || user.email || 'N/A',
-              phone: patientRecord.phone || 'Not provided',
-              dateOfBirth: patientRecord.dateOfBirth || patientRecord.date_of_birth || 'Not provided',
-              address: patientRecord.address || 'Not provided',
-              emergencyContact: profileDetails.emergency_contact || patientRecord.emergencyContact || 'Not provided',
+              phone: patientRecord.phone || '',
+              dateOfBirth: patientRecord.dateOfBirth || patientRecord.date_of_birth || '',
+              address: patientRecord.address || '',
+              emergencyContact: profileDetails.emergency_contact || patientRecord.emergencyContact || '',
               gender: patientRecord.gender || '',
               handedness: profileDetails.handedness || patientRecord.handedness || '',
               occupation: profileDetails.occupation || patientRecord.occupation || '',
@@ -1562,12 +1596,12 @@ const PatientDashboard = () => {
                 setPatientData(prevData => ({
                   ...prevData,
                   profile: {
-                    name: patientByEmail.fullName || patientByEmail.full_name || patientByEmail.name || user.name || 'N/A',
+                    name: patientByEmail.fullName || patientByEmail.full_name || patientByEmail.name || user.name || '',
                     email: patientByEmail.email || user.email || 'N/A',
-                    phone: patientByEmail.phone || 'Not provided',
-                    dateOfBirth: patientByEmail.dateOfBirth || patientByEmail.date_of_birth || 'Not provided',
-                    address: patientByEmail.address || 'Not provided',
-                    emergencyContact: profileDetails.emergency_contact || patientByEmail.emergencyContact || 'Not provided',
+                    phone: patientByEmail.phone || '',
+                    dateOfBirth: patientByEmail.dateOfBirth || patientByEmail.date_of_birth || '',
+                    address: patientByEmail.address || '',
+                    emergencyContact: profileDetails.emergency_contact || patientByEmail.emergencyContact || '',
                     gender: patientByEmail.gender || '',
                     handedness: profileDetails.handedness || patientByEmail.handedness || '',
                     occupation: profileDetails.occupation || patientByEmail.occupation || '',
@@ -10208,6 +10242,14 @@ const PatientDashboard = () => {
   ];
 
   const getTabContent = () => {
+    // While the clinical-report check is still loading, don't flash gated content or the lock card
+    if (loading && clinicalReport === null && activeTab !== 'welcome' && activeTab !== 'profile') {
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#323956]"></div>
+        </div>
+      );
+    }
     // Block all pages except welcome and profile if medical history not completed
     if (!loading && clinicalReport === null && activeTab !== 'welcome' && activeTab !== 'profile') {
       return (
@@ -10542,8 +10584,8 @@ const PatientDashboard = () => {
             )}
             {sidebarItems
               .filter(item => {
-                // Before medical history completion, only show Welcome and Profile
-                if (!clinicalReport && !loading) {
+                // Before medical history completion (or while still checking), only show Welcome and Profile
+                if (!clinicalReport) {
                   return item.id === 'welcome' || item.id === 'profile';
                 }
                 return true;

@@ -654,19 +654,30 @@ class DatabaseService {
   async resolvePatientForUser(user) {
     if (!user) return null;
     const rowId = user.patientId || user.id;
+
+    // Short TTL cache: ProfileGate re-runs this on EVERY tab navigation
+    // (its effect is keyed on location.pathname) and each call is a full
+    // database round trip (~0.3-0.8s for far-away users). 30s is short
+    // enough that a just-saved profile is re-read promptly.
+    if (!this._patientResolveCache) this._patientResolveCache = new Map();
+    const cacheKey = `${rowId || ''}|${(user.email || '').toLowerCase()}`;
+    const cached = this._patientResolveCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < 30000) return cached.row;
+
+    let row = null;
     if (rowId) {
       try {
-        const byId = await this.findById('patients', rowId);
-        if (byId) return byId;
+        row = await this.findById('patients', rowId);
       } catch (e) {
         // Supabase-Auth UIDs won't match a patients.id — fall through to email
       }
     }
-    if (user.email) {
+    if (!row && user.email) {
       const rows = await this.get('patients', { email: user.email.trim() });
-      return rows[0] || null;
+      row = rows[0] || null;
     }
-    return null;
+    if (row) this._patientResolveCache.set(cacheKey, { row, at: Date.now() });
+    return row;
   }
 
   // Reports specific methods
@@ -681,29 +692,18 @@ class DatabaseService {
       try {
         const actualTable = this.mapTableName('reports');
 
-        // Primary query (by clinic_id) and the legacy null-clinic scan run CONCURRENTLY.
-        const [directRes, legacyRes] = await Promise.all([
-          this.supabaseService.supabase.from(actualTable).select('*').eq('clinic_id', clinicId),
-          this.supabaseService.supabase.from(actualTable).select('*').is('clinic_id', null),
-        ]);
+        // Single clinic-filtered query. The old second query scanned EVERY
+        // null-clinic report row globally and then filtered by report.org_id
+        // — a column the live reports table doesn't even have, so it never
+        // matched anything and only added a whole-table round trip per load.
+        const directRes = await this.supabaseService.supabase
+          .from(actualTable).select('*').eq('clinic_id', clinicId);
 
         if (directRes.error) {
           console.error('ERROR: Error querying reports by clinic_id:', directRes.error);
           return [];
         }
-        const directReports = directRes.data;
-        const legacyReports = legacyRes.data;
-
-        // Merge: direct results + any legacy reports matching by org_id
-        const legacyMatches = (legacyReports || []).filter(report =>
-          report.org_id === clinicId
-        );
-
-        const allReportIds = new Set((directReports || []).map(r => r.id));
-        const clinicReports = [
-          ...(directReports || []),
-          ...legacyMatches.filter(r => !allReportIds.has(r.id))
-        ];
+        const clinicReports = [...(directRes.data || [])];
 
         // Backfill missing clinic_id/patient_id IN MEMORY only (so the list displays
         // correctly). Do NOT write back to the DB on this read path — that issued N

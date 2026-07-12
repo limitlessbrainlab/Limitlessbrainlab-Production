@@ -33,9 +33,6 @@ const ProfileGate = ({ children }) => {
     { key: 'phone', label: 'Phone Number', altKeys: ['phone_number', 'phoneNumber', 'contact'] }
   ];
 
-  // Clinical Report is optional (not blocking)
-  const [hasClinicalReport, setHasClinicalReport] = useState(null);
-
   useEffect(() => {
     const checkProfileCompletion = async () => {
       if (!user?.email) {
@@ -52,7 +49,6 @@ const ProfileGate = ({ children }) => {
         if (!patientRecord) {
           setIsProfileComplete(false);
           setMissingFields([...requiredFields.map(f => f.label)]);
-          setHasClinicalReport(false);
           setLoading(false);
           return;
         }
@@ -77,31 +73,10 @@ const ProfileGate = ({ children }) => {
           }
         }
 
-        // Check if Clinical Report exists
-        let clinicalReportExists = false;
-        try {
-          const clinicalReports = await DatabaseService.findBy('clinical_reports', 'patient_id', patientRecord.id);
-          const patientClinicalReport = clinicalReports?.[0];
-
-          if (patientClinicalReport) {
-            // Check if essential clinical fields are filled
-            const hasEssentialClinicalData =
-              patientClinicalReport.presenting_complaints ||
-              patientClinicalReport.presentingComplaints ||
-              patientClinicalReport.past_medical_history ||
-              patientClinicalReport.pastMedicalHistory;
-
-            clinicalReportExists = !!hasEssentialClinicalData;
-          }
-        } catch (err) {
-        }
-
-        setHasClinicalReport(clinicalReportExists);
-
-        // Clinical Report is optional - don't add to missing fields
-        // if (!clinicalReportExists) {
-        //   missing.push('Clinical & Medical History Form');
-        // }
+        // (The clinical-report existence check that used to run here was
+        // non-blocking and its result was never rendered — removed to save a
+        // database round trip on EVERY tab navigation, since this effect is
+        // keyed on location.pathname.)
 
         setMissingFields(missing);
         setIsProfileComplete(missing.length === 0);

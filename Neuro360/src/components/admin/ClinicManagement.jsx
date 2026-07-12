@@ -153,7 +153,7 @@ const ClinicManagement = ({ onUpdate }) => {
     // doesn't touch the loading spinner, so rows update in place.
     const refreshInterval = setInterval(() => {
       loadClinics(true).catch(err => console.warn('Clinic list refresh failed:', err?.message));
-    }, 30000);
+    }, 60000);
     // Cleanup function
     return () => {
       clearTimeout(timer);

@@ -22,14 +22,16 @@ const AdvancedAnalytics = ({ clinicId, clinic }) => {
     try {
       setLoading(true);
 
-      // Load patients, reports, and subscription data
+      // Load patients, reports, and this clinic's subscription rows — filtered
+      // server-side (the old full-table subscriptions drain fetched every
+      // clinic's rows just to .find() one)
       const [patients, reports, subscriptions] = await Promise.all([
         DatabaseService.getPatientsByClinic(clinicId),
         DatabaseService.getReportsByClinic(clinicId),
-        DatabaseService.get('subscriptions')
+        DatabaseService.findBy('subscriptions', 'clinic_id', clinicId).catch(() => [])
       ]);
 
-      const clinicSubscription = subscriptions.find(sub => sub.clinicId === clinicId);
+      const clinicSubscription = (subscriptions || [])[0];
 
       // Generate analytics
       const analytics = generateAnalytics(patients, reports, clinicSubscription);

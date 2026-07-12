@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { WHATSAPP_URL } from '../../config/whatsapp';
@@ -99,20 +99,22 @@ import {
 } from 'lucide-react';
 
 // Import page components for sidebar sections
-import ANSResetProtocol from '../../pages/ANSResetProtocol';
-import FrequenciesMusic from '../../pages/FrequenciesMusic';
-import SupplementsNootropics from '../../pages/SupplementsNootropics';
-import FivePillars from '../../pages/FivePillars';
-import NeuroCoaching from '../../pages/NeuroCoaching';
-import BrainCoach from '../../pages/BrainCoach';
-import HomeNeurofeedback from '../../pages/HomeNeurofeedback';
-import Photobiomodulation from '../../pages/Photobiomodulation';
-import WalletPage from '../../pages/Wallet';
-import OpeningPage from '../../pages/OpeningPage';
-import InteractiveBrain from '../../pages/InteractiveBrain';
+// Sidebar section pages are lazy-loaded: eagerly importing all of them made
+// this route's chunk ~1.4MB — patients downloaded every section to view one.
+const ANSResetProtocol = lazy(() => import('../../pages/ANSResetProtocol'));
+const FrequenciesMusic = lazy(() => import('../../pages/FrequenciesMusic'));
+const SupplementsNootropics = lazy(() => import('../../pages/SupplementsNootropics'));
+const FivePillars = lazy(() => import('../../pages/FivePillars'));
+const NeuroCoaching = lazy(() => import('../../pages/NeuroCoaching'));
+const BrainCoach = lazy(() => import('../../pages/BrainCoach'));
+const HomeNeurofeedback = lazy(() => import('../../pages/HomeNeurofeedback'));
+const Photobiomodulation = lazy(() => import('../../pages/Photobiomodulation'));
+const WalletPage = lazy(() => import('../../pages/Wallet'));
+const OpeningPage = lazy(() => import('../../pages/OpeningPage'));
+const InteractiveBrain = lazy(() => import('../../pages/InteractiveBrain'));
+const BrainCourses = lazy(() => import('../../pages/BrainCourses'));
+const Events = lazy(() => import('../../pages/Events'));
 import MyBookings from './MyBookings';
-import BrainCourses from '../../pages/BrainCourses';
-import Events from '../../pages/Events';
 import ProfileGate from './ProfileGate';
 import { getCareProtocol } from '../../utils/careProtocolLookup';
 
@@ -1286,11 +1288,29 @@ const PatientDashboard = () => {
 
       // Match shared reports by the patient signature as well. Some legacy rows
       // were saved with a mismatched patient_id, but their report payload still
-      // carries the correct patient name/email/clinic.
-      const allReports = await DatabaseService.get('reports');
+      // carries the correct patient name/email/clinic. Query only plausible
+      // candidates server-side (this clinic's rows + email-tagged rows) — the
+      // old full-table drain here ran TWICE per mount and dominated portal
+      // load time (each Supabase round trip is ~0.3-0.8s for far-away users).
       const nameKey = normalizeName(patientName);
       const emailKey = normalizeEmail(patientEmail);
-      const signatureReports = (allReports || []).filter((r) => {
+      let candidateReports = [];
+      const orParts = [];
+      if (clinicId) orParts.push(`clinic_id.eq.${clinicId}`);
+      if (emailKey) {
+        orParts.push(`report_data->>patientEmail.eq.${patientEmail}`);
+        orParts.push(`report_data->>patient_email.eq.${patientEmail}`);
+      }
+      if (orParts.length) {
+        const { data: candRows, error: candErr } = await supabase
+          .from('reports')
+          .select('*')
+          .or(orParts.join(','))
+          .order('created_at', { ascending: false })
+          .limit(500);
+        if (!candErr && candRows) candidateReports = candRows;
+      }
+      const signatureReports = candidateReports.filter((r) => {
         let rd = r.reportData || r.report_data || {};
         if (typeof rd === 'string') {
           try { rd = JSON.parse(rd); } catch { rd = {}; }
@@ -1351,11 +1371,17 @@ const PatientDashboard = () => {
         allMatched = [];
       }
 
-      // Fall back to a full scan (legacy rows lacking patient_id) only when the id lookup yielded
-      // no visible (non-Claude) rows.
-      if (allMatched.filter(notClaude).length === 0) {
-        const allResults = await DatabaseService.get('algorithmResults');
-        allMatched = (allResults || []).filter(matchesPatient);
+      // Fall back to legacy rows lacking patient_id — but filtered server-side
+      // (by clinic, else by name) instead of the old full-table drain, which
+      // fired for EVERY new patient and cost a whole-table round trip.
+      if (allMatched.filter(notClaude).length === 0 && (clinicId || patientName)) {
+        const fallbackQuery = supabase.from('algorithm_results').select('*')
+          .order('created_at', { ascending: false })
+          .limit(300);
+        const { data: legacyRows } = clinicId
+          ? await fallbackQuery.eq('clinic_id', clinicId)
+          : await fallbackQuery.ilike('patient_name', `%${patientName}%`);
+        allMatched = (legacyRows || []).filter(matchesPatient);
       }
 
       const patientResults = allMatched.filter(notClaude);
@@ -1751,9 +1777,20 @@ const PatientDashboard = () => {
     loadPatientData();
   }, [user?.id]);
 
-  // Fetch immediately on tab open while on the Neurosense Reports tab.
+  // Refetch reports when the patient identity/clinic inputs CHANGE after the
+  // initial load. loadPatientData already fetched with these exact values on
+  // mount — skipping the first firing halves the reports queries per mount.
+  const reportsFetchKeyRef = useRef(null);
   useEffect(() => {
     if (!patientDbId) return;
+    const key = `${patientDbId}|${patientData?.profile?.name || ''}|${patientClinicId || ''}|${user?.email || ''}`;
+    if (reportsFetchKeyRef.current === null) {
+      // First run after loadPatientData — data is already fresh
+      reportsFetchKeyRef.current = key;
+      return;
+    }
+    if (reportsFetchKeyRef.current === key) return;
+    reportsFetchKeyRef.current = key;
     fetchPatientReports(patientDbId, patientData?.profile?.name, patientClinicId, user?.email);
   }, [patientDbId, patientData?.profile?.name, patientClinicId, user?.email]);
 
@@ -10409,7 +10446,11 @@ const PatientDashboard = () => {
   };
 
   const renderContent = () => {
-    const content = getTabContent();
+    const content = (
+      <Suspense fallback={<div className="flex items-center justify-center min-h-[300px]"><div className="w-8 h-8 border-4 border-[#323956] border-t-transparent rounded-full animate-spin" /></div>}>
+        {getTabContent()}
+      </Suspense>
+    );
     // Show content with frozen overlay popup if locked tab
     if (isTabLocked(activeTab)) {
       return (

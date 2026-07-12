@@ -5,6 +5,7 @@ import DatabaseService from '../../services/databaseService';
 import NotificationService from '../../services/notificationService';
 import { hashPassword } from '../../utils/passwordUtils';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
+import { supabase } from '../../lib/supabaseClient';
 
 // API Base URL for backend email
 const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
@@ -33,7 +34,7 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
     loadPendingItems();
 
     // Refresh every 30 seconds
-    const interval = setInterval(loadPendingItems, 30000);
+    const interval = setInterval(loadPendingItems, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -48,14 +49,27 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
 
   const loadPendingItems = async () => {
     try {
-      // Load pending clinics
-      const clinics = await DatabaseService.get('clinics') || [];
-      const pendingClinics = clinics.filter(c =>
-        (c.subscription_status === 'pending_approval' || c.subscriptionStatus === 'pending_approval') ||
-        (c.subscription_status === 'pending' || c.subscriptionStatus === 'pending') ||
-        (!c.is_active && !c.isActive)
-      );
-      setPendingClinics(pendingClinics);
+      // Load ONLY pending/inactive clinics — filtered server-side. This runs
+      // on a poll, and the old version drained the whole clinics table every
+      // tick just to filter a handful of rows in JS.
+      const { data: rows, error } = await supabase
+        .from('clinics')
+        .select('*')
+        .or('subscription_status.eq.pending_approval,subscription_status.eq.pending,is_active.eq.false')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      // camelCase aliases to match what DatabaseService.get used to return
+      setPendingClinics((rows || []).map(c => ({
+        ...c,
+        isActive: c.is_active,
+        subscriptionStatus: c.subscription_status,
+        contactPerson: c.contact_person,
+        clinicName: c.clinic_name,
+        clinicType: c.clinic_type,
+        countryCode: c.country_code,
+        createdAt: c.created_at,
+        plainPassword: c.plain_password
+      })));
 
       // Super admins are now active immediately, no pending approval needed
       setPendingSuperAdmins([]);

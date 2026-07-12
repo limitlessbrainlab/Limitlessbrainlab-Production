@@ -646,11 +646,15 @@ const ClinicDashboard = () => {
         }
       }
 
-      
-      // Get ONLY this clinic's patients and reports
-      let clinicPatients = await DatabaseService.getPatientsByClinic(currentClinic.id);
-      let clinicReports = await DatabaseService.getReportsByClinic(currentClinic.id);
-      
+
+      // Get ONLY this clinic's patients and reports — in parallel; each of
+      // these is a separate database round trip and running them serially
+      // added their latencies together on every dashboard load
+      let [clinicPatients, clinicReports] = await Promise.all([
+        DatabaseService.getPatientsByClinic(currentClinic.id),
+        DatabaseService.getReportsByClinic(currentClinic.id)
+      ]);
+
       // If no patients in database but exist in localStorage, migrate them
       if (clinicPatients.length === 0) {
 

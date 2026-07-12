@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import Cookies from 'js-cookie';
 import { authService } from '../services/authService';
@@ -821,7 +821,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const value = {
+  // Memoized so every AuthProvider render doesn't hand a brand-new object to
+  // all consumers (which would re-render everything that calls useAuth)
+  const value = useMemo(() => ({
     user,
     loading,
     isAuthenticated,
@@ -830,7 +832,8 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateUser,
     checkAuthStatus,
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [user, loading, isAuthenticated]);
 
   return (
     <AuthContext.Provider value={value}>

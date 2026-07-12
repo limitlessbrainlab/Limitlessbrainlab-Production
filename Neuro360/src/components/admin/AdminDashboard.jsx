@@ -31,7 +31,7 @@ const AdminDashboard = ({ analytics = {} }) => {
     // in the portal without a manual reload. Counters are now cheap head-count
     // queries, so the interval is inexpensive; the extra window-focus refetch was
     // dropped to cut sustained load.
-    const interval = setInterval(loadRealTimeData, 30000);
+    const interval = setInterval(loadRealTimeData, 60000);
     return () => clearInterval(interval);
   }, []);
 

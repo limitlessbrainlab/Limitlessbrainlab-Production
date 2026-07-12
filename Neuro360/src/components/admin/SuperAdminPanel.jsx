@@ -1,32 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import DatabaseService from '../../services/databaseService';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
-import ClinicManagement from './ClinicManagement';
-import PatientReports from './PatientReports';
-import AnalyticsDashboard from './AnalyticsDashboard';
-import AlertDashboard from './AlertDashboard';
 import DashboardLayout from '../layout/DashboardLayout';
 import DDOLink from '../DDOLink';
-import AdminDashboard from './AdminDashboard';
-import RecentActivities from './RecentActivities';
-import SystemSettings from './SystemSettings';
-import PaymentHistory from './PaymentHistory';
-import DataAccess from './DataAccess';
-import BrandingConfiguration from './BrandingConfiguration';
-import AdvancedAnalytics from './AdvancedAnalytics';
-import NotificationCenter from './NotificationCenter';
-import AgreementManager from './AgreementManager';
-import AlgorithmDataProcessor from './AlgorithmDataProcessor';
 import PendingClinicsNotification from './PendingClinicsNotification';
-import CoachManagement from './CoachManagement';
-import AssessmentManagement from './AssessmentManagement';
-import StaticPageManagement from './StaticPageManagement';
-import WebsiteInquiries from './WebsiteInquiries';
-import WebsitePayments from './WebsitePayments';
-import PatientSubscriptions from './PatientSubscriptions';
-import PricingManagement from './PricingManagement';
 import { useAuth } from '../../contexts/AuthContext';
+
+// Tab panels are lazy-loaded: eagerly importing all ~24 admin screens made
+// this route's chunk ~1.7MB — admins downloaded every panel to view one.
+const ClinicManagement = lazy(() => import('./ClinicManagement'));
+const PatientReports = lazy(() => import('./PatientReports'));
+const AnalyticsDashboard = lazy(() => import('./AnalyticsDashboard'));
+const AlertDashboard = lazy(() => import('./AlertDashboard'));
+const AdminDashboard = lazy(() => import('./AdminDashboard'));
+const RecentActivities = lazy(() => import('./RecentActivities'));
+const SystemSettings = lazy(() => import('./SystemSettings'));
+const PaymentHistory = lazy(() => import('./PaymentHistory'));
+const DataAccess = lazy(() => import('./DataAccess'));
+const BrandingConfiguration = lazy(() => import('./BrandingConfiguration'));
+const AdvancedAnalytics = lazy(() => import('./AdvancedAnalytics'));
+const NotificationCenter = lazy(() => import('./NotificationCenter'));
+const AgreementManager = lazy(() => import('./AgreementManager'));
+const AlgorithmDataProcessor = lazy(() => import('./AlgorithmDataProcessor'));
+const CoachManagement = lazy(() => import('./CoachManagement'));
+const AssessmentManagement = lazy(() => import('./AssessmentManagement'));
+const StaticPageManagement = lazy(() => import('./StaticPageManagement'));
+const WebsiteInquiries = lazy(() => import('./WebsiteInquiries'));
+const WebsitePayments = lazy(() => import('./WebsitePayments'));
+const PatientSubscriptions = lazy(() => import('./PatientSubscriptions'));
+const PricingManagement = lazy(() => import('./PricingManagement'));
 
 const SuperAdminPanel = () => {
 
@@ -288,7 +291,9 @@ const SuperAdminPanel = () => {
           </div>
         )}
         
-        {renderContent()}
+        <Suspense fallback={<div className="flex items-center justify-center min-h-[300px]"><div className="w-8 h-8 border-4 border-[#323956] border-t-transparent rounded-full animate-spin" /></div>}>
+          {renderContent()}
+        </Suspense>
       </div>
     </DashboardLayout>
   );

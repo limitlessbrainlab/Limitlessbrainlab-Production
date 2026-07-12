@@ -76,8 +76,10 @@ function App() {
     }
   }, []);
 
-  // Test Supabase connection on app startup
+  // Test Supabase connection on app startup — dev only; in production it
+  // burned two database round trips on every page load for a console log
   useEffect(() => {
+    if (import.meta.env.PROD) return;
     const runConnectionTest = async () => {
       await testSupabaseConnection();
     };

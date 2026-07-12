@@ -633,10 +633,7 @@ const PatientDashboard = () => {
   useEffect(() => {
     if (activeTab !== 'profile' || loading || isEditingProfile || autoEditFiredRef.current) return;
     if (!patientDbId) return; // patient record not resolved yet
-    const p = patientData?.profile || {};
-    const incomplete = !cleanProfileValue(p.name) || !cleanProfileValue(p.dateOfBirth)
-      || !cleanProfileValue(p.gender) || !cleanProfileValue(p.phone);
-    if (incomplete) {
+    if (profileIncomplete) {
       autoEditFiredRef.current = true;
       handleEditProfile();
     }
@@ -955,6 +952,16 @@ const PatientDashboard = () => {
   // DB stores gender/handedness lowercase ('male', 'right'); the selects use
   // title-case option values, so normalize for display
   const titleCase = (v) => v ? v.charAt(0).toUpperCase() + v.slice(1).toLowerCase() : '';
+
+  // Same 4 required fields as ProfileGate. While checks are in flight
+  // (loading / record unresolved) treat the profile as incomplete so the
+  // portal never flashes the unrestricted view.
+  const profileForCompleteness = patientData?.profile || {};
+  const profileIncomplete = loading || !patientDbId ||
+    !cleanProfileValue(profileForCompleteness.name) ||
+    !cleanProfileValue(profileForCompleteness.dateOfBirth) ||
+    !cleanProfileValue(profileForCompleteness.gender) ||
+    !cleanProfileValue(profileForCompleteness.phone);
 
   // Handle profile edit - populate form with current data
   // Also check clinicalReport for fields like handedness, occupation, referral_reason
@@ -1495,7 +1502,7 @@ const PatientDashboard = () => {
           setPatientClinicId(clinicId || null);
 
           const [, , , clinicData] = await Promise.all([
-            fetchClinicalReport(user.id),
+            fetchClinicalReport(user.patientId || user.id),
             fetchPatientReports(patientRecord.id, patientFullName, clinicId, patientRecord.email || user.email),
             fetchAlgorithmResults(patientRecord.id, patientRecord.email || user.email, patientFullName, clinicId),
             clinicId ? DatabaseService.findById('clinics', clinicId).catch(() => null) : Promise.resolve(null),
@@ -1570,7 +1577,7 @@ const PatientDashboard = () => {
                 }
 
                 // Fetch clinical report for this patient
-                await fetchClinicalReport(user.id);
+                await fetchClinicalReport(user.patientId || user.id);
 
                 // Fetch all reports for this patient (including response reports)
                 // Use patientByEmail.id — reports are stored with patient_id = patients table row id.
@@ -1724,10 +1731,10 @@ const PatientDashboard = () => {
     patientDbId ? [
       { table: 'reports', filter: patientClinicId ? `clinic_id=eq.${patientClinicId}` : `patient_id=eq.${patientDbId}` },
       { table: 'algorithm_results', filter: `patient_id=eq.${patientDbId}` },
-      { table: 'clinical_reports', filter: `patient_id=eq.${user?.id}` }
+      { table: 'clinical_reports', filter: `patient_id=eq.${user?.patientId || user?.id}` }
     ] : [],
     () => {
-      fetchClinicalReport(user?.id);
+      fetchClinicalReport(user?.patientId || user?.id);
       fetchPatientReports(patientDbId, patientData?.profile?.name, patientClinicId, user?.email);
       fetchAlgorithmResults(patientDbId, user?.email, patientData?.profile?.name, patientClinicId);
     },
@@ -10584,8 +10591,8 @@ const PatientDashboard = () => {
             )}
             {sidebarItems
               .filter(item => {
-                // Before medical history completion (or while still checking), only show Welcome and Profile
-                if (!clinicalReport) {
+                // Until profile AND medical history are complete (or while still checking), only show Welcome and Profile
+                if (!clinicalReport || profileIncomplete) {
                   return item.id === 'welcome' || item.id === 'profile';
                 }
                 return true;
@@ -10781,7 +10788,7 @@ const PatientDashboard = () => {
           setShowClinicalHistoryPopup(false); // Close popup permanently after saving
           // Refresh clinical report data using user.id (UUID), not patientUid
           if (user?.id) {
-            await fetchClinicalReport(user.id);
+            await fetchClinicalReport(user.patientId || user.id);
           }
           toast.success('Clinical report saved successfully!');
         }}

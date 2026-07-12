@@ -521,11 +521,15 @@ const RegisterForm = () => {
             <div className="ml-3 text-sm">
               <label htmlFor="terms" className="text-gray-700 font-medium">
                 I agree to the{' '}
-                <Link to="/terms" className="text-[#323956] hover:text-[#232D3C] font-semibold transition-all duration-200 hover:underline hover:underline-offset-4">
+                {/* /terms and /privacy don't exist as routes (the catch-all sent
+                    users to the homepage); only the privacy-policy static page
+                    exists today — point Terms there too until a Terms page is
+                    published (then use /page/<its-slug>) */}
+                <Link to="/privacy-policy" className="text-[#323956] hover:text-[#232D3C] font-semibold transition-all duration-200 hover:underline hover:underline-offset-4">
                   Terms and Conditions
                 </Link>{' '}
                 and{' '}
-                <Link to="/privacy" className="text-[#323956] hover:text-[#232D3C] font-semibold transition-all duration-200 hover:underline hover:underline-offset-4">
+                <Link to="/privacy-policy" className="text-[#323956] hover:text-[#232D3C] font-semibold transition-all duration-200 hover:underline hover:underline-offset-4">
                   Privacy Policy
                 </Link>
               </label>

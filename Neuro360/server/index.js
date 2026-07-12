@@ -772,7 +772,7 @@ app.use((req, res, next) => {
 // Wire route-specific rate limiters (previously defined but never applied).
 // Placed after body parsing so email-keyed limiters can read req.body.
 app.use([
-  '/api/send-otp', '/api/verify-otp', '/api/send-password-reset', '/api/send-password-email',
+  '/api/send-otp', '/api/verify-otp', '/api/send-password-email',
   '/api/send-welcome-email', '/api/send-assessment-email',
   '/api/send-no-credit-email', '/api/send-partner-welcome-email', '/api/send-partner-email-update',
   '/api/notifications/send', '/api/check-email-exists', '/api/wallet/invoice-email'
@@ -780,7 +780,7 @@ app.use([
 // Report emails get a dedicated, higher limit — sending several patients' reports in one
 // sitting must not be throttled by the generic 5/hour email budget (OTP/welcome/etc.).
 app.use(['/api/send-report-email'], rateLimiters.reportEmailLimiter);
-app.use(['/api/send-password-reset', '/api/send-password-email'], rateLimiters.passwordResetLimiter);
+app.use(['/api/send-password-email'], rateLimiters.passwordResetLimiter);
 app.use([
   '/api/create-frequency-checkout', '/api/create-meditation-checkout', '/api/create-report-checkout',
   '/api/create-coaching-checkout', '/api/create-assessment-checkout',
@@ -6196,7 +6196,7 @@ app.post('/api/send-otp', async (req, res) => {
     const mailOptions = {
       from: EMAIL_FROM,
       to: email,
-      subject: 'Email Verification OTP - Limitless Brain Lab',
+      subject: 'Your Limitless Brain Lab verification code',
       attachments: getLogoAttachment(),
       html: `
         <!DOCTYPE html>
@@ -6452,9 +6452,12 @@ app.post('/api/validate-session', async (req, res) => {
       return res.json({ valid: true });
     }
 
+    // patients has no is_active column; clinics does — deactivation must end
+    // live sessions, not just block the next login.
+    const columns = table === 'clinics' ? 'id, email, credentials_updated_at, is_active' : 'id, email, credentials_updated_at';
     const { data: row, error } = await supabase
       .from(table)
-      .select('id, email, credentials_updated_at')
+      .select(columns)
       .eq('id', userId)
       .maybeSingle();
 
@@ -6469,6 +6472,11 @@ app.post('/api/validate-session', async (req, res) => {
       return res.json({ valid: false });
     }
 
+    // Deactivated clinic → end the session (previously only enforced at login).
+    if (table === 'clinics' && row.is_active === false) {
+      return res.json({ valid: false, reason: 'deactivated' });
+    }
+
     const emailChanged = (row.email || '').trim().toLowerCase() !== (email || '').trim().toLowerCase();
     // A null baseline (session predates this feature) is "older than" any set DB value.
     const credChanged = !!row.credentials_updated_at &&
@@ -6481,136 +6489,6 @@ app.post('/api/validate-session', async (req, res) => {
     return res.json({ valid: true });
   }
 });
-
-// =====================================================
-// EMAIL 5 — PASSWORD RESET (token-based, for ResetPasswordForm)
-// =====================================================
-
-// In-memory password reset token store
-const passwordResetStore = new Map();
-
-// Generate password reset token
-const generateResetToken = () => {
-  return require('crypto').randomBytes(32).toString('hex');
-};
-
-// Forgot Password - Generate reset token and send email
-app.post('/api/send-password-reset', async (req, res) => {
-  try {
-    const { email, name, resetLink } = req.body;
-
-    if (!email || !name) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email and name are required'
-      });
-    }
-
-    if (!emailTransporter) {
-      return res.status(500).json({
-        success: false,
-        message: 'Email service not configured'
-      });
-    }
-
-    const mailOptions = {
-      from: EMAIL_FROM,
-      to: email,
-      subject: 'Reset your password',
-      attachments: getLogoAttachment(),
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f7fa; padding: 40px 20px;">
-            <tr>
-              <td align="center">
-                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.1);">
-                  <!-- Header -->
-                  <tr>
-                    <td style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 24px 32px; text-align: center;">
-                      <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; margin-bottom: 10px;" />
-                      <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700;">Limitless Brain Lab</h1>
-                      <p style="color: #F5D05D; margin: 6px 0 0; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600;">Password Reset</p>
-                    </td>
-                  </tr>
-
-                  <!-- Main Content -->
-                  <tr>
-                    <td style="padding: 36px 32px;">
-                      <h2 style="color: #323956; margin: 0 0 20px; font-size: 22px; font-weight: 600;">Hi ${name},</h2>
-                      <p style="color: #555; font-size: 15px; line-height: 1.8; margin: 0 0 24px;">
-                        We received a request to reset the password for your Limitless Brain Lab account. Click the link below to choose a new one:
-                      </p>
-
-                      <!-- CTA Button -->
-                      <div style="text-align: center; margin: 0 0 24px;">
-                        <a href="${resetLink}" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 13px 32px; border-radius: 8px; font-weight: 600; font-size: 14px;">
-                          Reset My Password
-                        </a>
-                      </div>
-
-                      <!-- Expiry Notice -->
-                      <div style="background: #fef3c7; border-radius: 12px; padding: 16px; border-left: 4px solid #f59e0b; margin: 0 0 24px;">
-                        <p style="color: #92400e; margin: 0; font-size: 13px;">
-                          ⏰ <strong>This link expires in 30 minutes.</strong> If it expires before you use it, just head back to the login page and request another.
-                        </p>
-                      </div>
-
-                      <!-- Security Tips -->
-                      <div style="background: #f8f9fc; border-radius: 12px; padding: 20px; margin: 0 0 24px;">
-                        <h3 style="color: #323956; margin: 0 0 12px; font-size: 15px; font-weight: 600;">A few things to keep in mind:</h3>
-                        <ul style="color: #555; margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.8;">
-                          <li>Choose a password you haven't used before</li>
-                          <li>Use at least 8 characters with a mix of letters, numbers, and symbols</li>
-                          <li>Never share your password with anyone, including our team</li>
-                        </ul>
-                      </div>
-
-                      <!-- Reassurance -->
-                      <p style="color: #555; font-size: 14px; line-height: 1.8; margin: 0;">
-                        Didn't request this? You can safely ignore this email — your password won't change unless you click the link above. If you're seeing repeated reset emails you didn't ask for, please reply to let us know so we can secure your account.
-                      </p>
-                    </td>
-                  </tr>
-
-                  <!-- Footer -->
-                  <tr>
-                    <td style="background: #f8f9fc; padding: 20px 32px; border-top: 1px solid #e5e7eb; text-align: center;">
-                      <p style="color: #555; margin: 0 0 8px; font-size: 15px; font-weight: 600;">Stay safe,</p>
-                      <p style="color: #323956; margin: 0; font-size: 15px; font-weight: 700;">The Limitless Brain Lab Team</p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </body>
-        </html>
-      `
-    };
-
-    await emailTransporter.sendMail(mailOptions);
-
-    res.json({
-      success: true,
-      message: 'Password reset email sent successfully'
-    });
-
-  } catch (error) {
-    console.error('Password reset email error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to send reset email',
-      error: error.message
-    });
-  }
-});
-
 // Send new password to registered email after password change
 app.post('/api/send-password-email', async (req, res) => {
   try {

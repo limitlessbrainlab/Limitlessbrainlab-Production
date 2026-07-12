@@ -17,7 +17,6 @@ import ScrollToTop from './components/ScrollToTop';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
 import ForgotPasswordForm from './components/auth/ForgotPasswordForm';
-import ResetPasswordForm from './components/auth/ResetPasswordForm';
 import ActivationPending from './components/auth/ActivationPending';
 import DashboardRouter from './components/DashboardRouter';
 
@@ -181,7 +180,8 @@ function App() {
                   <Route path="/register" element={<RegisterForm />} />
                   <Route path="/activation-pending" element={<ActivationPending />} />
                   <Route path="/forgot-password" element={<ForgotPasswordForm />} />
-                  <Route path="/reset-password" element={<ResetPasswordForm />} />
+                  {/* Token-based reset was never wired server-side; the working flow is the OTP one at /forgot-password */}
+                  <Route path="/reset-password" element={<Navigate to="/forgot-password" replace />} />
 
                   {/* Super Admin Routes */}
                   <Route path="/admin" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />

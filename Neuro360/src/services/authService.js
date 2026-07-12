@@ -111,8 +111,13 @@ export const authService = {
           const isActive = clinicByEmail.isActivated || clinicByEmail.is_active;
           const subscriptionStatus = clinicByEmail.subscriptionStatus || clinicByEmail.subscription_status;
 
-          if (!isActive || subscriptionStatus === 'pending_approval') {
+          if (subscriptionStatus === 'pending_approval') {
             throw new Error('Your account is pending activation. Please wait for admin approval. You will receive an email with login credentials once approved.');
+          }
+          if (!isActive) {
+            // Previously approved but since disabled — a "pending activation"
+            // message here misled deactivated clinics
+            throw new Error('Your account has been deactivated. Please contact support at info@limitlessbrainlab.com.');
           }
 
           const clinicPasswordMatch = await comparePassword(password, clinicByEmail.password);
@@ -157,7 +162,11 @@ export const authService = {
         const { data: patients, error: patientsError } = await supabase
           .from('patients')
           .select('*')
-          .eq('email', normalizedEmail);
+          .eq('email', normalizedEmail)
+          // Newest row first: with duplicate-email rows, the Supabase-Auth
+          // fallback below picks patients[0], which must match the
+          // resolvePatientForUser newest-row rule
+          .order('created_at', { ascending: false });
 
         if (patientsError) {
           console.error('ALERT: patients read failed during login:', patientsError?.message);
@@ -405,12 +414,12 @@ export const authService = {
         const isActive = clinic.isActivated || clinic.is_active;
         const subscriptionStatus = clinic.subscriptionStatus || clinic.subscription_status;
 
-        if (!isActive) {
-          throw new Error('Your clinic account is pending activation by super admin. Please wait for approval.');
-        }
-
         if (subscriptionStatus === 'pending_approval') {
           throw new Error('Your clinic registration is pending approval. You will be notified once approved.');
+        }
+
+        if (!isActive) {
+          throw new Error('Your account has been deactivated. Please contact support at info@limitlessbrainlab.com.');
         }
 
         return {
@@ -592,14 +601,25 @@ export const authService = {
           // Don't fail registration if email fails
         }
 
+        // Return the same shape as a patient login (token + full user) so
+        // AuthContext.register logs the new patient straight in. Without a
+        // token, AuthContext treated the successful registration as
+        // "Registration completed but login failed" and stranded the user
+        // with an error even though the account existed.
         return {
           success: true,
-          message: 'Registration successful! A confirmation email has been sent. You can now login with your credentials.',
+          message: 'Registration successful! A confirmation email has been sent.',
+          token: savedPatient?.id ? `patient_token_${Date.now()}` : undefined,
           user: {
             id: savedPatient?.id || 'pending',
             email: patientData.email,
             name: patientData.full_name,
-            role: 'patient'
+            phone: patientData.phone || null,
+            role: 'patient',
+            clinicId: patientData.clinic_id || null,
+            patientId: savedPatient?.id || null,
+            isActivated: true,
+            credentialsUpdatedAt: null
           }
         };
       }

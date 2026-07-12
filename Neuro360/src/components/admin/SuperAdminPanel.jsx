@@ -4,7 +4,6 @@ import DatabaseService from '../../services/databaseService';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import DashboardLayout from '../layout/DashboardLayout';
 import DDOLink from '../DDOLink';
-import PendingClinicsNotification from './PendingClinicsNotification';
 import { useAuth } from '../../contexts/AuthContext';
 
 // Tab panels are lazy-loaded: eagerly importing all ~24 admin screens made

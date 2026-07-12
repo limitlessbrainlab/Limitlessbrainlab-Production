@@ -1298,8 +1298,9 @@ const PatientDashboard = () => {
       const orParts = [];
       if (clinicId) orParts.push(`clinic_id.eq.${clinicId}`);
       if (emailKey) {
-        orParts.push(`report_data->>patientEmail.eq.${patientEmail}`);
-        orParts.push(`report_data->>patient_email.eq.${patientEmail}`);
+        // Quoted so reserved characters in the value can't corrupt the filter
+        orParts.push(`report_data->>patientEmail.eq."${patientEmail}"`);
+        orParts.push(`report_data->>patient_email.eq."${patientEmail}"`);
       }
       if (orParts.length) {
         const { data: candRows, error: candErr } = await supabase

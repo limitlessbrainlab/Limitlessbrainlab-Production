@@ -369,6 +369,13 @@ class DatabaseService {
     try {
       const actualTable = this.mapTableName(table);
 
+      // Any patients write invalidates the resolvePatientForUser TTL cache —
+      // otherwise ProfileGate could read a stale (pre-save) row for up to 30s
+      // and wrongly show "Complete Your Profile" right after a save.
+      if (actualTable === 'patients' && this._patientResolveCache) {
+        this._patientResolveCache.clear();
+      }
+
       // Filter valid fields based on table
       const filteredUpdates = this.filterValidFields(actualTable, updates);
       if (actualTable === 'clinics' && filteredUpdates.email) {

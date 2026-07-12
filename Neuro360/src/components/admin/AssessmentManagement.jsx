@@ -20,8 +20,29 @@ import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabaseClient';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
+import AssessmentResults from './AssessmentResults';
+
+// Catalog / Results view toggle shared by both views
+const ViewSwitcher = ({ view, setView }) => (
+  <div className="flex gap-2">
+    {[['catalog', 'Catalog'], ['results', 'Purchases & Results']].map(([key, label]) => (
+      <button
+        key={key}
+        onClick={() => setView(key)}
+        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+          view === key
+            ? 'bg-[#323956] text-white'
+            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+        }`}
+      >
+        {label}
+      </button>
+    ))}
+  </div>
+);
 
 const AssessmentManagement = () => {
+  const [view, setView] = useState('catalog');
   const [assessments, setAssessments] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedAssessment, setSelectedAssessment] = useState(null);
@@ -268,8 +289,18 @@ const AssessmentManagement = () => {
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
+  if (view === 'results') {
+    return (
+      <div className="space-y-6">
+        <ViewSwitcher view={view} setView={setView} />
+        <AssessmentResults />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      <ViewSwitcher view={view} setView={setView} />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

@@ -27,6 +27,8 @@ const NeurosenseBooking = () => {
   const [showContactModal, setShowContactModal] = useState(false);
   const [highlightedCard, setHighlightedCard] = useState(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  // Post-payment thank-you modal: null | { verifying } | { verifying:false, assessmentName, takeUrl, customerEmail }
+  const [paymentSuccessInfo, setPaymentSuccessInfo] = useState(null);
   const [cities, setCities] = useState(DEFAULT_LOCATIONS);
   const [services, setServices] = useState([]);
   const [bundles, setBundles] = useState([]);
@@ -126,20 +128,25 @@ const NeurosenseBooking = () => {
     const sessionId = params.get('session_id');
 
     if (paymentStatus === 'success' && assessmentId) {
-      toast.success(
-        'Payment successful! The assessment link has been sent to your email. Please check your inbox.',
-        { duration: 6000 }
-      );
-
-      // Verify session and trigger confirmation email
+      // verify-session records the purchase, sends the customer + internal
+      // emails (idempotent server-side), and returns the one-time gate URL
+      // so the buyer can start the assessment right now.
+      setPaymentSuccessInfo({ verifying: true });
       if (sessionId) {
         fetch(`${API_BASE_URL}/stripe/verify-session/${sessionId}`)
           .then(r => r.json())
-          .then(data => {
-            if (data.success) {
-            }
-          })
-          .catch(err => console.error('Session verification failed:', err));
+          .then(data => setPaymentSuccessInfo({
+            verifying: false,
+            assessmentName: data?.assessmentName || '',
+            takeUrl: data?.takeUrl || data?.assessmentLink || '',
+            customerEmail: data?.customerEmail || ''
+          }))
+          .catch(err => {
+            console.error('Session verification failed:', err);
+            setPaymentSuccessInfo({ verifying: false });
+          });
+      } else {
+        setPaymentSuccessInfo({ verifying: false });
       }
 
       // Clean URL
@@ -490,6 +497,52 @@ const NeurosenseBooking = () => {
           </div>
         </div>
       </section> */}
+
+      {/* Post-payment thank-you modal */}
+      {paymentSuccessInfo && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setPaymentSuccessInfo(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-[#323956] to-[#4a5578] px-6 py-6 text-center">
+              <div className="w-14 h-14 mx-auto bg-white/20 rounded-full flex items-center justify-center mb-2">
+                <Sparkles className="h-8 w-8 text-white" />
+              </div>
+              <h2 className="text-xl font-bold text-white">Thank You! Payment Successful</h2>
+            </div>
+            <div className="p-6 text-center">
+              {paymentSuccessInfo.verifying ? (
+                <div className="flex flex-col items-center gap-3 py-4">
+                  <div className="w-8 h-8 border-2 border-[#323956]/30 border-t-[#323956] rounded-full animate-spin" />
+                  <p className="text-gray-500 text-sm">Confirming your purchase…</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-gray-700 text-sm">
+                    You purchased{paymentSuccessInfo.assessmentName ? <> <strong>{paymentSuccessInfo.assessmentName}</strong></> : ' your assessment'}.
+                  </p>
+                  <p className="text-gray-500 text-sm mt-2">
+                    A confirmation email with your one-time assessment link has been sent
+                    {paymentSuccessInfo.customerEmail ? <> to <strong>{paymentSuccessInfo.customerEmail}</strong></> : ''}.
+                  </p>
+                  {paymentSuccessInfo.takeUrl && (
+                    <a
+                      href={paymentSuccessInfo.takeUrl}
+                      className="inline-block mt-5 px-8 py-3 bg-gradient-to-r from-[#323956] to-[#4a5578] text-white font-bold rounded-xl hover:shadow-lg transition-all duration-300"
+                    >
+                      Take Your Assessment Now
+                    </a>
+                  )}
+                  <button
+                    onClick={() => setPaymentSuccessInfo(null)}
+                    className="block w-full mt-4 py-2.5 text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors"
+                  >
+                    Close
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
 

@@ -483,6 +483,8 @@ const PatientDashboard = () => {
   const [availableAssessments, setAvailableAssessments] = useState([]);
   const [assessmentsLoading, setAssessmentsLoading] = useState(true);
   const [purchasedAssessments, setPurchasedAssessments] = useState([]);
+  // Per-assessment gate state: { [assessmentId]: { linkToken, completed } }
+  const [purchasedAssessmentState, setPurchasedAssessmentState] = useState({});
   const [isProcessingAssessmentPayment, setIsProcessingAssessmentPayment] = useState(null);
 
   // JotForm iframe modal state
@@ -518,18 +520,29 @@ const PatientDashboard = () => {
     []
   );
 
-  // Fetch purchased assessments by patient_email
+  // Fetch purchased assessments by patient_email, including the one-time
+  // gate token and completion state so the card can route through the gate
+  // (and lock itself once the assessment is completed)
   const fetchPurchasedAssessments = useCallback(async () => {
     if (!user?.email) return;
     try {
       const { data, error } = await supabase
         .from('assessment_purchases')
-        .select('assessment_id')
-        .eq('patient_email', user.email.toLowerCase());
+        .select('assessment_id, link_token, assessment_completed_at, created_at')
+        .eq('patient_email', user.email.toLowerCase())
+        .order('created_at', { ascending: false });
 
       if (!error && data) {
         const uniqueIds = [...new Set(data.map(p => p.assessment_id))];
         setPurchasedAssessments(uniqueIds);
+        // Newest purchase per assessment wins
+        const byId = {};
+        for (const p of data) {
+          if (p.assessment_id && !byId[p.assessment_id]) {
+            byId[p.assessment_id] = { linkToken: p.link_token || null, completed: !!p.assessment_completed_at };
+          }
+        }
+        setPurchasedAssessmentState(byId);
       }
     } catch (error) {
       console.error('Error fetching assessment purchases:', error);
@@ -836,7 +849,7 @@ const PatientDashboard = () => {
               patientId: patRow?.external_id || ''
             };
 
-            await fetch(`${API_URL}/send-assessment-email`, {
+            const emailResp = await fetch(`${API_URL}/send-assessment-email`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -853,9 +866,16 @@ const PatientDashboard = () => {
                 patientPhone: patientDetails.phone,
                 patientDob: patientDetails.dob,
                 patientGender: patientDetails.gender,
-                patientUid: patientDetails.patientId
+                patientUid: patientDetails.patientId,
+                // Shared with the Stripe webhook so the pair sends exactly once
+                dedupeKey: sessionId ? `assessment:${sessionId}:emails` : undefined
               })
             });
+            const emailData = await emailResp.json().catch(() => null);
+            if (emailData?.takeUrl) {
+              // Surface the one-time gate link in the success popup
+              setPaymentSuccessDetails(prev => prev ? { ...prev, takeUrl: emailData.takeUrl } : prev);
+            }
           } catch (emailErr) {
           }
 
@@ -5515,16 +5535,35 @@ const PatientDashboard = () => {
                         </p>
 
                         {hasAccess ? (
+                          purchasedAssessmentState[assessment.id]?.completed ? (
+                            <button
+                              disabled
+                              className="mt-2 sm:mt-3 px-3 sm:px-4 py-1.5 bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-300 text-xs sm:text-sm font-semibold rounded-lg inline-flex items-center space-x-1.5 cursor-not-allowed"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                              <span>Completed</span>
+                            </button>
+                          ) : (
                           <button
                             className="mt-2 sm:mt-3 px-3 sm:px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm font-semibold rounded-lg inline-flex items-center space-x-1.5 transition-all"
                             onClick={(e) => {
                               e.stopPropagation();
-                              openAssessment(assessment);
+                              // Paid purchases go through the one-time gate link so
+                              // completion/expiry is enforced; free assessments keep
+                              // the in-portal iframe.
+                              const gate = purchasedAssessmentState[assessment.id];
+                              if (isPurchased && gate?.linkToken) {
+                                window.open(`/assessment/take/${gate.linkToken}`, '_blank', 'noopener');
+                              } else {
+                                openAssessment(assessment);
+                              }
                             }}
                           >
                             <Play className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                             <span>Get Assessment</span>
                           </button>
+                          )
                         ) : (
                           <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-2 sm:gap-3">
                             <div className="flex items-center space-x-1">
@@ -10833,8 +10872,18 @@ const PatientDashboard = () => {
             </div>
           </div>
 
-          {/* Button */}
-          <div className="px-5 pb-5">
+          {/* Buttons */}
+          <div className="px-5 pb-5 space-y-2">
+            {paymentSuccessDetails.takeUrl && (
+              <a
+                href={paymentSuccessDetails.takeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full py-2.5 bg-gradient-to-r from-[#323956] to-[#4a5578] hover:shadow-lg text-white text-sm font-semibold rounded-lg transition-all text-center"
+              >
+                Start Assessment Now
+              </a>
+            )}
             <button
               onClick={() => setShowPaymentSuccessPopup(false)}
               className="w-full py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white text-sm font-semibold rounded-lg transition-all"

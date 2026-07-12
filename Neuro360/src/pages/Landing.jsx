@@ -131,7 +131,8 @@ const Landing = () => {
           .then((data) => setPaymentSuccessInfo({
             verifying: false,
             assessmentName: data?.assessmentName || '',
-            assessmentLink: data?.assessmentLink || '',
+            // One-time gate URL preferred over the raw JotForm link
+            assessmentLink: data?.takeUrl || data?.assessmentLink || '',
             customerEmail: data?.customerEmail || ''
           }))
           .catch(() => setPaymentSuccessInfo({ verifying: false }));

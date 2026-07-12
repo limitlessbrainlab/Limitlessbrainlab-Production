@@ -2158,16 +2158,8 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
       const customerName = session.metadata?.customer_name || '';
       const amountPaid = `${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}`;
 
-      res.json({
-        success: true,
-        status: session.payment_status,
-        customerEmail: customerEmail,
-        tier: session.metadata?.tier,
-        amount: session.amount_total / 100,
-        currency: session.currency?.toUpperCase(),
-        assessmentName: session.metadata?.assessment_name || null,
-        assessmentLink: session.metadata?.assessment_link || null
-      });
+      // (response is sent after the DB save below so assessment purchases can
+      // return their one-time gate URL, which needs the purchase row to exist)
 
       // Save payment record to database
       if (supabase) {
@@ -2284,6 +2276,33 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
         }
       }
 
+      // One-time gate URL for assessments (replaces the raw JotForm link in
+      // the response and the confirmation email)
+      let takeUrl = null;
+      if (paymentType === 'assessment') {
+        try {
+          takeUrl = await ensureAssessmentToken({
+            sessionId,
+            email: customerEmail,
+            assessmentId: session.metadata?.assessment_id
+          });
+        } catch (tokenErr) {
+          console.error('ensureAssessmentToken failed:', tokenErr.message);
+        }
+      }
+
+      res.json({
+        success: true,
+        status: session.payment_status,
+        customerEmail: customerEmail,
+        tier: session.metadata?.tier,
+        amount: session.amount_total / 100,
+        currency: session.currency?.toUpperCase(),
+        assessmentName: session.metadata?.assessment_name || null,
+        assessmentLink: session.metadata?.assessment_link || null,
+        takeUrl
+      });
+
       // Send confirmation email to user after successful payment.
       // Subscriptions are excluded: applySubscriptionPurchase already sends the
       // welcome + admin emails exactly once (claimNotificationOnce), so the
@@ -2301,7 +2320,8 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
 
         if (paymentType === 'assessment') {
           productName = session.metadata?.assessment_name || 'Brain Assessment';
-          assessmentLink = session.metadata?.assessment_link || '';
+          // One-time gate URL, never the raw JotForm link
+          assessmentLink = takeUrl || session.metadata?.assessment_link || '';
           emailSubject = `Payment Confirmation - ${productName} - Limitless Brain Lab`;
         } else if (paymentType === 'subscription') {
           productName = `${session.metadata?.tier || ''} Subscription`;
@@ -2317,8 +2337,9 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
           subject: emailSubject,
           html: getUserConfirmationHtml(customerName || 'User').replace(
             'Thank you for submitting your application. We have successfully received it, and our team will get in touch with you within <strong style="color: #323956;">two working days</strong> to guide you through the next steps.',
-            `Thank you for your payment! Your purchase of <strong style="color: #323956;">${productName}</strong> has been confirmed.<br><br>
+            `Thank you for your payment! You purchased <strong style="color: #323956;">${productName}</strong>.<br><br>
             <strong>Amount Paid:</strong> ${amountPaid}<br>
+            <strong>Date:</strong> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST<br>
             <strong>Order ID:</strong> ${sessionId.slice(-12)}
             ${assessmentLink ? `<br><br><div style="text-align: center; margin: 20px 0;">
               <a href="${assessmentLink}" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 700; font-size: 15px;">Take Your Assessment Now</a>
@@ -2830,6 +2851,185 @@ async function applySubscriptionPurchase(session) {
   return { ok: true, tier, alreadyApplied: false };
 }
 
+// ── One-time assessment gate links ─────────────────────────────────────────
+// Each paid assessment purchase gets a random token. Buyers get
+// ${APP_URL}/assessment/take/<token> (page + emails) instead of the raw
+// JotForm URL; /api/assessment-link/consume validates state server-side and
+// only then reveals the JotForm link(s). Once completed (JotForm webhook, or
+// 30 minutes after first open for single assessments) the link is spent and
+// shows "assessment already completed".
+const ASSESSMENT_LINK_VALID_DAYS = 30;
+const ASSESSMENT_OPEN_GRACE_MS = 30 * 60 * 1000;
+
+async function ensureAssessmentToken({ sessionId, email, assessmentId } = {}) {
+  if (!supabase) return null;
+  let row = null;
+  if (sessionId) {
+    const { data } = await supabase.from('assessment_purchases')
+      .select('id, link_token')
+      .eq('stripe_session_id', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    row = data?.[0] || null;
+  }
+  if (!row && email && assessmentId) {
+    const { data } = await supabase.from('assessment_purchases')
+      .select('id, link_token')
+      .eq('patient_email', email.toLowerCase())
+      .eq('assessment_id', assessmentId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    row = data?.[0] || null;
+  }
+  if (!row) return null;
+  if (!row.link_token) {
+    const token = require('crypto').randomBytes(24).toString('hex');
+    const { error } = await supabase.from('assessment_purchases')
+      .update({
+        link_token: token,
+        link_expires_at: new Date(Date.now() + ASSESSMENT_LINK_VALID_DAYS * 24 * 60 * 60 * 1000).toISOString()
+      })
+      .eq('id', row.id)
+      .is('link_token', null); // lose gracefully if a concurrent caller already set it
+    if (error) {
+      console.error('ensureAssessmentToken update failed:', error.message);
+      return null;
+    }
+    const { data: fresh } = await supabase.from('assessment_purchases')
+      .select('link_token').eq('id', row.id).single();
+    row.link_token = fresh?.link_token || token;
+  }
+  return `${APP_URL}/assessment/take/${row.link_token}`;
+}
+
+app.post('/api/assessment-link/consume', async (req, res) => {
+  try {
+    if (!supabase) return res.status(500).json({ status: 'error' });
+    const token = String(req.body?.token || '').trim();
+    if (!/^[a-f0-9]{24,64}$/.test(token)) return res.json({ status: 'invalid' });
+
+    const { data: rows } = await supabase.from('assessment_purchases')
+      .select('id, assessment_name, assessment_link, link_expires_at, link_opened_at, assessment_completed_at')
+      .eq('link_token', token)
+      .limit(1);
+    const row = rows?.[0];
+    if (!row) return res.json({ status: 'invalid' });
+
+    const assessmentName = row.assessment_name || 'your assessment';
+    if (row.assessment_completed_at) return res.json({ status: 'completed', assessmentName });
+    if (row.link_expires_at && new Date(row.link_expires_at) < new Date()) {
+      return res.json({ status: 'expired', assessmentName });
+    }
+
+    const links = String(row.assessment_link || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (!links.length) return res.json({ status: 'invalid' });
+    const isBundle = links.length > 1;
+    const now = new Date();
+
+    if (!row.link_opened_at) {
+      await supabase.from('assessment_purchases')
+        .update({ link_opened_at: now.toISOString() }).eq('id', row.id);
+    } else if (!isBundle && (now - new Date(row.link_opened_at)) > ASSESSMENT_OPEN_GRACE_MS) {
+      // Single assessment re-opened after the grace window: the one-time link
+      // is spent. (The JotForm completion webhook marks true completion; this
+      // is the fallback when that webhook isn't configured on the form.)
+      await supabase.from('assessment_purchases')
+        .update({ assessment_completed_at: now.toISOString() }).eq('id', row.id);
+      return res.json({ status: 'completed', assessmentName });
+    }
+
+    return res.json({ status: 'ok', assessmentName, links, isBundle });
+  } catch (e) {
+    console.error('assessment-link consume error:', e.message);
+    res.status(500).json({ status: 'error' });
+  }
+});
+
+// JotForm submission webhook. Add https://limitlessbrainlab.com/api/jotform-webhook
+// under each form's Settings → Integrations → WebHooks. JotForm POSTs
+// multipart/form-data with formID, submissionID, pretty ("Q:A, Q:A") and
+// rawRequest (JSON). Marks the matching purchase completed, stores the
+// answers, and emails the full Q&A to the admin inbox.
+app.post('/api/jotform-webhook', require('multer')().none(), async (req, res) => {
+  // Always 200 — JotForm retries/disables on failures and there is no value
+  // in retrying a submission we could not match.
+  res.json({ received: true });
+  try {
+    if (!supabase) return;
+    const formID = String(req.body?.formID || '').trim();
+    const submissionID = String(req.body?.submissionID || '').trim();
+    const pretty = String(req.body?.pretty || '');
+    let answers = null;
+    try { answers = JSON.parse(req.body?.rawRequest || 'null'); } catch (_) {}
+
+    if (!formID || !submissionID) return;
+    if (!(await claimNotificationOnce(`jotform:${submissionID}`))) return;
+
+    // Submitter email: any value in the answers (or pretty string) that looks like one
+    const answerText = JSON.stringify(answers || {}) + ' ' + pretty;
+    const submitterEmail = (answerText.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/) || [null])[0];
+
+    // Match the purchase: newest row whose stored JotForm link contains this
+    // form id, preferring the submitter's email, not yet completed.
+    const { data: candidates } = await supabase.from('assessment_purchases')
+      .select('id, patient_email, assessment_name, assessment_completed_at')
+      .ilike('assessment_link', `%${formID}%`)
+      .order('created_at', { ascending: false })
+      .limit(25);
+    let purchase = null;
+    if (candidates?.length) {
+      const open = candidates.filter(c => !c.assessment_completed_at);
+      purchase = (submitterEmail && open.find(c => c.patient_email === submitterEmail.toLowerCase()))
+        || (submitterEmail && candidates.find(c => c.patient_email === submitterEmail.toLowerCase()))
+        || open[0] || null;
+    }
+
+    if (purchase) {
+      const { error } = await supabase.from('assessment_purchases')
+        .update({
+          assessment_completed_at: purchase.assessment_completed_at || new Date().toISOString(),
+          submission_data: { formID, submissionID, pretty, answers, submitted_at: new Date().toISOString() }
+        })
+        .eq('id', purchase.id);
+      if (error) console.error('jotform-webhook purchase update failed:', error.message);
+      console.log(`SUCCESS: JotForm submission ${submissionID} matched purchase ${purchase.id} (${purchase.patient_email})`);
+    } else {
+      console.warn(`JotForm submission ${submissionID} (form ${formID}, ${submitterEmail || 'no email'}) matched no purchase`);
+    }
+
+    // Q&A email to the admin inbox regardless of match
+    if (mailerConfigured) {
+      const qaRows = pretty
+        ? pretty.split(', ').map(pair => {
+            const idx = pair.indexOf(':');
+            const q = idx > -1 ? pair.slice(0, idx) : pair;
+            const a = idx > -1 ? pair.slice(idx + 1) : '';
+            return `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;color:#555;font-size:13px;">${escapeHtml(q)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;color:#111;font-size:13px;font-weight:600;">${escapeHtml(a)}</td></tr>`;
+          }).join('')
+        : `<tr><td colspan="2" style="padding:6px 10px;font-size:12px;color:#555;"><pre>${escapeHtml(JSON.stringify(answers, null, 2))}</pre></td></tr>`;
+
+      emailTransporter.sendMail({
+        from: EMAIL_FROM,
+        to: process.env.EMAIL_TO || process.env.EMAIL_USER,
+        subject: `Assessment completed: ${purchase?.assessment_name || `form ${formID}`}${submitterEmail ? ` — ${submitterEmail}` : ''}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 640px;">
+            <h2 style="color: #323956;">Assessment Completed</h2>
+            <p><strong>Assessment:</strong> ${purchase?.assessment_name || `JotForm ${formID}`}</p>
+            <p><strong>Patient:</strong> ${submitterEmail || purchase?.patient_email || 'unknown'}</p>
+            <p><strong>Submission ID:</strong> ${submissionID}</p>
+            <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+            <h3 style="color: #323956; margin-top: 18px;">Questions &amp; Answers</h3>
+            <table style="width:100%;border-collapse:collapse;border:1px solid #eee;">${qaRows}</table>
+          </div>
+        `
+      }).catch(err => console.error('JotForm completion email failed:', err.message));
+    }
+  } catch (e) {
+    console.error('jotform-webhook error:', e.message);
+  }
+});
+
 app.post('/api/confirm-report-credits', async (req, res) => {
   try {
     const result = await applyReportCredits(req.body?.sessionId);
@@ -3146,7 +3346,22 @@ app.post('/api/send-assessment-email', async (req, res) => {
       }
     }
 
-    const links = (assessmentLink || '').split(',').filter(l => l.trim());
+    // One-time gate URL replaces the raw JotForm link(s) in the email; the
+    // gate page handles bundles by listing the individual parts itself.
+    let takeUrl = null;
+    if (!hideAccessLink && assessmentLink) {
+      try {
+        takeUrl = await ensureAssessmentToken({
+          sessionId: transactionId,
+          email: customerEmail
+        });
+      } catch (tokenErr) {
+        console.error('ensureAssessmentToken (send-assessment-email) failed:', tokenErr.message);
+      }
+    }
+    const emailLink = takeUrl || assessmentLink;
+
+    const links = takeUrl ? [takeUrl] : (assessmentLink || '').split(',').filter(l => l.trim());
     const assessmentNames = {
       'https://form.jotform.com/233250136675151': 'Brain Fitness Score',
       'https://form.jotform.com/260117244562148': 'Brain Burnout Score',
@@ -3158,7 +3373,7 @@ app.post('/api/send-assessment-email', async (req, res) => {
       ? `
         <tr>
           <td style="padding: 0 32px 8px;" align="center">
-            <a href="${assessmentLink}" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #4A6FA5 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-weight: 700; font-size: 16px;">
+            <a href="${emailLink}" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #4A6FA5 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-weight: 700; font-size: 16px;">
               Take Your Assessment Now
             </a>
           </td>
@@ -3166,7 +3381,7 @@ app.post('/api/send-assessment-email', async (req, res) => {
         <tr>
           <td style="padding: 8px 32px 24px; text-align: center;">
             <p style="color: #999; font-size: 12px; margin: 0;">
-              Or copy this link: <a href="${assessmentLink}" style="color: #4A6FA5;">${assessmentLink}</a>
+              Or copy this link: <a href="${emailLink}" style="color: #4A6FA5;">${emailLink}</a>${takeUrl ? '<br>This link is for one-time use — it expires once the assessment is completed.' : ''}
             </p>
           </td>
         </tr>`
@@ -3407,7 +3622,7 @@ app.post('/api/send-assessment-email', async (req, res) => {
       console.warn('Admin notification email failed:', adminErr.message);
     }
 
-    res.json({ success: true, message: 'Assessment email sent successfully' });
+    res.json({ success: true, message: 'Assessment email sent successfully', takeUrl });
   } catch (error) {
     console.error('Assessment email error:', error);
     res.status(500).json({ success: false, message: 'Failed to send email', error: error.message });
@@ -3748,6 +3963,19 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             created_at: new Date().toISOString()
           }).catch(err => console.warn('payments table insert skipped:', err.message));
 
+          // One-time gate URL replaces the raw JotForm link in the email
+          let assessmentTakeUrl = null;
+          try {
+            assessmentTakeUrl = await ensureAssessmentToken({
+              sessionId: session.id,
+              email: session.customer_email,
+              assessmentId
+            });
+          } catch (tokenErr) {
+            console.error('ensureAssessmentToken (webhook) failed:', tokenErr.message);
+          }
+          const assessmentEmailLink = assessmentTakeUrl || assessmentLink;
+
           // Send assessment link + admin emails exactly once across this
           // webhook and the /api/stripe/verify-session confirm path (shared
           // dedupe key) — whichever runs first sends the pair.
@@ -3756,7 +3984,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             : false;
 
           // Send assessment link email to customer
-          if (assessmentEmailsClaimed && assessmentLink) {
+          if (assessmentEmailsClaimed && assessmentEmailLink) {
             const assessmentMailOptions = {
               from: EMAIL_FROM,
               to: session.customer_email,
@@ -3793,7 +4021,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                               </div>
                               <h2 style="color: #323956; margin: 0 0 8px; font-size: 24px;">Payment Successful!</h2>
                               <p style="color: #666; margin: 0; font-size: 15px;">
-                                ${customerName ? `Hi ${customerName},` : 'Hi,'} your <strong>${assessmentName}</strong> is now ready to take.
+                                ${customerName ? `Hi ${customerName},` : 'Hi,'} you purchased <strong>${assessmentName}</strong> — it is now ready to take.
                               </p>
                             </td>
                           </tr>
@@ -3813,6 +4041,10 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                                     <td style="padding: 8px 0; color: #323956; font-weight: 600; text-align: right;">${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</td>
                                   </tr>
                                   <tr>
+                                    <td style="padding: 8px 0; color: #666;">Date &amp; Time:</td>
+                                    <td style="padding: 8px 0; color: #323956; font-weight: 600; text-align: right;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</td>
+                                  </tr>
+                                  <tr>
                                     <td style="padding: 8px 0; color: #666;">Order ID:</td>
                                     <td style="padding: 8px 0; color: #666; font-size: 12px; text-align: right;">${session.id.slice(-12)}</td>
                                   </tr>
@@ -3821,40 +4053,23 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                             </td>
                           </tr>
 
-                          <!-- Assessment Link Button(s) -->
-                          ${(() => {
-                            const links = (assessmentLink || '').split(',').filter(l => l.trim());
-                            if (links.length <= 1) {
-                              return `
-                              <tr>
-                                <td style="padding: 0 32px 8px;" align="center">
-                                  <a href="${assessmentLink}" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #4A6FA5 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-weight: 700; font-size: 16px;">
-                                    Take Your Assessment Now
-                                  </a>
-                                </td>
-                              </tr>
-                              <tr>
-                                <td style="padding: 8px 32px 24px; text-align: center;">
-                                  <p style="color: #999; font-size: 12px; margin: 0;">
-                                    Or copy this link: <a href="${assessmentLink}" style="color: #4A6FA5;">${assessmentLink}</a>
-                                  </p>
-                                </td>
-                              </tr>`;
-                            }
-                            return `
-                              <tr>
-                                <td style="padding: 0 32px 24px;">
-                                  <h3 style="color: #323956; margin: 0 0 16px; font-size: 16px; text-align: center;">Your Assessment Links</h3>
-                                  ${links.map((link, i) => `
-                                    <div style="margin-bottom: 12px; text-align: center;">
-                                      <a href="${link.trim()}" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #4A6FA5 100%); color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 10px; font-weight: 600; font-size: 14px; width: 80%; max-width: 400px;">
-                                        Assessment ${i + 1}
-                                      </a>
-                                    </div>
-                                  `).join('')}
-                                </td>
-                              </tr>`;
-                          })()}
+                          <!-- Assessment Link Button — always the one-time gate URL
+                               (for bundles the gate page lists the individual parts) -->
+                          <tr>
+                            <td style="padding: 0 32px 8px;" align="center">
+                              <a href="${assessmentEmailLink}" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #4A6FA5 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-weight: 700; font-size: 16px;">
+                                Take Your Assessment Now
+                              </a>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 8px 32px 24px; text-align: center;">
+                              <p style="color: #999; font-size: 12px; margin: 0;">
+                                Or copy this link: <a href="${assessmentEmailLink}" style="color: #4A6FA5;">${assessmentEmailLink}</a><br>
+                                This link is for one-time use — it expires once the assessment is completed.
+                              </p>
+                            </td>
+                          </tr>
 
                           <!-- Footer -->
                           <tr>

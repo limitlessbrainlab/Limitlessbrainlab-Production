@@ -39,6 +39,7 @@ const LBWProgress                = lazy(() => import('./pages/LBWProgress.jsx'))
 const LBWContent                 = lazy(() => import('./pages/LBWContent.jsx'));
 const ContactForm                = lazy(() => import('./pages/ContactForm.jsx'));
 const NeurosenseBooking          = lazy(() => import('./pages/NeurosenseBooking.jsx'));
+const TakeAssessment             = lazy(() => import('./pages/TakeAssessment.jsx'));
 const Pricing                    = lazy(() => import('./pages/Pricing.jsx'));
 const MoversSection              = lazy(() => import('./pages/MoversSection.jsx'));
 const ANSResetProtocol           = lazy(() => import('./pages/ANSResetProtocol.jsx'));
@@ -164,6 +165,7 @@ function App() {
                   <Route path="/lbw/content" element={<LBWContent />} />
                   <Route path="/contact" element={<ContactForm />} />
                   <Route path="/neurosense-booking" element={<NeurosenseBooking />} />
+                  <Route path="/assessment/take/:token" element={<TakeAssessment />} />
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/coach-certification" element={<CoachCertification />} />
                   <Route path="/locations" element={<Locations />} />

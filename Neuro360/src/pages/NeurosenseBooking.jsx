@@ -245,7 +245,12 @@ const NeurosenseBooking = () => {
           customerName: paymentName.toUpperCase(),
           currency: 'USD',
           amount: selectedService.salePrice.usd,
-          assessmentLink: selectedService.link
+          assessmentLink: selectedService.link,
+          // Return to THIS public page — the server default (/dashboard/about-brain)
+          // is login-protected, so a guest buyer would be bounced to /login and the
+          // payment-success handler above would never run.
+          successUrl: `${window.location.origin}/neurosense-booking?payment=success&assessment=${selectedService.id}&session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${window.location.origin}/neurosense-booking?payment=cancelled`
         })
       });
 

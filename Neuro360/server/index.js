@@ -2164,7 +2164,9 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
         customerEmail: customerEmail,
         tier: session.metadata?.tier,
         amount: session.amount_total / 100,
-        currency: session.currency?.toUpperCase()
+        currency: session.currency?.toUpperCase(),
+        assessmentName: session.metadata?.assessment_name || null,
+        assessmentLink: session.metadata?.assessment_link || null
       });
 
       // Save payment record to database
@@ -2225,7 +2227,13 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
       // Subscriptions are excluded: applySubscriptionPurchase already sends the
       // welcome + admin emails exactly once (claimNotificationOnce), so the
       // generic confirmation here would duplicate them on every verify call.
-      if (mailerConfigured && customerEmail && paymentType !== 'subscription') {
+      // The claim below shares its key with the webhook branch for the same
+      // type, so whichever path runs first sends the pair — never both.
+      const emailClaimKey = paymentType === 'assessment'
+        ? `assessment:${sessionId}:emails`
+        : `pack:${sessionId}:emails`;
+      if (mailerConfigured && customerEmail && paymentType !== 'subscription'
+          && await claimNotificationOnce(emailClaimKey)) {
         let emailSubject = '';
         let assessmentLink = '';
         let productName = '';
@@ -3679,8 +3687,15 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             created_at: new Date().toISOString()
           }).catch(err => console.warn('payments table insert skipped:', err.message));
 
+          // Send assessment link + admin emails exactly once across this
+          // webhook and the /api/stripe/verify-session confirm path (shared
+          // dedupe key) — whichever runs first sends the pair.
+          const assessmentEmailsClaimed = mailerConfigured
+            ? await claimNotificationOnce(`assessment:${session.id}:emails`)
+            : false;
+
           // Send assessment link email to customer
-          if (mailerConfigured && assessmentLink) {
+          if (assessmentEmailsClaimed && assessmentLink) {
             const assessmentMailOptions = {
               from: EMAIL_FROM,
               to: session.customer_email,
@@ -3802,7 +3817,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           }
 
           // Also notify admin about the purchase
-          if (mailerConfigured) {
+          if (assessmentEmailsClaimed) {
             const adminMailOptions = {
               from: EMAIL_FROM,
               to: process.env.EMAIL_TO || process.env.EMAIL_USER,
@@ -3939,8 +3954,14 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             await savePatientPayment(session.customer_email, 'frequency', session.metadata.pack_id?.replace(/_/g, ' ') || 'Frequency Pack', session.amount_total / 100, session.currency?.toUpperCase(), session.metadata.pack_id || null);
           }
 
+          // Send customer + admin emails exactly once across this webhook and
+          // the /api/stripe/verify-session confirm path (shared dedupe key).
+          const packEmailsClaimed = mailerConfigured
+            ? await claimNotificationOnce(`pack:${session.id}:emails`)
+            : false;
+
           // Send confirmation email
-          if (mailerConfigured) {
+          if (packEmailsClaimed) {
             const packName = session.metadata.is_bundle === 'true'
               ? (isMeditationPurchase ? 'Complete Meditation Bundle' : 'Complete Frequency Bundle')
               : session.metadata.pack_id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -4045,7 +4066,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         }
 
           // Notify admin (Limitless Brain Lab) about frequency/meditation purchase
-          if (mailerConfigured) {
+          if (packEmailsClaimed) {
             const itemType = isMeditationPurchase ? 'Meditation' : 'Frequency';
             const itemName = session.metadata.is_bundle === 'true'
               ? (isMeditationPurchase ? 'Complete Meditation Bundle' : 'Complete Frequency Bundle')
@@ -4238,7 +4259,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
     if (mailerConfigured && customerEmail) {
       const renewalMail = {
-        from: process.env.EMAIL_USER,
+        from: EMAIL_FROM,
         to: customerEmail,
         subject: `Subscription Renewed Successfully - Limitless Brain Lab`,
         attachments: [{ filename: 'logo.png', path: LOGO_PATH, cid: LOGO_CID }],
@@ -4267,6 +4288,22 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       emailTransporter.sendMail(renewalMail)
         .then(() => console.log('✉️ Renewal confirmation email sent'))
         .catch(err => console.error('❌ Renewal email failed:', err.message));
+
+      // Internal copy — renewals previously notified no one internally
+      emailTransporter.sendMail({
+        from: EMAIL_FROM,
+        to: process.env.EMAIL_TO || process.env.EMAIL_USER,
+        subject: `Subscription Renewal Received - ${customerEmail}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 500px;">
+            <h2 style="color: #323956;">Subscription Renewal</h2>
+            <p><strong>Customer:</strong> ${customerEmail}</p>
+            <p><strong>Amount:</strong> ${currency} ${amountPaid}</p>
+            <p><strong>Invoice ID:</strong> ${invoice.id}</p>
+            <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+          </div>
+        `
+      }).catch(err => console.error('Admin renewal email failed:', err.message));
     }
 
   // Handle failed payment

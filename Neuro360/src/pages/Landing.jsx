@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Brain, ShieldCheck, Users, Truck, ArrowDown, Menu, X, MapPin, Instagram, Linkedin, Youtube, Facebook, Heart, Droplets, Stethoscope, Dna, FlaskConical, Activity } from 'lucide-react';
+import { Brain, ShieldCheck, Users, Truck, ArrowDown, Menu, X, MapPin, Instagram, Linkedin, Youtube, Facebook, Heart, Droplets, Stethoscope, Dna, FlaskConical, Activity, CheckCircle } from 'lucide-react';
 import { WHATSAPP_URL } from '../config/whatsapp';
 import toast from 'react-hot-toast';
 import { getFriendlyErrorMessage } from '../utils/friendlyError';
@@ -34,6 +34,8 @@ const Landing = () => {
   const [bfsPaymentEmail, setBfsPaymentEmail] = useState('');
   const [bfsPaymentName, setBfsPaymentName] = useState('');
   const [bfsProcessing, setBfsProcessing] = useState(false);
+  // Post-payment thank-you modal: null | { verifying } | { verifying:false, assessmentName, assessmentLink, customerEmail }
+  const [paymentSuccessInfo, setPaymentSuccessInfo] = useState(null);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -112,14 +114,30 @@ const Landing = () => {
   }, []);
 
   // Handle return from Stripe checkout (Brain Fitness Score paid from the landing page).
-  // Buyer lands back on "/" instead of a protected dashboard route; the assessment link
-  // is emailed by the Stripe webhook, so we just confirm and clean the URL.
+  // Buyer lands back on "/" instead of a protected dashboard route. verify-session is the
+  // fallback fulfillment: it records the purchase AND sends the customer + internal emails
+  // even when the Stripe webhook doesn't reach the server (idempotent server-side, so no
+  // double email when the webhook does fire). The thank-you modal replaces the old toast.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const payment = params.get('payment');
     if (!payment) return;
     if (payment === 'success') {
-      toast.success('Payment successful! Your assessment link has been emailed to you.');
+      const sessionId = params.get('session_id');
+      setPaymentSuccessInfo({ verifying: true });
+      if (sessionId) {
+        fetch(`${API_BASE_URL}/stripe/verify-session/${sessionId}`)
+          .then((r) => r.json())
+          .then((data) => setPaymentSuccessInfo({
+            verifying: false,
+            assessmentName: data?.assessmentName || '',
+            assessmentLink: data?.assessmentLink || '',
+            customerEmail: data?.customerEmail || ''
+          }))
+          .catch(() => setPaymentSuccessInfo({ verifying: false }));
+      } else {
+        setPaymentSuccessInfo({ verifying: false });
+      }
     } else if (payment === 'cancelled') {
       toast('Payment cancelled.');
     }
@@ -2534,6 +2552,54 @@ const Landing = () => {
                   <>Pay USD 2.99 & Continue</>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Post-payment thank-you modal */}
+      {paymentSuccessInfo && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setPaymentSuccessInfo(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={(e) => e.stopPropagation()} style={{ animation: 'slideUp 0.3s ease-out' }}>
+            <div className="bg-gradient-to-r from-[#323956] to-[#4a5578] px-6 py-6 text-center">
+              <div className="w-14 h-14 mx-auto bg-white/20 rounded-full flex items-center justify-center mb-2">
+                <CheckCircle className="h-8 w-8 text-white" />
+              </div>
+              <h2 className="text-xl font-bold text-white">Thank You! Payment Successful</h2>
+            </div>
+            <div className="p-6 text-center">
+              {paymentSuccessInfo.verifying ? (
+                <div className="flex flex-col items-center gap-3 py-4">
+                  <div className="w-8 h-8 border-2 border-[#323956]/30 border-t-[#323956] rounded-full animate-spin" />
+                  <p className="text-gray-500 text-sm">Confirming your purchase…</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-gray-700 text-sm">
+                    Your purchase{paymentSuccessInfo.assessmentName ? <> of <strong>{paymentSuccessInfo.assessmentName}</strong></> : ''} is confirmed.
+                  </p>
+                  <p className="text-gray-500 text-sm mt-2">
+                    A confirmation email{paymentSuccessInfo.assessmentLink ? ' with your assessment link' : ''} has been sent
+                    {paymentSuccessInfo.customerEmail ? <> to <strong>{paymentSuccessInfo.customerEmail}</strong></> : ''}.
+                  </p>
+                  {paymentSuccessInfo.assessmentLink && (
+                    <a
+                      href={paymentSuccessInfo.assessmentLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block mt-5 px-8 py-3 bg-gradient-to-r from-[#c9a227] to-[#b8911f] text-white font-bold rounded-xl hover:shadow-lg transition-all duration-300"
+                    >
+                      Take Your Assessment Now
+                    </a>
+                  )}
+                  <button
+                    onClick={() => setPaymentSuccessInfo(null)}
+                    className="block w-full mt-4 py-2.5 text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors"
+                  >
+                    Close
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

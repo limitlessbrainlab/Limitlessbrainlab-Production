@@ -2969,30 +2969,33 @@ app.post('/api/jotform-webhook', require('multer')().none(), async (req, res) =>
     const answerText = JSON.stringify(answers || {}) + ' ' + pretty;
     const submitterEmail = (answerText.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/) || [null])[0];
 
-    // Match the purchase: newest row whose stored JotForm link contains this
-    // form id, preferring the submitter's email, not yet completed.
+    // Match the purchase. Email is the primary key: a submission must never
+    // complete another patient's purchase, so without an email match we only
+    // accept a form-id match when it is unambiguous (exactly one open row).
     const { data: candidates } = await supabase.from('assessment_purchases')
       .select('id, patient_email, assessment_name, assessment_completed_at')
       .ilike('assessment_link', `%${formID}%`)
       .order('created_at', { ascending: false })
       .limit(25);
     let purchase = null;
-    if (candidates?.length) {
-      const open = candidates.filter(c => !c.assessment_completed_at);
-      purchase = (submitterEmail && open.find(c => c.patient_email === submitterEmail.toLowerCase()))
-        || (submitterEmail && candidates.find(c => c.patient_email === submitterEmail.toLowerCase()))
-        || open[0] || null;
-    }
-    // Fallback: stored links may use a named JotForm alias while webhooks send
-    // the numeric form id — match the submitter's newest open purchase instead.
-    if (!purchase && submitterEmail) {
-      const { data: byEmail } = await supabase.from('assessment_purchases')
-        .select('id, patient_email, assessment_name, assessment_completed_at')
-        .eq('patient_email', submitterEmail.toLowerCase())
-        .is('assessment_completed_at', null)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      purchase = byEmail?.[0] || null;
+    if (submitterEmail) {
+      const em = submitterEmail.toLowerCase();
+      const mine = (candidates || []).filter(c => c.patient_email === em);
+      purchase = mine.find(c => !c.assessment_completed_at) || mine[0] || null;
+      if (!purchase) {
+        // Stored links may use a named JotForm alias while webhooks send the
+        // numeric form id — match the submitter's newest open purchase instead.
+        const { data: byEmail } = await supabase.from('assessment_purchases')
+          .select('id, patient_email, assessment_name, assessment_completed_at')
+          .eq('patient_email', em)
+          .is('assessment_completed_at', null)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        purchase = byEmail?.[0] || null;
+      }
+    } else {
+      const open = (candidates || []).filter(c => !c.assessment_completed_at);
+      if (open.length === 1) purchase = open[0];
     }
 
     if (purchase) {

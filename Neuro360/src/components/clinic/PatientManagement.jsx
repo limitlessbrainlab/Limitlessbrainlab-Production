@@ -1989,7 +1989,7 @@ const PatientModal = ({ patient, onSubmit, onClose, register, handleSubmit, watc
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-3">
+        <form onSubmit={handleSubmit(handleFormSubmit)} autoComplete="off" className="space-y-3">
           <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   Referred By *
@@ -2122,6 +2122,12 @@ const PatientModal = ({ patient, onSubmit, onClose, register, handleSubmit, watc
                       <input
                         type={showPassword ? "text" : "password"}
                         autoComplete="new-password"
+                        // readOnly until focus: browsers and password managers skip
+                        // read-only fields, so nothing ever autofills these boxes.
+                        readOnly
+                        onFocus={(e) => e.target.removeAttribute('readonly')}
+                        data-lpignore="true"
+                        data-1p-ignore=""
                         {...register('password', {
                           // Optional on edit (existing patient): a blank value keeps the
                           // current password, so every strength check passes when empty.
@@ -2157,6 +2163,10 @@ const PatientModal = ({ patient, onSubmit, onClose, register, handleSubmit, watc
                       <input
                         type={showConfirmPassword ? "text" : "password"}
                         autoComplete="new-password"
+                        readOnly
+                        onFocus={(e) => e.target.removeAttribute('readonly')}
+                        data-lpignore="true"
+                        data-1p-ignore=""
                         {...register('confirmPassword', {
                           required: patient ? false : 'Please confirm password',
                           validate: (value, formValues) => !formValues.password || value === formValues.password || 'Passwords do not match'

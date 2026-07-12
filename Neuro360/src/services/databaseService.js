@@ -809,20 +809,8 @@ class DatabaseService {
 
     const report = await this.add('reports', reportData);
 
-    // Update clinic usage
-    if (clinicId) {
-      try {
-        const clinic = await this.findById('clinics', clinicId);
-        if (clinic) {
-          await this.update('clinics', clinic.id, {
-            reportsUsed: (clinic.reportsUsed || 0) + 1
-          });
-        }
-      } catch (updateError) {
-        console.warn('WARNING: Could not update clinic usage:', updateError);
-        // Continue anyway - report was created successfully
-      }
-    }
+    // reports_used is metered server-side in /api/qeeg/process on generation;
+    // saving a report record here must not consume a credit.
 
     // Skip usage tracking for now - 'usage' table doesn't exist yet
     // TODO: Create proper usage/analytics table in future

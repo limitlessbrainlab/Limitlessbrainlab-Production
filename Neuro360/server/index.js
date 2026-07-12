@@ -2889,11 +2889,10 @@ async function applySubscriptionPurchase(session) {
 // Each paid assessment purchase gets a random token. Buyers get
 // ${APP_URL}/assessment/take/<token> (page + emails) instead of the raw
 // JotForm URL; /api/assessment-link/consume validates state server-side and
-// only then reveals the JotForm link(s). Once completed (JotForm webhook, or
-// 30 minutes after first open for single assessments) the link is spent and
-// shows "assessment already completed".
+// only then reveals the JotForm link(s). The link is spent only on a real
+// submission signal (the gate page's /complete call or the JotForm webhook)
+// or when link_expires_at passes — never on a mere re-open.
 const ASSESSMENT_LINK_VALID_DAYS = 30;
-const ASSESSMENT_OPEN_GRACE_MS = 30 * 60 * 1000;
 
 async function ensureAssessmentToken({ sessionId, email, assessmentId } = {}) {
   if (!supabase) return null;
@@ -2958,18 +2957,10 @@ app.post('/api/assessment-link/consume', async (req, res) => {
     const links = String(row.assessment_link || '').split(',').map(s => s.trim()).filter(Boolean);
     if (!links.length) return res.json({ status: 'invalid' });
     const isBundle = links.length > 1;
-    const now = new Date();
 
     if (!row.link_opened_at) {
       await supabase.from('assessment_purchases')
-        .update({ link_opened_at: now.toISOString() }).eq('id', row.id);
-    } else if (!isBundle && (now - new Date(row.link_opened_at)) > ASSESSMENT_OPEN_GRACE_MS) {
-      // Single assessment re-opened after the grace window: the one-time link
-      // is spent. (The JotForm completion webhook marks true completion; this
-      // is the fallback when that webhook isn't configured on the form.)
-      await supabase.from('assessment_purchases')
-        .update({ assessment_completed_at: now.toISOString() }).eq('id', row.id);
-      return res.json({ status: 'completed', assessmentName });
+        .update({ link_opened_at: new Date().toISOString() }).eq('id', row.id);
     }
 
     return res.json({ status: 'ok', assessmentName, links, isBundle });

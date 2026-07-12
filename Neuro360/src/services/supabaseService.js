@@ -553,13 +553,7 @@ class SupabaseService {
       created_at: new Date().toISOString()
     });
 
-    // Update clinic usage
-    const clinic = await this.findById('clinics', reportData.clinic_id);
-    if (clinic) {
-      await this.update('clinics', clinic.id, {
-        reports_used: (clinic.reports_used || 0) + 1
-      });
-    }
+    // reports_used is metered server-side in /api/qeeg/process on generation.
 
     // Track usage
     await this.add('usage', {

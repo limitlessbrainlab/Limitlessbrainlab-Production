@@ -656,6 +656,32 @@ router.post('/process', upload.fields([
     progressLog.forEach(log => console.log(log));
     console.log('=============================\n');
 
+    // Meter the report credit here, server-side — the old client-side counter
+    // in databaseService.addReport was skippable from dev tools. Optimistic
+    // concurrency (retry on conflicting writers); fail-open like the guard.
+    if (reqClinicId && reqClinicId !== DEFAULT_CLINIC_ID) {
+      try {
+        const { createClient } = require('@supabase/supabase-js');
+        const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+        let metered = false;
+        for (let attempt = 0; attempt < 3 && !metered; attempt++) {
+          const { data: clinic } = await sb.from('clinics').select('reports_used').eq('id', reqClinicId).single();
+          const current = clinic?.reports_used;
+          const used = Number(current ?? 0);
+          let update = sb.from('clinics').update({ reports_used: used + 1 }).eq('id', reqClinicId);
+          update = (current === null || current === undefined)
+            ? update.is('reports_used', null)
+            : update.eq('reports_used', current);
+          const { data: updated } = await update.select('id');
+          metered = !!(updated && updated.length);
+          if (metered) logProgress('CREDITS', `reports_used incremented to ${used + 1}`, '🧮');
+        }
+        if (!metered) console.warn('Credit increment failed after retries for clinic', reqClinicId);
+      } catch (incErr) {
+        console.warn('Credit increment failed (fail-open):', incErr.message);
+      }
+    }
+
     res.json({
       success: true,
       data: {

@@ -79,8 +79,14 @@ const setupMiddleware = (app, allowedOrigins) => {
   // Compression
   app.use(compression());
 
-  // Body parsing
-  app.use(express.json({ limit: '50mb' }));
+  // Body parsing. The Stripe webhook MUST be skipped: signature verification
+  // (stripe.webhooks.constructEvent) needs the raw request bytes, and this
+  // global parser runs before the route-level express.raw() in index.js —
+  // parsing here made EVERY webhook delivery fail with a 400.
+  app.use((req, res, next) => {
+    if (req.originalUrl === '/api/stripe-webhook') return next();
+    return express.json({ limit: '50mb' })(req, res, next);
+  });
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // General API rate limiter (applies to all routes)

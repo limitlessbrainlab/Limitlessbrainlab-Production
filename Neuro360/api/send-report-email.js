@@ -2,7 +2,9 @@ import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 import reportEmailTemplate from '../shared/reportEmailTemplate.cjs';
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
+// Hardcoded on purpose: login/dashboard CTAs in emails must always land on production,
+// never a *.vercel.app deployment (FRONTEND_URL may point at a stale one).
+const FRONTEND_URL = 'https://limitlessbrainlab.com';
 const FROM_ADDRESS = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'info@limitlessbrainlab.com';
 const EMAIL_FROM = `"Limitless Brain Lab" <${FROM_ADDRESS}>`;
 // Load the logo from the brand production domain (aligned with the From domain), never a

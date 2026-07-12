@@ -246,25 +246,6 @@ const INTERNAL_COPY_EMAIL = process.env.INTERNAL_COPY_EMAIL || 'limitlessbrainla
 // (Stripe success_url/cancel_url still use FRONTEND_URL — that is intentional.)
 const APP_URL = 'https://limitlessbrainlab.com';
 
-// Allowed login origins for credential-email links. A clinic/patient created on a given
-// environment is emailed the login link for THAT environment (see origin_url / the
-// frontend loginUrl). Anything not on this allowlist falls back to production, so we never
-// email an untrusted/arbitrary URL.
-const ALLOWED_LOGIN_ORIGINS = [
-  'https://limitlessbrainlab.com',
-  'https://www.limitlessbrainlab.com',
-  'https://limitlessbrainlab-production.vercel.app',
-  'https://limitlessbrainlab-eight.vercel.app',
-];
-const resolveLoginBase = (url) => {
-  try {
-    const o = new URL(String(url)).origin;
-    return ALLOWED_LOGIN_ORIGINS.includes(o) ? o : APP_URL;
-  } catch {
-    return APP_URL;
-  }
-};
-
 // Escape user-supplied values before interpolating into email HTML. Without this,
 // a typed password containing < > & or " renders corrupted in the mail client
 // (e.g. "Br@in<Lab>2026" shows as "Br@in2026"), so the recipient copies the wrong
@@ -2624,7 +2605,7 @@ async function applySubscriptionPurchase(session) {
             ${tier === 'PRO' || tier === 'PREMIUM' ? '<li>Frequencies Library</li><li>Meditations</li><li>Supplements Guide</li>' : ''}
             ${tier === 'BASIC' || tier === 'PRO' || tier === 'PREMIUM' ? '<li>ANS Reset Protocol</li><li>MOVERS Exercises</li><li>Five Pillars</li>' : ''}
           </ul>
-          <a href="${process.env.FRONTEND_URL || 'https://limitlessbrainlab.com'}/dashboard" style="display: inline-block; background: #323956; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">Go to Dashboard</a>
+          <a href="${APP_URL}/dashboard" style="display: inline-block; background: #323956; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">Go to Dashboard</a>
         </div>
       `
     };
@@ -3758,7 +3739,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           // Send confirmation email to clinic — reorder vs first purchase
           if (mailerConfigured && session.customer_email) {
             const isReorder = currentAllowed > 0;
-            const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
+            const FRONTEND_URL = APP_URL;
 
             const clinicMailOptions = isReorder
               ? {
@@ -4565,8 +4546,8 @@ app.post('/api/clinic-credentials', async (req, res) => {
     const { clinicName, contactPerson, otp } = req.body;
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '').trim();
-    // Login link points to the environment the clinic was created on (allowlisted).
-    const loginBase = resolveLoginBase(req.body.loginUrl);
+    // Login link always points to production, regardless of the origin that sent the request.
+    const loginBase = APP_URL;
 
     if (!email || !password) {
       return res.status(400).json({
@@ -6380,7 +6361,7 @@ app.post('/api/send-welcome-email', async (req, res) => {
       console.log('ℹ️ Using default email service for patient welcome email');
     }
 
-    const loginUrl = `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/patient/login`;
+    const loginUrl = `${APP_URL}/patient/login`;
 
     const mailOptions = {
       from: fromEmail,
@@ -6475,7 +6456,7 @@ app.post('/api/send-welcome-email', async (req, res) => {
     // a failure here must not break the patient welcome email.
     if (clinicEmail) {
       try {
-        const dashboardUrl = `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/clinic/login`;
+        const dashboardUrl = `${APP_URL}/clinic/login`;
         const dateAdded = fmtDateTime(new Date());
         await emailTransporter.sendMail({
           from: EMAIL_FROM,
@@ -6605,7 +6586,7 @@ app.post('/api/send-email-update-notification', async (req, res) => {
     // "unchanged" note when no plaintext is available (e.g. legacy patients).
     const hasPassword = !!password;
     const passwordLabel = passwordChanged ? 'New Password' : 'Current Password';
-    const loginUrl = `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/patient/login`;
+    const loginUrl = `${APP_URL}/patient/login`;
 
     const mailOptions = {
       from: fromEmail,
@@ -6782,7 +6763,7 @@ app.post('/api/send-report-email', async (req, res) => {
     const transporter = emailTransporter;
     const fromEmail = EMAIL_FROM;
 
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
+    const FRONTEND_URL = APP_URL;
     const patientLoginUrl = `${FRONTEND_URL}/patient/login`;
     const clinicLoginUrl = `${FRONTEND_URL}/clinic/login`;
 
@@ -7252,7 +7233,7 @@ app.post('/api/notify-patient-report', async (req, res) => {
     const displayName = patientName || 'there';
     const displayReport = reportType || 'Brain Wellness Report';
     const displayClinic = clinicName || 'your clinic';
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
+    const FRONTEND_URL = APP_URL;
 
     const emailsSent = [];
 
@@ -7365,7 +7346,7 @@ app.post('/api/send-no-credit-email', async (req, res) => {
       return res.status(500).json({ success: false, message: 'Email not configured' });
     }
 
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
+    const FRONTEND_URL = APP_URL;
     const displayName = clinicName || 'Clinic Admin';
     const accountType = clinicType === 'lbl_partner' ? 'Partner' : 'Clinic';
     const dashboardPath = clinicType === 'lbl_partner' ? '/clinic/subscription' : '/clinic/subscription';
@@ -7476,7 +7457,7 @@ app.post('/api/send-credit-alert', async (req, res) => {
     const tier = (cur !== 'none' && rank[cur] > rank[prev]) ? cur : null;
     if (!tier) return res.json({ success: true, sent: false, reason: 'no threshold crossed', remaining });
 
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
+    const FRONTEND_URL = APP_URL;
     const buyUrl = `${FRONTEND_URL}/clinic/subscription`;
     const clinicName = clinic.name || 'your clinic';
     const usageRows = [

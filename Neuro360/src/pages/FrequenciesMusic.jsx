@@ -45,6 +45,8 @@ const FrequenciesMusic = () => {
   });
   const [playingTrack, setPlayingTrack] = useState(null);
   const [purchasedPacks, setPurchasedPacks] = useState([]);
+  // PRO/PREMIUM subscribers get all packs without per-item purchase
+  const [hasFullContentAccess, setHasFullContentAccess] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(null);
   const [userLocation, setUserLocation] = useState({ country: 'IN', currency: 'INR', symbol: '₹', packPrice: 399, originalPrice: 699 });
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -89,6 +91,20 @@ const FrequenciesMusic = () => {
   const fetchPurchasedPacks = async () => {
     if (!user?.email) return;
     try {
+      // PRO/PREMIUM subscription unlocks the whole library (per the plan
+      // benefits promised at purchase) — newest patients row wins
+      const { data: subRows } = await supabase
+        .from('patients')
+        .select('subscription_tier, subscription_status')
+        .eq('email', user.email.toLowerCase())
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const sub = subRows?.[0];
+      setHasFullContentAccess(
+        ['PRO', 'PREMIUM'].includes((sub?.subscription_tier || '').toUpperCase()) &&
+        sub?.subscription_status === 'active'
+      );
+
       const allPackIds = [];
 
       // Try pack_id column first
@@ -771,7 +787,7 @@ const FrequenciesMusic = () => {
         <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-2 sm:gap-6 auto-rows-fr">
           {frequencyPacks.map((pack, index) => {
             const isFirstCard = index === 0;
-            const isPurchased = purchasedPacks.includes(pack.id);
+            const isPurchased = purchasedPacks.includes(pack.id) || hasFullContentAccess;
             const isUnlocked = isFirstCard || isPurchased;
             const isLocked = !isUnlocked;
             return (

@@ -133,12 +133,15 @@ class AccessControlService {
    */
   async getUserSubscription(userEmail) {
     try {
-      // Check patient's subscription status
-      const { data: patient, error } = await supabase
+      // Check patient's subscription status. Duplicate-email rows exist, so
+      // .single() would throw — take the newest row instead.
+      const { data: patientRows, error } = await supabase
         .from('patients')
         .select('id, subscription_status, subscription_tier, reports_unlocked, dashboard_access, clinic_id')
         .eq('email', userEmail.toLowerCase())
-        .single();
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const patient = patientRows?.[0];
 
       if (error || !patient) {
         // Default to free tier if no patient found

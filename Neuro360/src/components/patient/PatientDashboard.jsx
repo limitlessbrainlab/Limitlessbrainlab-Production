@@ -486,6 +486,8 @@ const PatientDashboard = () => {
   // Per-assessment gate state: { [assessmentId]: { linkToken, completed } }
   const [purchasedAssessmentState, setPurchasedAssessmentState] = useState({});
   const [isProcessingAssessmentPayment, setIsProcessingAssessmentPayment] = useState(null);
+  // PRO/PREMIUM subscribers get all frequency/meditation packs without per-item purchase
+  const [hasFullContentAccess, setHasFullContentAccess] = useState(false);
 
   // JotForm iframe modal state
   const [activeJotForm, setActiveJotForm] = useState(null); // { title, link }
@@ -1520,9 +1522,13 @@ const PatientDashboard = () => {
           const patientFullName = patientRecord.fullName || patientRecord.full_name || patientRecord.name || user.name;
           const clinicId = patientRecord.clinicId || patientRecord.clinic_id || patientRecord.orgId || patientRecord.org_id || patientRecord.ownerId || patientRecord.owner_id;
           setPatientClinicId(clinicId || null);
+          setHasFullContentAccess(
+            ['PRO', 'PREMIUM'].includes((patientRecord.subscriptionTier || patientRecord.subscription_tier || '').toUpperCase()) &&
+            (patientRecord.subscriptionStatus || patientRecord.subscription_status) === 'active'
+          );
 
           const [, , , clinicData] = await Promise.all([
-            fetchClinicalReport(user.patientId || user.id),
+            fetchClinicalReport(patientRecord.id),
             fetchPatientReports(patientRecord.id, patientFullName, clinicId, patientRecord.email || user.email),
             fetchAlgorithmResults(patientRecord.id, patientRecord.email || user.email, patientFullName, clinicId),
             clinicId ? DatabaseService.findById('clinics', clinicId).catch(() => null) : Promise.resolve(null),
@@ -1596,8 +1602,13 @@ const PatientDashboard = () => {
                   setPatientUid(generatedUid);
                 }
 
+                setHasFullContentAccess(
+                  ['PRO', 'PREMIUM'].includes((patientByEmail.subscriptionTier || patientByEmail.subscription_tier || '').toUpperCase()) &&
+                  (patientByEmail.subscriptionStatus || patientByEmail.subscription_status) === 'active'
+                );
+
                 // Fetch clinical report for this patient
-                await fetchClinicalReport(user.patientId || user.id);
+                await fetchClinicalReport(patientByEmail.id);
 
                 // Fetch all reports for this patient (including response reports)
                 // Use patientByEmail.id — reports are stored with patient_id = patients table row id.
@@ -1751,10 +1762,10 @@ const PatientDashboard = () => {
     patientDbId ? [
       { table: 'reports', filter: patientClinicId ? `clinic_id=eq.${patientClinicId}` : `patient_id=eq.${patientDbId}` },
       { table: 'algorithm_results', filter: `patient_id=eq.${patientDbId}` },
-      { table: 'clinical_reports', filter: `patient_id=eq.${user?.patientId || user?.id}` }
+      { table: 'clinical_reports', filter: `patient_id=eq.${patientDbId}` }
     ] : [],
     () => {
-      fetchClinicalReport(user?.patientId || user?.id);
+      fetchClinicalReport(patientDbId);
       fetchPatientReports(patientDbId, patientData?.profile?.name, patientClinicId, user?.email);
       fetchAlgorithmResults(patientDbId, user?.email, patientData?.profile?.name, patientClinicId);
     },
@@ -8737,7 +8748,7 @@ const PatientDashboard = () => {
             {meditationPacks.map((pack, index) => {
               const actualIndex = index;
               const isFirstCard = actualIndex === 0;
-            const isPurchased = purchasedPacks.includes(pack.id);
+            const isPurchased = purchasedPacks.includes(pack.id) || hasFullContentAccess;
             const isUnlocked = isFirstCard || isPurchased || pack.isFree;
             const isLocked = !isUnlocked;
             return (
@@ -10827,7 +10838,7 @@ const PatientDashboard = () => {
           setShowClinicalHistoryPopup(false); // Close popup permanently after saving
           // Refresh clinical report data using user.id (UUID), not patientUid
           if (user?.id) {
-            await fetchClinicalReport(user.patientId || user.id);
+            await fetchClinicalReport(patientDbId || user.patientId || user.id);
           }
           toast.success('Clinical report saved successfully!');
         }}

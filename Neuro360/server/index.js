@@ -2216,6 +2216,27 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
             // subscription confirmed via this path granted no plan access.
             const subResult = await applySubscriptionPurchase(session);
             if (!subResult.ok) console.error('verify-session applySubscriptionPurchase failed:', subResult.message);
+          } else if (paymentType === 'coaching_session') {
+            // Coaching must NOT fall through to the frequency/meditation branch
+            // (it used to create a spurious frequency_purchases row with an
+            // undefined pack_id). Record in the shared payments ledger only;
+            // the Calendly email + booking records come from the webhook /
+            // brain-coach return page.
+            const { error: coachErr } = await supabase.from('payments').upsert({
+              clinic_id: session.metadata?.clinic_id || null,
+              patient_email: customerEmail?.toLowerCase(),
+              amount: session.amount_total / 100,
+              currency: session.currency?.toUpperCase() || 'USD',
+              status: 'completed',
+              type: 'coaching',
+              package_name: session.metadata?.coach_name ? `Coaching Session - ${session.metadata.coach_name}` : 'Coaching Session',
+              payment_method: 'stripe',
+              payment_id: session.payment_intent || sessionId,
+              stripe_payment_id: session.payment_intent || sessionId,
+              stripe_session_id: sessionId,
+              created_at: new Date().toISOString()
+            }, { onConflict: 'stripe_session_id', ignoreDuplicates: true });
+            if (coachErr) console.error('DB save error (payments/coaching):', coachErr.message);
           } else {
             // Frequency or meditation. The live tables are minimal —
             // meditation_purchases(patient_email, meditation_id, purchased_at)
@@ -4422,19 +4443,52 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         const patientName = session.metadata?.patient_name || 'Patient';
         const coachId = session.metadata?.coach_id;
 
-        // Save coaching payment record
-        await supabase.from('coaching_payments').upsert({
+        // Save coaching payment record. NOTE: the old write targeted a
+        // coaching_payments table that does not exist in the live DB and
+        // swallowed the error — coaching purchases were never recorded on
+        // this path. Record into the shared payments ledger + patient_payments
+        // (what the Wallet and admin portals actually read).
+        const { error: coachPayErr } = await supabase.from('payments').upsert({
+          clinic_id: null,
           patient_email: patientEmail?.toLowerCase(),
-          patient_name: patientName,
-          coach_id: coachId,
-          coach_name: coachName,
           amount: session.amount_total / 100,
-          currency: session.currency,
+          currency: session.currency?.toUpperCase() || 'USD',
+          status: 'completed',
+          type: 'coaching',
+          package_name: coachName ? `Coaching Session - ${coachName}` : 'Coaching Session',
+          payment_method: 'stripe',
+          payment_id: session.payment_intent || session.id,
+          stripe_payment_id: session.payment_intent || session.id,
           stripe_session_id: session.id,
-          calendly_url: calendlyUrl || null,
-          status: 'paid',
           created_at: new Date().toISOString()
-        }, { onConflict: 'stripe_session_id' }).then(() => {}).catch(() => {});
+        }, { onConflict: 'stripe_session_id', ignoreDuplicates: true });
+        if (coachPayErr) console.error('Coaching payments insert failed:', coachPayErr.message);
+        // patient_payments row so the coaching purchase shows in the Wallet
+        // even when the buyer never returns to the brain-coach page
+        // (savePatientPayment lives in an earlier block and is out of scope here)
+        try {
+          const { data: existingCoachPay } = await supabase.from('patient_payments')
+            .select('id').eq('stripe_session_id', session.id).limit(1);
+          if (!existingCoachPay?.length) {
+            const { error: ppErr } = await supabase.from('patient_payments').insert({
+              clinic_id: session.metadata?.clinic_id || null,
+              patient_email: patientEmail?.toLowerCase(),
+              patient_name: patientName || '',
+              amount: session.amount_total / 100,
+              currency: session.currency?.toUpperCase() || 'USD',
+              status: 'completed',
+              type: 'coaching',
+              item_name: coachName ? `Coaching Session - ${coachName}` : 'Coaching Session',
+              stripe_session_id: session.id,
+              stripe_payment_intent: session.payment_intent,
+              source: 'Brain Coach',
+              created_at: new Date().toISOString()
+            });
+            if (ppErr) console.warn('coaching patient_payments insert skipped:', ppErr.message);
+          }
+        } catch (ppCatch) {
+          console.warn('coaching patient_payments insert skipped:', ppCatch.message);
+        }
 
         // Send Calendly link email to patient
         if (emailTransporter && patientEmail) {

@@ -638,7 +638,11 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
         referredBy: referredByValue,
         referredByOther: referredByOtherValue,
         occupation: patient.occupation || '',
-        handedness: patient.handedness || ''
+        handedness: patient.handedness || '',
+        // Explicitly blank so a value left over from a prior add attempt (or
+        // injected by the browser) never rides along into an edit submit.
+        password: '',
+        confirmPassword: ''
       };
       reset(formData);
     } else {
@@ -2094,6 +2098,7 @@ const PatientModal = ({ patient, onSubmit, onClose, register, handleSubmit, watc
             </label>
             <input
               type="email"
+              autoComplete="off"
               {...register('email', {
                 required: 'Email is required',
                 pattern: {
@@ -2116,6 +2121,7 @@ const PatientModal = ({ patient, onSubmit, onClose, register, handleSubmit, watc
                     <div className="relative">
                       <input
                         type={showPassword ? "text" : "password"}
+                        autoComplete="new-password"
                         {...register('password', {
                           // Optional on edit (existing patient): a blank value keeps the
                           // current password, so every strength check passes when empty.
@@ -2150,6 +2156,7 @@ const PatientModal = ({ patient, onSubmit, onClose, register, handleSubmit, watc
                     <div className="relative">
                       <input
                         type={showConfirmPassword ? "text" : "password"}
+                        autoComplete="new-password"
                         {...register('confirmPassword', {
                           required: patient ? false : 'Please confirm password',
                           validate: (value, formValues) => !formValues.password || value === formValues.password || 'Passwords do not match'

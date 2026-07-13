@@ -509,9 +509,16 @@ const SystemSettings = () => {
         </button>
       )}
 
-      {/* Add / Edit Form */}
+      {/* Add / Edit Form (modal) */}
       {clinicLocationForm && (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 space-y-4">
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={resetClinicForm}
+        >
+          <div
+            className="bg-white rounded-xl p-5 space-y-4 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-sm font-semibold text-gray-900">
               {clinicLocationForm.id ? 'Edit Location' : 'Add New Location'}
@@ -677,6 +684,7 @@ const SystemSettings = () => {
               <Save className="h-4 w-4" />
               {clinicLocationForm.id ? 'Update Location' : 'Add Location'}
             </button>
+          </div>
           </div>
         </div>
       )}

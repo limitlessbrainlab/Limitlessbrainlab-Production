@@ -291,6 +291,16 @@ const INTERNAL_COPY_EMAIL = process.env.INTERNAL_COPY_EMAIL || 'limitlessbrainla
 // (Stripe success_url/cancel_url still use FRONTEND_URL — that is intentional.)
 const APP_URL = 'https://limitlessbrainlab.com';
 
+// Standard grey contact strip — the bottom bar of every email card. attachEmailFooter
+// detects this strip (background:#f8fafc + border-top) and welds the brand footer directly
+// ABOVE it, so body + footer + strip read as one continuous card. Templates that end with
+// this strip render integrated; bare fragments without it fall through to a detached
+// floating footer. Keep it as the LAST inner element, containing only <p> (no nested <div>),
+// so the stripDivEnd/stripRowTail matchers in attachEmailFooter can find it.
+const CONTACT_STRIP_HTML = `<div style="background:#f8fafc; padding:16px 30px; text-align:center; border-top:1px solid #e5e7eb;">
+            <p style="color:#94a3b8; margin:0; font-size:11px;">Limitlessbrainlab.com &nbsp;|&nbsp; info@limitlessbrainlab.com</p>
+          </div>`;
+
 // Escape user-supplied values before interpolating into email HTML. Without this,
 // a typed password containing < > & or " renders corrupted in the mail client
 // (e.g. "Br@in<Lab>2026" shows as "Br@in2026"), so the recipient copies the wrong
@@ -2621,12 +2631,12 @@ async function sendClinicReportPurchaseEmails(session, previousAllowed) {
         subject: `Payment Successful - ${reports} EEG Reports Added`,
         attachments: getLogoAttachment(),
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+            <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 24px; text-align: center;">
               <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover;" />
               <h1 style="color: #ffffff; margin: 10px 0 0; font-size: 20px;">Payment Successful!</h1>
             </div>
-            <div style="padding: 24px; background: #ffffff; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+            <div style="padding: 24px; background: #ffffff;">
               <p style="color: #333;">Hi ${customerName || 'Clinic Admin'},</p>
               <p style="color: #555;">Your payment of <strong>${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</strong> has been processed successfully.</p>
               <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin: 16px 0;">
@@ -2638,6 +2648,7 @@ async function sendClinicReportPurchaseEmails(session, previousAllowed) {
               </div>
               <p style="color: #999; font-size: 12px; text-align: center;">Thank you for choosing Limitless Brain Lab!</p>
             </div>
+            ${CONTACT_STRIP_HTML}
           </div>
         `
       };
@@ -2651,14 +2662,17 @@ async function sendClinicReportPurchaseEmails(session, previousAllowed) {
     to: process.env.EMAIL_TO || process.env.EMAIL_USER,
     subject: `New Clinic Report Purchase: ${reports} Reports`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 500px;">
-        <h2 style="color: #323956;">New Clinic Report Purchase</h2>
-        <p><strong>Clinic ID:</strong> ${clinicId}</p>
-        <p><strong>Customer:</strong> ${customerName || 'N/A'} (${session.customer_email})</p>
-        <p><strong>Reports:</strong> ${reports} EEG Reports</p>
-        <p><strong>Amount:</strong> ${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</p>
-        <p><strong>Session ID:</strong> ${session.id}</p>
-        <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+        <div style="padding: 24px 28px;">
+          <h2 style="color: #323956; margin-top: 0;">New Clinic Report Purchase</h2>
+          <p><strong>Clinic ID:</strong> ${clinicId}</p>
+          <p><strong>Customer:</strong> ${customerName || 'N/A'} (${session.customer_email})</p>
+          <p><strong>Reports:</strong> ${reports} EEG Reports</p>
+          <p><strong>Amount:</strong> ${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</p>
+          <p><strong>Session ID:</strong> ${session.id}</p>
+          <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+        </div>
+        ${CONTACT_STRIP_HTML}
       </div>
     `
   };
@@ -2887,20 +2901,23 @@ async function applySubscriptionPurchase(session) {
       subject: `Welcome to Limitless Brain Lab ${tier}`,
       attachments: getLogoAttachment(),
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 20px; text-align: center;">
             <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;" />
             <h1 style="color: #ffffff; margin: 10px 0 0;">Welcome to Limitless Brain Lab ${tier}!</h1>
           </div>
-          <p>Thank you for upgrading your subscription.</p>
-          <p><strong>Amount Paid:</strong> ${currency} ${amount.toFixed(2)}</p>
-          <p>You now have access to all ${tier} features including:</p>
-          <ul>
-            ${tier === 'PREMIUM' ? '<li>Brain Coach Access</li><li>Home Neurofeedback</li><li>All Assessments</li>' : ''}
-            ${tier === 'PRO' || tier === 'PREMIUM' ? '<li>Frequencies Library</li><li>Meditations</li><li>Supplements Guide</li>' : ''}
-            ${tier === 'BASIC' || tier === 'PRO' || tier === 'PREMIUM' ? '<li>ANS Reset Protocol</li><li>MOVERS Exercises</li><li>Five Pillars</li>' : ''}
-          </ul>
-          <a href="${APP_URL}/dashboard" style="display: inline-block; background: #323956; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">Go to Dashboard</a>
+          <div style="padding: 24px 28px; background: #ffffff;">
+            <p style="margin-top: 0;">Thank you for upgrading your subscription.</p>
+            <p><strong>Amount Paid:</strong> ${currency} ${amount.toFixed(2)}</p>
+            <p>You now have access to all ${tier} features including:</p>
+            <ul>
+              ${tier === 'PREMIUM' ? '<li>Brain Coach Access</li><li>Home Neurofeedback</li><li>All Assessments</li>' : ''}
+              ${tier === 'PRO' || tier === 'PREMIUM' ? '<li>Frequencies Library</li><li>Meditations</li><li>Supplements Guide</li>' : ''}
+              ${tier === 'BASIC' || tier === 'PRO' || tier === 'PREMIUM' ? '<li>ANS Reset Protocol</li><li>MOVERS Exercises</li><li>Five Pillars</li>' : ''}
+            </ul>
+            <a href="${APP_URL}/dashboard" style="display: inline-block; background: #323956; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px;">Go to Dashboard</a>
+          </div>
+          ${CONTACT_STRIP_HTML}
         </div>
       `
     };
@@ -2913,13 +2930,16 @@ async function applySubscriptionPurchase(session) {
       to: process.env.EMAIL_TO || process.env.EMAIL_USER,
       subject: `New Subscription Purchase: ${tier}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 500px;">
-          <h2 style="color: #323956;">New Subscription Purchase</h2>
-          <p><strong>Customer:</strong> ${email}</p>
-          <p><strong>Tier:</strong> ${tier}</p>
-          <p><strong>Amount:</strong> ${currency} ${amount.toFixed(2)}</p>
-          <p><strong>Session ID:</strong> ${session.id}</p>
-          <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+          <div style="padding: 24px 28px;">
+            <h2 style="color: #323956; margin-top: 0;">New Subscription Purchase</h2>
+            <p><strong>Customer:</strong> ${email}</p>
+            <p><strong>Tier:</strong> ${tier}</p>
+            <p><strong>Amount:</strong> ${currency} ${amount.toFixed(2)}</p>
+            <p><strong>Session ID:</strong> ${session.id}</p>
+            <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+          </div>
+          ${CONTACT_STRIP_HTML}
         </div>
       `
     };
@@ -3127,14 +3147,17 @@ app.post('/api/jotform-webhook', require('multer')().none(), async (req, res) =>
         to: process.env.EMAIL_TO || process.env.EMAIL_USER,
         subject: `Assessment completed: ${purchase?.assessment_name || `form ${formID}`}${submitterEmail ? ` — ${submitterEmail}` : ''}`,
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 640px;">
-            <h2 style="color: #323956;">Assessment Completed</h2>
-            <p><strong>Assessment:</strong> ${purchase?.assessment_name || `JotForm ${formID}`}</p>
-            <p><strong>Patient:</strong> ${submitterEmail || purchase?.patient_email || 'unknown'}</p>
-            <p><strong>Submission ID:</strong> ${submissionID}</p>
-            <p><strong>Date:</strong> ${new Date().toISOString()}</p>
-            <h3 style="color: #323956; margin-top: 18px;">Questions &amp; Answers</h3>
-            <table style="width:100%;border-collapse:collapse;border:1px solid #eee;">${qaRows}</table>
+          <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+            <div style="padding: 24px 28px;">
+              <h2 style="color: #323956; margin-top: 0;">Assessment Completed</h2>
+              <p><strong>Assessment:</strong> ${purchase?.assessment_name || `JotForm ${formID}`}</p>
+              <p><strong>Patient:</strong> ${submitterEmail || purchase?.patient_email || 'unknown'}</p>
+              <p><strong>Submission ID:</strong> ${submissionID}</p>
+              <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+              <h3 style="color: #323956; margin-top: 18px;">Questions &amp; Answers</h3>
+              <table style="width:100%;border-collapse:collapse;border:1px solid #eee;">${qaRows}</table>
+            </div>
+            ${CONTACT_STRIP_HTML}
           </div>
         `
       }).catch(err => console.error('JotForm completion email failed:', err.message));
@@ -4132,13 +4155,16 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
               to: process.env.EMAIL_TO || process.env.EMAIL_USER,
               subject: `New Assessment Purchase: ${assessmentName}`,
               html: `
-                <div style="font-family: Arial, sans-serif; max-width: 500px;">
-                  <h2 style="color: #323956;">New Assessment Purchase</h2>
-                  <p><strong>Customer:</strong> ${customerName || 'N/A'} (${session.customer_email})</p>
-                  <p><strong>Assessment:</strong> ${assessmentName}</p>
-                  <p><strong>Amount:</strong> ${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</p>
-                  <p><strong>Session ID:</strong> ${session.id}</p>
-                  <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+                  <div style="padding: 24px 28px;">
+                    <h2 style="color: #323956; margin-top: 0;">New Assessment Purchase</h2>
+                    <p><strong>Customer:</strong> ${customerName || 'N/A'} (${session.customer_email})</p>
+                    <p><strong>Assessment:</strong> ${assessmentName}</p>
+                    <p><strong>Amount:</strong> ${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</p>
+                    <p><strong>Session ID:</strong> ${session.id}</p>
+                    <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+                  </div>
+                  ${CONTACT_STRIP_HTML}
                 </div>
               `
             };
@@ -4385,14 +4411,17 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
               to: process.env.EMAIL_TO || process.env.EMAIL_USER,
               subject: `New ${itemType} Purchase: ${itemName}`,
               html: `
-                <div style="font-family: Arial, sans-serif; max-width: 500px;">
-                  <h2 style="color: #323956;">New ${itemType} Purchase</h2>
-                  <p><strong>Customer:</strong> ${session.customer_email}</p>
-                  <p><strong>Item:</strong> ${itemName}</p>
-                  <p><strong>Bundle:</strong> ${session.metadata.is_bundle === 'true' ? 'Yes' : 'No'}</p>
-                  <p><strong>Amount:</strong> ${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</p>
-                  <p><strong>Session ID:</strong> ${session.id}</p>
-                  <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+                  <div style="padding: 24px 28px;">
+                    <h2 style="color: #323956; margin-top: 0;">New ${itemType} Purchase</h2>
+                    <p><strong>Customer:</strong> ${session.customer_email}</p>
+                    <p><strong>Item:</strong> ${itemName}</p>
+                    <p><strong>Bundle:</strong> ${session.metadata.is_bundle === 'true' ? 'Yes' : 'No'}</p>
+                    <p><strong>Amount:</strong> ${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</p>
+                    <p><strong>Session ID:</strong> ${session.id}</p>
+                    <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+                  </div>
+                  ${CONTACT_STRIP_HTML}
                 </div>
               `
             };
@@ -4566,14 +4595,17 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             to: process.env.EMAIL_TO || process.env.EMAIL_USER,
             subject: `New Coaching Session Purchase: ${coachName}`,
             html: `
-              <div style="font-family: Arial, sans-serif; max-width: 500px;">
-                <h2 style="color: #323956;">New Coaching Session Purchase</h2>
-                <p><strong>Patient:</strong> ${patientName} (${patientEmail})</p>
-                <p><strong>Coach:</strong> ${coachName}</p>
-                <p><strong>Amount:</strong> ${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</p>
-                <p><strong>Calendly:</strong> ${calendlyUrl || 'N/A'}</p>
-                <p><strong>Session ID:</strong> ${session.id}</p>
-                <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+                <div style="padding: 24px 28px;">
+                  <h2 style="color: #323956; margin-top: 0;">New Coaching Session Purchase</h2>
+                  <p><strong>Patient:</strong> ${patientName} (${patientEmail})</p>
+                  <p><strong>Coach:</strong> ${coachName}</p>
+                  <p><strong>Amount:</strong> ${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</p>
+                  <p><strong>Calendly:</strong> ${calendlyUrl || 'N/A'}</p>
+                  <p><strong>Session ID:</strong> ${session.id}</p>
+                  <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+                </div>
+                ${CONTACT_STRIP_HTML}
               </div>
             `
           };
@@ -4636,12 +4668,15 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         to: process.env.EMAIL_TO || process.env.EMAIL_USER,
         subject: `Subscription Renewal Received - ${customerEmail}`,
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 500px;">
-            <h2 style="color: #323956;">Subscription Renewal</h2>
-            <p><strong>Customer:</strong> ${customerEmail}</p>
-            <p><strong>Amount:</strong> ${currency} ${amountPaid}</p>
-            <p><strong>Invoice ID:</strong> ${invoice.id}</p>
-            <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+            <div style="padding: 24px 28px;">
+              <h2 style="color: #323956; margin-top: 0;">Subscription Renewal</h2>
+              <p><strong>Customer:</strong> ${customerEmail}</p>
+              <p><strong>Amount:</strong> ${currency} ${amountPaid}</p>
+              <p><strong>Invoice ID:</strong> ${invoice.id}</p>
+              <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+            </div>
+            ${CONTACT_STRIP_HTML}
           </div>
         `
       }).catch(err => console.error('Admin renewal email failed:', err.message));
@@ -6451,12 +6486,12 @@ app.post('/api/send-password-email', async (req, res) => {
       subject: 'Your Password Has Been Changed - Limitless Brain Lab',
       attachments: getLogoAttachment(),
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 24px; text-align: center;">
             <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover;" />
             <h1 style="color: #ffffff; margin: 10px 0 0; font-size: 20px;">Password Changed Successfully</h1>
           </div>
-          <div style="padding: 24px; background: #ffffff; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+          <div style="padding: 24px; background: #ffffff;">
             <p style="color: #333;">Hi ${name || 'User'},</p>
             <p style="color: #555;">Your password has been successfully changed. Here are your updated login credentials:</p>
             <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0;">
@@ -6468,6 +6503,7 @@ app.post('/api/send-password-email', async (req, res) => {
               <a href="${APP_URL}/login" style="display: inline-block; background: #323956; color: #fff; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-weight: 600;">Login Now</a>
             </div>
           </div>
+          ${CONTACT_STRIP_HTML}
         </div>
       `
     };
@@ -7646,13 +7682,16 @@ app.post('/api/send-no-credit-email', async (req, res) => {
             subject: `Report blocked — no credits: ${displayName}`,
             attachments: getLogoAttachment(),
             html: `
-              <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto;">
-                <p style="color:#333;font-size:15px;">A report generation was <strong>blocked</strong> because the ${accountType.toLowerCase()} has 0 report credits.</p>
-                <div style="background:#f8f9fc;border-radius:10px;padding:16px 20px;margin:16px 0;">
-                  <p style="margin:0;color:#323956;font-size:14px;"><strong>${accountType}:</strong> ${displayName}</p>
-                  <p style="margin:6px 0 0;color:#323956;font-size:14px;"><strong>Email:</strong> ${clinicEmail}</p>
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+                <div style="padding: 24px 28px;">
+                  <p style="color:#333;font-size:15px;margin-top:0;">A report generation was <strong>blocked</strong> because the ${accountType.toLowerCase()} has 0 report credits.</p>
+                  <div style="background:#f8f9fc;border-radius:10px;padding:16px 20px;margin:16px 0;">
+                    <p style="margin:0;color:#323956;font-size:14px;"><strong>${accountType}:</strong> ${displayName}</p>
+                    <p style="margin:6px 0 0;color:#323956;font-size:14px;"><strong>Email:</strong> ${clinicEmail}</p>
+                  </div>
+                  <p style="color:#666;font-size:13px;">The ${accountType.toLowerCase()} has been notified to purchase more credits.</p>
                 </div>
-                <p style="color:#666;font-size:13px;">The ${accountType.toLowerCase()} has been notified to purchase more credits.</p>
+                ${CONTACT_STRIP_HTML}
               </div>`,
           });
           console.log(`✉️ No-credit admin copy sent to ${adminInbox}`);

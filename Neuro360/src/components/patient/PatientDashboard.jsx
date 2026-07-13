@@ -1451,7 +1451,7 @@ const PatientDashboard = () => {
 
         // Also refresh the profile text fields so edits made in the avatar
         // "Profile" modal appear without a full page reload.
-        const profileDetails = patientRecord.medical_history?.profile_details || {};
+        const profileDetails = patientRecord.medicalHistory?.profile_details || patientRecord.medical_history?.profile_details || {};
         setPatientData(prev => ({
           ...prev,
           profile: {
@@ -1562,7 +1562,7 @@ const PatientDashboard = () => {
           ]);
 
           // Get extra profile fields from medical_history.profile_details (if stored there)
-          const profileDetails = patientRecord.medical_history?.profile_details || {};
+          const profileDetails = patientRecord.medicalHistory?.profile_details || patientRecord.medical_history?.profile_details || {};
 
           // Update patient data state with real data from database
           // Keep raw values in state ('' when empty) — the view JSX renders its
@@ -1656,7 +1656,7 @@ const PatientDashboard = () => {
                 }
 
                 // Get extra profile fields from medical_history.profile_details
-                const profileDetails = patientByEmail.medical_history?.profile_details || {};
+                const profileDetails = patientByEmail.medicalHistory?.profile_details || patientByEmail.medical_history?.profile_details || {};
 
                 setPatientData(prevData => ({
                   ...prevData,

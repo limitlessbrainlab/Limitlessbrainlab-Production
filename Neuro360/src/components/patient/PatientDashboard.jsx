@@ -10861,7 +10861,10 @@ const PatientDashboard = () => {
           name: patientData?.profile?.name,
           email: patientData?.profile?.email,
           phone: patientData?.profile?.phone,
-          dateOfBirth: patientData?.profile?.dateOfBirth
+          dateOfBirth: patientData?.profile?.dateOfBirth,
+          gender: patientData?.profile?.gender,
+          handedness: patientData?.profile?.handedness,
+          occupation: patientData?.profile?.occupation
         }}
         existingReport={clinicalReport}
         onClose={() => {

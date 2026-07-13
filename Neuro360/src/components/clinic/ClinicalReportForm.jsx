@@ -16,9 +16,11 @@ const ClinicalReportForm = ({ patient, onClose, onSave }) => {
     // Patient Information
     fullName: patient.full_name || patient.fullName || patient.name || '',
     dateOfBirth: patient.dateOfBirth || patient.date_of_birth || '',
-    gender: patient.gender || '',
-    handedness: '',
-    occupation: '',
+    // FormSelect option values are lowercase — normalize so clinic-entered
+    // values ('male'/'Male', 'right'/'Right') prefill instead of showing "Select..."
+    gender: (patient.gender || '').toLowerCase(),
+    handedness: (patient.handedness || '').toLowerCase(),
+    occupation: patient.occupation || '',
     // Try all possible field names for patient UID
     patientId: patient.external_id || patient.externalId || patient.external_Id || patient.patient_id || (patient.id?.length > 36 ? patient.id?.slice(0, 8) : patient.id) || '',
     dateOfTest: new Date().toISOString().split('T')[0],
@@ -163,8 +165,8 @@ const ClinicalReportForm = ({ patient, onClose, onSave }) => {
             // Patient Information
             fullName: report.full_name || initialData.fullName,
             dateOfBirth: report.date_of_birth || initialData.dateOfBirth,
-            gender: report.gender || initialData.gender,
-            handedness: report.handedness || initialData.handedness,
+            gender: (report.gender || initialData.gender || '').toLowerCase(),
+            handedness: (report.handedness || initialData.handedness || '').toLowerCase(),
             occupation: report.occupation || initialData.occupation,
             patientId: report.patient_uid || initialData.patientId,
             dateOfTest: report.date_of_test || initialData.dateOfTest,

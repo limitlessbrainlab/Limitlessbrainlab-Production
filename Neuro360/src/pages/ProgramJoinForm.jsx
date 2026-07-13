@@ -110,7 +110,7 @@ const ProgramJoinForm = () => {
       subtext: "Enter if you have it, or skip",
       icon: Activity,
       type: 'text',
-      placeholder: 'e.g., 75/100',
+      placeholder: 'e.g., 75',
       required: false,
       field: 'brainFitnessScore'
     },
@@ -220,7 +220,11 @@ const ProgramJoinForm = () => {
           message: formData.message ? formData.message.toUpperCase() : formData.message,
           profession: formData.profession,
           industry: formData.industry,
-          brain_fitness_score: formData.brainFitnessScore || null,
+          // brain_fitness_score is an INTEGER column — extract the leading number
+          // ("75/100" -> 75) so a free-text entry never rejects the whole insert.
+          brain_fitness_score: (String(formData.brainFitnessScore).match(/\d+/)
+            ? parseInt(String(formData.brainFitnessScore).match(/\d+/)[0], 10)
+            : null),
           has_done_brain_scan: formData.hasDoneBrainScan,
           program_type: '100X Brain Optimization',
           created_at: new Date().toISOString()
@@ -228,6 +232,13 @@ const ProgramJoinForm = () => {
 
       if (error) {
         console.error('Database error:', error);
+      }
+
+      // Only report success if the row actually persisted — a swallowed insert
+      // error here is how earlier submissions were silently lost.
+      if (error) {
+        toast.error('We could not save your application — please try again.');
+        return;
       }
 
       toast.success('Your application has been submitted successfully!');

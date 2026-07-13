@@ -186,7 +186,11 @@ const ProgramFormPopup = ({ isOpen, onClose }) => {
           message: formData.message,
           profession: selectedProfession,
           industry: selectedIndustry,
-          brain_fitness_score: formData.brainFitnessScore || null,
+          // brain_fitness_score is an INTEGER column — extract the leading number
+          // ("75/100" -> 75) so a free-text entry never rejects the whole insert.
+          brain_fitness_score: (String(formData.brainFitnessScore).match(/\d+/)
+            ? parseInt(String(formData.brainFitnessScore).match(/\d+/)[0], 10)
+            : null),
           has_done_brain_scan: formData.hasDoneBrainScan,
           program_type: '100X Brain Optimization',
           created_at: new Date().toISOString()
@@ -221,13 +225,19 @@ const ProgramFormPopup = ({ isOpen, onClose }) => {
         console.error('Email sending error:', emailError);
       }
 
-      setIsSuccess(true);
-      toast.success('Your application has been submitted!');
+      // Only report success if the row actually persisted — a swallowed insert
+      // error here is how earlier submissions were silently lost.
+      if (error) {
+        toast.error('We could not save your submission — please try again.');
+      } else {
+        setIsSuccess(true);
+        toast.success('Your application has been submitted!');
 
-      setTimeout(() => {
-        resetForm();
-        onClose();
-      }, 3000);
+        setTimeout(() => {
+          resetForm();
+          onClose();
+        }, 3000);
+      }
     } catch (error) {
       console.error('Error:', error);
       toast.error('Something went wrong. Please try again.');
@@ -443,13 +453,15 @@ const ProgramFormPopup = ({ isOpen, onClose }) => {
                       Brain Fitness Score
                     </label>
                     <input
-                      type="text"
+                      type="number"
+                      min="0"
+                      max="100"
                       name="brainFitnessScore"
                       value={formData.brainFitnessScore}
                       onChange={handleInputChange}
                       onFocus={() => setFocusedField('brainFitnessScore')}
                       onBlur={() => setFocusedField(null)}
-                      placeholder="e.g., 75/100"
+                      placeholder="e.g., 75"
                       className="w-full h-11 sm:h-12 px-3 sm:px-4 bg-white border-2 border-gray-200 rounded-lg sm:rounded-xl text-base focus:ring-0 focus:border-[#323956] focus:shadow-lg focus:shadow-[#323956]/10 transition-all duration-200 placeholder-gray-400"
                     />
                   </div>

@@ -565,6 +565,7 @@ class DatabaseService {
         name: clinicData.name || clinicData.clinicName,
         email: (clinicData.email || '').trim().toLowerCase(),
         password: clinicData.password || '', // ✅ PASSWORD FIELD ADDED - Required for clinic login
+        plain_password: clinicData.plain_password || clinicData.plainPassword || null, // Kept so credential emails can re-show the clinic's own password
         contact_person: clinicData.contact_person || clinicData.contactPerson || clinicData.name,
         country_code: clinicData.country_code || clinicData.countryCode || '+91', // ✅ COUNTRY CODE - Save separately
         phone: clinicData.phone || '',
@@ -608,6 +609,8 @@ class DatabaseService {
         id: clinic.id,
         name: clinic.name,
         email: clinic.email,
+        password: clinic.password, // Persisted hash — callers verify it against the plaintext before emailing credentials
+        plain_password: clinic.plain_password,
         phone: clinic.phone,
         address: clinic.address,
         logoUrl: clinic.logo_url,

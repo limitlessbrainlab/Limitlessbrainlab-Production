@@ -32,7 +32,7 @@ import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import DatabaseService from '../../services/databaseService';
 import { supabase } from '../../lib/supabaseClient';
-import { hashPassword, isHashed } from '../../utils/passwordUtils';
+import { hashPassword, isHashed, comparePassword } from '../../utils/passwordUtils';
 import { getOriginUrl, resolveEnv, canonicalUrlForEnv } from '../../utils/environment';
 import AdminAssignmentModal from './AdminAssignmentModal';
 import LocationService from '../../services/locationService';
@@ -480,6 +480,18 @@ const ClinicManagement = ({ onUpdate }) => {
       };
 
       const createdClinic = await DatabaseService.add('clinics', clinicData);
+
+      // Read-back guard: verify the hash that actually persisted matches the plaintext
+      // we're about to email. A write-path regression here (e.g. a dropped/mangled
+      // password column) would otherwise email credentials that can never log in.
+      const persistedOk = await comparePassword(password, createdClinic?.password);
+      if (!persistedOk) {
+        setShowModal(false);
+        reset();
+        toast.error(`Clinic "${data.name}" was created, but the stored password FAILED verification — credentials email NOT sent. Set a new password via Edit Clinic before sharing credentials.`, { duration: 10000 });
+        loadClinics().catch(() => {});
+        return;
+      }
 
       // Close modal and reset form immediately after successful creation
       setShowModal(false);

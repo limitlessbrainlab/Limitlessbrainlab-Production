@@ -3,7 +3,7 @@ import { CheckCircle, XCircle, Bell, ArrowLeft, Clock, Mail } from 'lucide-react
 import toast from 'react-hot-toast';
 import DatabaseService from '../../services/databaseService';
 import NotificationService from '../../services/notificationService';
-import { hashPassword } from '../../utils/passwordUtils';
+import { hashPassword, comparePassword } from '../../utils/passwordUtils';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -134,7 +134,14 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
       }
 
       // Save updated clinic
-      await DatabaseService.update('clinics', clinic.id, updatedClinic);
+      const savedClinic = await DatabaseService.update('clinics', clinic.id, updatedClinic);
+
+      // Read-back guard: only email a password the persisted hash actually verifies
+      // against — never send credentials that can't log in.
+      const persistedOk = await comparePassword(emailPassword, savedClinic?.password);
+      if (!persistedOk) {
+        throw new Error(`Approval saved, but the stored password for "${clinic.name}" failed verification — credentials email NOT sent. Reset the clinic's password and retry.`);
+      }
 
       // Send approval email with credentials
       let emailSent = false;

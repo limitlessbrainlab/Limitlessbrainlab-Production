@@ -960,9 +960,7 @@ const ClinicManagement = ({ onUpdate }) => {
     }
 
     try {
-      const otpCode = generateOTP();
-      
-      // Update clinic with new password and OTP
+      // Update clinic with new password
       if (!selectedClinic?.id) {
         toast.error('No clinic selected for password reset');
         return;
@@ -975,23 +973,13 @@ const ClinicManagement = ({ onUpdate }) => {
         plain_password: password,
         passwordResetAt: new Date().toISOString(),
         // Bump so the clinic's open session is force-logged-out after a password reset
-        credentials_updated_at: new Date().toISOString(),
-        activationOTP: otpCode,
-        otpExpiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString() // 15 minutes
+        credentials_updated_at: new Date().toISOString()
       });
 
-      // Try to send email with credentials and OTP
+      // Try to send email with credentials (no activation OTP — not used)
       try {
-        console.log('Sending email with credentials:', {
-          clinic: selectedClinic?.name || 'Unknown Clinic',
-          email: selectedClinic?.email || 'Unknown Email',
-          username: selectedClinic?.email || 'Unknown Email',
-          password,
-          otp: otpCode
-        });
-        
-        await sendCredentialsEmail(selectedClinic, password, otpCode);
-        toast.success('SUCCESS: Password set successfully! Credentials and activation OTP sent to clinic email.', {
+        await sendCredentialsEmail(selectedClinic, password);
+        toast.success('SUCCESS: Password set successfully! Credentials sent to clinic email.', {
           duration: 5000
         });
       } catch (emailError) {
@@ -1008,8 +996,6 @@ Clinic: ${selectedClinic?.name || 'Unknown Clinic'}
 Email: ${selectedClinic?.email || 'Unknown Email'}
 Username: ${selectedClinic?.email || 'Unknown Email'}
 Password: ${newPassword}
-OTP: ${otpCode}
-Expires: 15 minutes
 
 Please manually share these credentials with the clinic.`;
         

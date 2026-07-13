@@ -49,13 +49,15 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
 
   const loadPendingItems = async () => {
     try {
-      // Load ONLY pending/inactive clinics — filtered server-side. This runs
-      // on a poll, and the old version drained the whole clinics table every
-      // tick just to filter a handful of rows in JS.
+      // Load ONLY self-registered clinics awaiting approval. Self-registration
+      // writes subscription_status='pending_approval' (authService). Admin
+      // "Add Clinic" writes subscription_status='pending' but is_active=true
+      // (already approved, just needs to pick a package) — those must NOT appear
+      // here, otherwise approving them fires a SECOND credential email.
       const { data: rows, error } = await supabase
         .from('clinics')
         .select('*')
-        .or('subscription_status.eq.pending_approval,subscription_status.eq.pending,is_active.eq.false')
+        .eq('subscription_status', 'pending_approval')
         .order('created_at', { ascending: false });
       if (error) throw error;
       // camelCase aliases to match what DatabaseService.get used to return
@@ -83,8 +85,6 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
       setLoading(true);
       setSelectedItem(clinic);
 
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
       // Prefer the password the clinic chose at registration (stored in plain_password),
       // so the approval email shows THEIR password and it keeps working at login.
       const existingPlain = String(clinic.plain_password || clinic.plainPassword || '').trim();
@@ -109,8 +109,14 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
 
       let emailPassword;
       if (existingPlain) {
-        // Keep the clinic's own password — do NOT reset the bcrypt hash (they log in with it).
+        // Email the clinic's own plaintext password, and RE-HASH it into the
+        // password column so the stored bcrypt hash is guaranteed to match the
+        // exact plaintext we email — clinics have no self-heal fallback, so any
+        // drift between hash and plaintext is a permanent "invalid password"
+        // lockout. This is the key login-works guarantee.
         emailPassword = existingPlain;
+        updatedClinic.password = await hashPassword(existingPlain);
+        updatedClinic.plain_password = existingPlain;
       } else {
         // Legacy fallback: no stored plaintext (clinic registered before this change) —
         // issue a fresh password and store both hash + plaintext.
@@ -141,8 +147,7 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
             clinicName: clinic.name || clinic.clinic_name,
             email: (clinic.email || '').trim().toLowerCase(),
             contactPerson: clinic.contact_person || clinic.name,
-            password: emailPassword,
-            otp: otp
+            password: emailPassword
           })
         });
         const emailResult = await emailResponse.json();

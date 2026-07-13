@@ -575,7 +575,7 @@ class DatabaseService {
         clinic_type: clinicData.clinic_type || clinicData.clinicType || 'lbl_partner',
         city: clinicData.city || '',
         reports_used: clinicData.reports_used || clinicData.reportsUsed || 0,
-        reports_allowed: clinicData.reports_allowed || parseInt(clinicData.reportsAllowed) || 10,
+        reports_allowed: Number(clinicData.reports_allowed ?? clinicData.reportsAllowed ?? 0) || 0,
         subscription_status: clinicData.subscription_status || clinicData.subscriptionStatus || 'trial',
         subscription_tier: clinicData.subscription_tier || 'free',
         trial_start_date: clinicData.trial_start_date || new Date().toISOString(),

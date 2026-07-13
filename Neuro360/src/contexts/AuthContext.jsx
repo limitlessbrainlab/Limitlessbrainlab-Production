@@ -6,6 +6,7 @@ import DatabaseService from '../services/databaseService';
 import supabase from '../lib/supabaseClient';
 import { getFriendlyErrorMessage } from '../utils/friendlyError';
 import { clearAllAndSignOut } from '../utils/sessionCleanup';
+import { reloadAllowed } from '../utils/guardedReload';
 
 /* global __APP_BUILD_ID__ */
 // Unique id of the deployed build (injected by vite define). Changes every deployment,
@@ -121,6 +122,9 @@ export const AuthProvider = ({ children }) => {
       stopped = true;
       try { await clearAllAndSignOut(); } catch (e) { /* ignore */ }
       localStorage.setItem('app_build_id', APP_BUILD_ID); // keep on-load gate consistent
+      // clearAllAndSignOut() wipes sessionStorage — restamp the deploy-reload
+      // guard so a version.json/bundle skew can't re-trigger within its window
+      try { sessionStorage.setItem('guarded_reload_deploy', String(Date.now())); } catch (e) { /* ignore */ }
       window.location.reload();
     };
 
@@ -177,10 +181,17 @@ export const AuthProvider = ({ children }) => {
         if (back != null && backendBaseline == null) backendBaseline = back;
         const frontChanged = front && frontendBaseline != null && front !== frontendBaseline; // Vercel redeployed
         const backChanged = back != null && backendBaseline != null && back !== backendBaseline; // Render redeployed
+        // A tab left open across a deploy runs a bundle OLDER than the live one; the
+        // baseline comparison above never catches it (the first check after login adopts
+        // the NEW version as baseline). Compare the live build id against the RUNNING
+        // bundle's id directly — same-build version.json always matches, so this only
+        // fires for a genuinely stale bundle. Rate-limited via reloadAllowed('deploy')
+        // so an edge-cache skew can't loop.
+        const frontStale = import.meta.env.PROD && front && APP_BUILD_ID && APP_BUILD_ID !== 'dev' && front !== APP_BUILD_ID;
         // Defer the wipe while returning from Stripe — otherwise the purchase page is
         // reloaded into a logged-out state. The payment query clears on mount, so the
         // next 60s/visibility check will still pick up the new build.
-        if ((frontChanged || backChanged) && !isPaymentReturn()) await wipeAndReload();
+        if (!isPaymentReturn() && (frontChanged || backChanged || (frontStale && reloadAllowed('deploy')))) await wipeAndReload();
       } catch (e) { /* offline/transient → ignore */ }
     };
 

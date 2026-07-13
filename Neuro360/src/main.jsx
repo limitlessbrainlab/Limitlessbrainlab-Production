@@ -6,6 +6,16 @@ import './index.css'
 // Import console error fixer for cleaner development experience
 import consoleErrorFixer from './utils/consoleErrorFixer.js'
 import './utils/globalErrorHandler.js'
+import { guardedReload } from './utils/guardedReload.js'
+
+// After a redeploy, a stale open tab lazy-loading an old hashed chunk gets a
+// 404 rewritten to index.html (text/html) → module MIME error. Vite reports
+// the failed dynamic import via this event; reload once to pick up the new
+// bundle. If the guard blocks (second failure within 60s), let the error
+// propagate so the ErrorBoundary shows its manual-refresh screen.
+window.addEventListener('vite:preloadError', (event) => {
+  if (guardedReload('chunk')) event.preventDefault()
+})
 
 // Temporarily disable console error suppression to debug registration issues
 // if (import.meta.env.DEV) {

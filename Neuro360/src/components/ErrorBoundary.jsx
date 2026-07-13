@@ -1,5 +1,10 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { guardedReload } from '../utils/guardedReload';
+
+// A redeploy removes old hashed chunks; a stale tab lazy-loading one gets a
+// 404/HTML response. Chrome / Firefox / Safari phrase the failure differently.
+const CHUNK_ERROR_RE = /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Loading chunk|module script|MIME type/i;
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -13,6 +18,13 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
+    // Stale-bundle chunk failure → reload once to pick up the new deployment.
+    // If the guard blocks (second failure within 60s), fall through to the
+    // manual "Refresh Page" fallback — that terminates any reload loop.
+    if (CHUNK_ERROR_RE.test(error?.message || '') && guardedReload('chunk')) {
+      return;
+    }
+
     // Log the error details in one place so production console captures the real crash.
     const details = {
       message: error?.message || String(error),

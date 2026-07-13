@@ -9,6 +9,7 @@ import { ProfessionalFormProvider } from './context/ProfessionalFormContext';
 import { ProgramFormProvider } from './context/ProgramFormContext';
 import { LocationsPopupProvider } from './context/LocationsPopupContext';
 import { testSupabaseConnection } from './utils/supabaseTest';
+import { guardedReload } from './utils/guardedReload';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import ScrollToTop from './components/ScrollToTop';
@@ -93,11 +94,12 @@ function App() {
       if (event.error && (
         event.error.message.includes('Loading chunk') ||
         event.error.message.includes('Failed to fetch') ||
-        event.error.message.includes('Cannot read properties') ||
         event.error.name === 'ChunkLoadError'
       )) {
         console.error('ALERT: Navigation/Chunk loading error detected');
-        setTimeout(() => { window.location.reload(); }, 100);
+        // Guarded: at most one auto-reload per minute — a deterministic render
+        // error must land on the ErrorBoundary screen, not loop the page.
+        guardedReload('chunk');
       }
     };
 

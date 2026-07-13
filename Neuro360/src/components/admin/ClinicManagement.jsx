@@ -32,7 +32,7 @@ import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import DatabaseService from '../../services/databaseService';
 import { supabase } from '../../lib/supabaseClient';
-import { hashPassword, isHashed, comparePassword } from '../../utils/passwordUtils';
+import { hashPassword, isHashed } from '../../utils/passwordUtils';
 import { getOriginUrl, resolveEnv, canonicalUrlForEnv } from '../../utils/environment';
 import AdminAssignmentModal from './AdminAssignmentModal';
 import LocationService from '../../services/locationService';
@@ -455,15 +455,15 @@ const ClinicManagement = ({ onUpdate }) => {
         countryCode: data.countryCode || '+91', // Save country code separately
         phone: data.phone, // Save phone number separately
         contactPerson: data.contactPerson || data.name,
-        subscription_status: 'pending', // Clinic must select package & pay before accessing dashboard
-        subscriptionStatus: 'pending', // Legacy field
+        subscription_status: 'pending_approval', // Must be approved by an admin before credentials are emailed / login works
+        subscriptionStatus: 'pending_approval', // Legacy field
         reports_allowed: 0, // No reports until package is purchased
         reportsAllowed: 0, // Legacy field
         reports_used: 0,
         reportsUsed: 0, // Legacy field
-        is_active: true, // Super admin created clinics are pre-approved
-        isActive: true, // Legacy field
-        isActivated: true, // Super admin created clinics are pre-approved
+        is_active: false, // Pending approval — same gate as self-registration
+        isActive: false, // Legacy field
+        isActivated: false, // Pending approval — credentials emailed only on approval
         trial_start_date: new Date().toISOString(),
         trial_end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days trial
         created_at: new Date().toISOString(),
@@ -479,41 +479,34 @@ const ClinicManagement = ({ onUpdate }) => {
         confirmPassword: undefined
       };
 
-      const createdClinic = await DatabaseService.add('clinics', clinicData);
-
-      // Read-back guard: verify the hash that actually persisted matches the plaintext
-      // we're about to email. A write-path regression here (e.g. a dropped/mangled
-      // password column) would otherwise email credentials that can never log in.
-      const persistedOk = await comparePassword(password, createdClinic?.password);
-      if (!persistedOk) {
-        setShowModal(false);
-        reset();
-        toast.error(`Clinic "${data.name}" was created, but the stored password FAILED verification — credentials email NOT sent. Set a new password via Edit Clinic before sharing credentials.`, { duration: 10000 });
-        loadClinics().catch(() => {});
-        return;
-      }
+      await DatabaseService.add('clinics', clinicData);
 
       // Close modal and reset form immediately after successful creation
       setShowModal(false);
       reset();
 
-      // Surface the exact credentials to the admin (ground truth, independent of how the
-      // clinic's email client renders the HTML) so they can verify/share them directly.
-      setCreatedCredentials({ clinicName: data.name, email: normalizedEmail, password });
-
-      // Send login credentials email to the verified email
+      // Admin-created clinics follow the same gate as self-registration: no credentials
+      // at create time. Send only a "Welcome to LBL" confirmation email now; the login
+      // credentials are emailed automatically when an admin approves the clinic in the
+      // Pending Approval queue (PendingClinicsNotification re-hashes plain_password and
+      // sends /api/clinic-credentials at that point).
       try {
-        await sendCredentialsEmail(
-          { name: data.name, email: normalizedEmail, contactPerson: data.contactPerson || data.name },
-          password,
-          null
-        );
-        toast.success(`Clinic "${data.name}" created successfully! Login credentials sent to ${normalizedEmail}.`, { duration: 5000 });
+        const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
+        await fetch(`${API_BASE_URL}/registration-confirmation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: data.contactPerson || data.name,
+            email: normalizedEmail,
+            clinicName: data.name,
+            type: 'clinic'
+          })
+        });
       } catch (emailError) {
-        console.warn('Credentials email failed:', emailError);
-        const reason = emailError?.message || 'Unknown error';
-        toast.error(`Clinic created, but the credentials email was NOT sent. Reason: ${reason}. Share credentials manually or fix the email service.`, { duration: 8000 });
+        // A failed welcome email must not fail creation — the clinic is still pending approval.
+        console.warn('Welcome email failed:', emailError);
       }
+      toast.success(`Clinic "${data.name}" created and is now pending approval. A welcome email was sent; login credentials will be emailed automatically once you approve it in Pending Approval.`, { duration: 7000 });
 
       // Reload clinics list (don't await to avoid blocking UI)
       loadClinics().catch(err => {

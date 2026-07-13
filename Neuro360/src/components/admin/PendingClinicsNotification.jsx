@@ -49,11 +49,11 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
 
   const loadPendingItems = async () => {
     try {
-      // Load ONLY self-registered clinics awaiting approval. Self-registration
-      // writes subscription_status='pending_approval' (authService). Admin
-      // "Add Clinic" writes subscription_status='pending' but is_active=true
-      // (already approved, just needs to pick a package) — those must NOT appear
-      // here, otherwise approving them fires a SECOND credential email.
+      // Load ONLY clinics awaiting approval. Both entry points write
+      // subscription_status='pending_approval' + is_active=false: clinic
+      // self-registration (authService) and admin "Add Clinic"
+      // (ClinicManagement). Neither emails credentials at create time — the
+      // credentials email is sent here on approval, so both go through this queue.
       const { data: rows, error } = await supabase
         .from('clinics')
         .select('*')

@@ -103,20 +103,14 @@ const htmlToPlainText = (html) =>
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-// Shared brand footer appended to EVERY outgoing email (signature, academy link, WhatsApp, socials).
+// Shared brand footer attached to EVERY outgoing email (signature, academy link, WhatsApp, socials).
 // The marker comment `lbl-email-footer` makes injection idempotent.
-function getEmailFooterHtml() {
+function getEmailFooterContentHtml() {
   const sig = fs.existsSync(SIGNATURE_PATH)
     ? `<img src="cid:${SIGNATURE_CID}" alt="Dr Sweta Adatia" width="190" style="display:block; width:190px; max-width:60%; height:auto; margin:8px 0 16px;" />`
     : '';
   return `
-  <!-- lbl-email-footer -->
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f7fa; padding:0 20px 40px;">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,0.06);">
-          <tr>
-            <td style="padding:28px 32px; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+              <!-- lbl-email-footer -->
               <p style="margin:0; color:#1a1f36; font-size:15px; font-weight:700; line-height:1.5;">Team<br/>Limitless Brain Lab</p>
               <p style="margin:14px 0 0; color:#555; font-size:14px; font-style:italic;">&ldquo;A healthy brain is the foundation of a limitless life.&rdquo;</p>
               ${sig}
@@ -130,7 +124,19 @@ function getEmailFooterHtml() {
                 <a href="https://www.linkedin.com/in/drswetaadatia/" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">LinkedIn</a> &nbsp;&#183;&nbsp;
                 <a href="https://www.youtube.com/@drsweta.adatia" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">YouTube (English)</a> &nbsp;&#183;&nbsp;
                 <a href="https://www.youtube.com/@drsweta.adatiahindi" target="_blank" style="color:#1e63b4; font-weight:600; text-decoration:none;">YouTube (Hindi)</a>
-              </p>
+              </p>`;
+}
+
+// Standalone footer card — used only as the last-resort fallback when the email
+// HTML has no recognizable card to attach the footer to.
+function getEmailFooterHtml() {
+  return `
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f7fa; padding:0 20px 40px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:16px; overflow:hidden;">
+          <tr>
+            <td style="padding:28px 32px; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${getEmailFooterContentHtml()}
             </td>
           </tr>
         </table>
@@ -139,15 +145,40 @@ function getEmailFooterHtml() {
   </table>`;
 }
 
+// Attach the brand footer INSIDE the email's main card so it reads as one
+// continuous template, not a separate floating block below it.
+function attachEmailFooter(html) {
+  const content = getEmailFooterContentHtml();
+  // Full-page table templates: page wrapper table -> width=600 card table.
+  // Splice the footer in as the card's final row, before the card's </table>.
+  const tableTail = /(<\/table>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/body>)/i;
+  if (tableTail.test(html)) {
+    const row = `\n          <tr>\n            <td style="padding:28px 32px; background:#ffffff; border-top:1px solid #e5e7eb; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${content}\n            </td>\n          </tr>\n        `;
+    return html.replace(tableTail, `${row}$1`);
+  }
+  // Div-card templates inside a <body>: the last </div> before </body> closes
+  // the card — insert the footer as a section inside it.
+  const divTail = /(<\/div>\s*<\/body>)/i;
+  if (divTail.test(html)) {
+    const section = `\n<div style="padding:28px 32px; background:#ffffff; border-top:1px solid #e5e7eb; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${content}\n</div>\n`;
+    return html.replace(divTail, `${section}$1`);
+  }
+  // Bare div-card templates (no <body>): move the card's bottom rounding onto
+  // the footer and sit flush underneath it so the two read as one card.
+  if (!/<\/body>/i.test(html)) {
+    const unrounded = html.replace(/border-radius:\s*0\s+0\s+12px\s+12px/gi, 'border-radius: 0');
+    return `${unrounded}\n<div style="max-width:600px; margin:0 auto; background:#ffffff; border:1px solid #e5e7eb; border-radius:0 0 12px 12px; padding:28px 32px; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${content}\n</div>`;
+  }
+  // Unrecognized structure with a <body>: standalone footer card before </body>.
+  return html.replace('</body>', `${getEmailFooterHtml()}\n</body>`);
+}
+
 // Enhance every outgoing email: append the brand footer (once), ensure the signature
 // attachment the footer references is present, and keep the existing plain-text + reply-to behaviour.
 function enhanceMailOptions(mailOptions) {
   const enhanced = { ...mailOptions };
   if (enhanced.html && !enhanced.html.includes('lbl-email-footer')) {
-    const footer = getEmailFooterHtml();
-    enhanced.html = enhanced.html.includes('</body>')
-      ? enhanced.html.replace('</body>', `${footer}\n</body>`)
-      : `${enhanced.html}${footer}`;
+    enhanced.html = attachEmailFooter(enhanced.html);
     if (fs.existsSync(SIGNATURE_PATH)) {
       const atts = Array.isArray(enhanced.attachments) ? [...enhanced.attachments] : [];
       if (!atts.some(a => a && a.cid === SIGNATURE_CID)) {
@@ -330,11 +361,12 @@ const buildClinicNotificationEmail = ({ to, subject, heading, subheading, greeti
             ${rows.length ? `<div style="background:#f8f9fc;border-radius:10px;padding:20px;margin:20px 0;">${rowsHtml}</div>` : ''}
             ${footerNote ? `<p style="color:#999;font-size:12px;line-height:1.6;margin:0;">${footerNote}</p>` : ''}
           </div>
+          <div style="padding:28px 32px;border-top:1px solid #e5e7eb;font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${getEmailFooterContentHtml()}
+          </div>
           <div style="background:#f8f9fc;padding:15px;text-align:center;border-top:1px solid #e5e7eb;">
             <p style="color:#888;margin:0;font-size:11px;">© ${new Date().getFullYear()} Limitless Brain Lab | Brain &amp; Mental Wellness</p>
           </div>
         </div>
-        ${getEmailFooterHtml()}
       </body>
       </html>`
   };

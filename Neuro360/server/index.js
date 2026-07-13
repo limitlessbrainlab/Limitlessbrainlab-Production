@@ -149,23 +149,37 @@ function getEmailFooterHtml() {
 // continuous template, not a separate floating block below it.
 function attachEmailFooter(html) {
   const content = getEmailFooterContentHtml();
+  // Most templates end their card with a thin grey contact strip
+  // ("Limitlessbrainlab.com | info@..."): background #f8f9fc/#f8fafc + border-top.
+  // The footer must go ABOVE that strip so the strip stays the card's bottom bar —
+  // footer-after-strip reads as two separate emails. The tempered middles
+  // ((?!<tr)/(?!<div)) keep the match to that single trailing element.
+
   // Full-page table templates: page wrapper table -> width=600 card table.
-  // Splice the footer in as the card's final row, before the card's </table>.
   const tableTail = /(<\/table>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/body>)/i;
   if (tableTail.test(html)) {
     const row = `\n          <tr>\n            <td style="padding:28px 32px; background:#ffffff; border-top:1px solid #e5e7eb; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${content}\n            </td>\n          </tr>\n        `;
+    const stripRowTail = /(<tr>\s*<td(?=[^>]*background:\s*#f8(?:f9fc|fafc))(?=[^>]*border-top)[^>]*>(?:(?!<\/?tr)[\s\S])*?<\/td>\s*<\/tr>)(\s*<\/table>\s*<\/td>\s*<\/tr>\s*<\/table>\s*<\/body>)/i;
+    if (stripRowTail.test(html)) return html.replace(stripRowTail, `${row}$1$2`);
     return html.replace(tableTail, `${row}$1`);
   }
-  // Div-card templates inside a <body>: the last </div> before </body> closes
-  // the card — insert the footer as a section inside it.
+  // Div-card templates inside a <body>: the last </div> before </body> closes the card.
   const divTail = /(<\/div>\s*<\/body>)/i;
   if (divTail.test(html)) {
     const section = `\n<div style="padding:28px 32px; background:#ffffff; border-top:1px solid #e5e7eb; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${content}\n</div>\n`;
+    const stripDivTail = /(<div(?=[^>]*background:\s*#f8(?:f9fc|fafc))(?=[^>]*border-top)[^>]*>(?:(?!<div)[\s\S])*?<\/div>)(\s*<\/div>\s*<\/body>)/i;
+    if (stripDivTail.test(html)) return html.replace(stripDivTail, `${section}$1$2`);
     return html.replace(divTail, `${section}$1`);
   }
-  // Bare div-card templates (no <body>): move the card's bottom rounding onto
-  // the footer and sit flush underneath it so the two read as one card.
+  // Bare div-card templates (no <body>): put the footer above a trailing strip
+  // when one exists, else move the card's bottom rounding onto the footer and
+  // sit flush underneath it so the two read as one card.
   if (!/<\/body>/i.test(html)) {
+    const stripDivEnd = /(<div(?=[^>]*background:\s*#f8(?:f9fc|fafc))(?=[^>]*border-top)[^>]*>(?:(?!<div)[\s\S])*?<\/div>)(\s*<\/div>\s*)$/i;
+    if (stripDivEnd.test(html)) {
+      const section = `\n<div style="padding:28px 32px; background:#ffffff; border-top:1px solid #e5e7eb; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${content}\n</div>\n`;
+      return html.replace(stripDivEnd, `${section}$1$2`);
+    }
     const unrounded = html.replace(/border-radius:\s*0\s+0\s+12px\s+12px/gi, 'border-radius: 0');
     return `${unrounded}\n<div style="max-width:600px; margin:0 auto; background:#ffffff; border:1px solid #e5e7eb; border-radius:0 0 12px 12px; padding:28px 32px; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">${content}\n</div>`;
   }
@@ -4912,7 +4926,7 @@ app.get('/api/test-gemini', async (req, res) => {
 // Clinic Credentials Email API endpoint
 app.post('/api/clinic-credentials', async (req, res) => {
   try {
-    const { clinicName, contactPerson, otp } = req.body;
+    const { clinicName, contactPerson } = req.body;
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '').trim();
     // Login link always points to production, regardless of the origin that sent the request.
@@ -5006,16 +5020,6 @@ app.post('/api/clinic-credentials', async (req, res) => {
                               </tr>
                             </table>
 
-                            ${otp ? `
-                            <table width="100%" style="background: rgba(255,255,255,0.15); border-radius: 8px;">
-                              <tr>
-                                <td style="padding: 12px 16px;">
-                                  <p style="color: rgba(255,255,255,0.7); margin: 0; font-size: 11px;">ACTIVATION OTP (Valid for 15 mins)</p>
-                                  <p style="color: #F5D05D; margin: 4px 0 0; font-size: 24px; font-weight: 700; letter-spacing: 4px;">${otp}</p>
-                                </td>
-                              </tr>
-                            </table>
-                            ` : ''}
                           </td>
                         </tr>
                       </table>

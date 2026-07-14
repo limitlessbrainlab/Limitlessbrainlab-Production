@@ -111,8 +111,17 @@ function makeReportId(patientId, dateStr) {
   return `NS-${seven}`;
 }
 
+// Dates printed on the NeuroSense report are DD/MM/YYYY. JS `new Date()` reads
+// slash dates as US MM/DD (12/07/2026 → 7 Dec 2026), so parse them explicitly.
+function parseDdMmYyyy(s) {
+  const m = String(s || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function formatDate(iso) {
-  const d = iso ? new Date(iso) : new Date();
+  const d = parseDdMmYyyy(iso) || (iso ? new Date(iso) : new Date());
   if (isNaN(d.getTime())) return new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
@@ -443,10 +452,19 @@ function buildReportDataFromSource(source, patient = {}, algorithmResults = null
     EC: { relative: { Pz: { Delta: num(bw.delta), Theta: num(bw.theta), Alpha: num(bw.alpha), Beta: num(bw.beta), HiBeta: num(bw.hiBeta) } } },
   };
 
-  // Prefer the date printed on the report; fall back to now.
+  // Assessment date: the ISO date sent with the request is authoritative (it
+  // is the date of the NeuroSense report being converted). Fall back to the
+  // date printed on the report — parsed as DD/MM/YYYY, never via bare
+  // new Date(), which reads slash dates as US MM/DD — then to now.
   let processedAt = new Date().toISOString();
+  const metaDate = patient.assessmentDate || patient.processedAt;
   const srcDate = source.patient && source.patient.assessmentDate;
-  if (srcDate && !isNaN(new Date(srcDate).getTime())) processedAt = new Date(srcDate).toISOString();
+  if (metaDate && !isNaN(new Date(metaDate).getTime())) {
+    processedAt = new Date(metaDate).toISOString();
+  } else {
+    const printed = parseDdMmYyyy(srcDate) || (srcDate && !isNaN(new Date(srcDate).getTime()) ? new Date(srcDate) : null);
+    if (printed) processedAt = printed.toISOString();
+  }
 
   const rd = buildReportData(qeegData, algoResults, {
     name: (source.patient && source.patient.name) || patient.name || 'Patient',

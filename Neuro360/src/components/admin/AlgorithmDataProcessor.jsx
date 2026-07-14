@@ -99,6 +99,10 @@ const AlgorithmDataProcessor = () => {
   // Reports swap the NeuroSense logo ONLY when this is set for the selected
   // patient's clinic; without a fresh upload every report keeps the default logo.
   const [sessionClinicLogo, setSessionClinicLogo] = useState(null); // { clinicId, logoUrl }
+  // Assessment date (ISO) of the report currently loaded in pdfUrl — sent with
+  // the Performance report so its Date of Assessment always matches the
+  // NeuroSense PDF it is built from (never the patient's stale lastProcessed).
+  const [reportAssessmentDate, setReportAssessmentDate] = useState(null);
 
   // Logo URL to send with a generation request — only when an Other Documents
   // upload happened this session for the SAME clinic as the given patient.
@@ -428,6 +432,7 @@ const AlgorithmDataProcessor = () => {
     setConsoleLog([]);
     setIsSaved(false);
     setPdfUrl(null);
+    setReportAssessmentDate(null);
     setIsSaving(false);
     setReportSent(false);
     setClaudeReportSent(false);
@@ -503,6 +508,7 @@ const AlgorithmDataProcessor = () => {
     setIsSaved(false);
     setIsSaving(false);
     setPdfUrl(null);
+    setReportAssessmentDate(null);
     setSavedResultId(null);
     setReportSent(false);
     // Reset NeuroSense Performance (Claude) report state
@@ -880,6 +886,8 @@ const AlgorithmDataProcessor = () => {
       // Auto-set PDF URL if returned from backend
       if (data.data.pdfUrl) {
         setPdfUrl(data.data.pdfUrl);
+        // Fresh processing: the NeuroSense PDF is dated now.
+        setReportAssessmentDate(new Date().toISOString());
         setConsoleLog(prev => [...prev, '📄 PDF report generated automatically']);
       }
 
@@ -1171,6 +1179,8 @@ const AlgorithmDataProcessor = () => {
         // Original creation timestamp so regenerated PDFs keep the original "Report generated on" date
         reportGeneratedAt: record.createdAt || record.created_at || record.processedAt || record.inputData?.processedAt || null,
       };
+      // Keep the Performance report's assessment date in step with this record.
+      setReportAssessmentDate(patientData.reportGeneratedAt);
 
       // Prepare algorithm results
       const algorithmResults = {
@@ -1397,7 +1407,7 @@ const AlgorithmDataProcessor = () => {
       // Forward patient identity + the report's upload/creation date so the
       // Performance report shows the SAME Date of Assessment as the NeuroSense
       // report and can render the "Report generated on … by <patientId>" line.
-      const uploadDateIso = selectedPatient?.lastProcessed || new Date().toISOString();
+      const uploadDateIso = reportAssessmentDate || selectedPatient?.lastProcessed || new Date().toISOString();
       formData.append('patientId', selectedPatient?.id || '');
       formData.append('patientName', getPatientName(selectedPatient) || '');
       formData.append('clinicName', selectedPatient?.clinicName || '');
@@ -3594,6 +3604,8 @@ const AlgorithmDataProcessor = () => {
                           if (record.pdfUrl) {
                             setPdfUrl(record.pdfUrl);
                           }
+                          // This record's date drives the Performance report's assessment date.
+                          setReportAssessmentDate(record.inputData?.processedAt || record.processedAt || record.createdAt || record.created_at || null);
                           // Set QEEG input PDF URLs if available
                           if (record.inputData?.eyesOpenUrl) {
                             setEyesOpenUrl(record.inputData.eyesOpenUrl);

@@ -3247,25 +3247,10 @@ async function resolveJotformFormId(link) {
   }
 }
 
-// Best-effort score pickup for the admin Assessment Results view: the first
-// answered field whose question/key mentions score/result/total/points —
-// JotForm calculation widgets ("Your Score") land here. Returns null when the
-// form simply has no such field.
-function extractAssessmentScore(answers) {
-  if (!answers || typeof answers !== 'object') return null;
-  const isScoreKey = (s) => /score|result|total|points/i.test(String(s || ''));
-  for (const [key, val] of Object.entries(answers)) {
-    // JotForm-API map ({ "Your Score": "42" }) and webhook rawRequest
-    // ({ q12_yourScore: "42" } or { text, answer } objects) both pass here.
-    const nested = (val && typeof val === 'object') ? val : null;
-    const label = nested?.text ? String(nested.text) : key;
-    if (!isScoreKey(label)) continue;
-    const raw = nested ? (nested.answer ?? Object.values(nested).filter(v => typeof v !== 'object').join(' ')) : val;
-    const value = String(raw ?? '').trim();
-    if (value) return value;
-  }
-  return null;
-}
+// Submission matching/recording + score extraction live in the shared
+// recorder so the webhook, the notification-email ingest and the backfill
+// scripts all behave identically.
+const { recordAssessmentSubmission, extractAssessmentScore } = require('./services/assessmentRecorder');
 
 app.post('/api/assessment-link/consume', async (req, res) => {
   try {
@@ -3450,54 +3435,13 @@ app.post('/api/jotform-webhook', require('multer')().none(), async (req, res) =>
     try { answers = JSON.parse(req.body?.rawRequest || 'null'); } catch (_) {}
 
     if (!formID || !submissionID) return;
-    if (!(await claimNotificationOnce(`jotform:${submissionID}`))) return;
 
-    // Submitter email: any value in the answers (or pretty string) that looks like one
-    const answerText = JSON.stringify(answers || {}) + ' ' + pretty;
-    const submitterEmail = (answerText.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/) || [null])[0];
-
-    // Match the purchase. Email is the primary key: a submission must never
-    // complete another patient's purchase, so without an email match we only
-    // accept a form-id match when it is unambiguous (exactly one open row).
-    const { data: candidates } = await supabase.from('assessment_purchases')
-      .select('id, patient_email, assessment_name, assessment_completed_at')
-      .ilike('assessment_link', `%${formID}%`)
-      .order('created_at', { ascending: false })
-      .limit(25);
-    let purchase = null;
-    if (submitterEmail) {
-      const em = submitterEmail.toLowerCase();
-      const mine = (candidates || []).filter(c => c.patient_email === em);
-      purchase = mine.find(c => !c.assessment_completed_at) || mine[0] || null;
-      if (!purchase) {
-        // Stored links may use a named JotForm alias while webhooks send the
-        // numeric form id — match the submitter's newest open purchase instead.
-        const { data: byEmail } = await supabase.from('assessment_purchases')
-          .select('id, patient_email, assessment_name, assessment_completed_at')
-          .eq('patient_email', em)
-          .is('assessment_completed_at', null)
-          .order('created_at', { ascending: false })
-          .limit(1);
-        purchase = byEmail?.[0] || null;
-      }
-    } else {
-      const open = (candidates || []).filter(c => !c.assessment_completed_at);
-      if (open.length === 1) purchase = open[0];
-    }
-
-    if (purchase) {
-      const score = extractAssessmentScore(answers);
-      const { error } = await supabase.from('assessment_purchases')
-        .update({
-          assessment_completed_at: purchase.assessment_completed_at || new Date().toISOString(),
-          submission_data: { formID, submissionID, pretty, answers, ...(score ? { score } : {}), submitted_at: new Date().toISOString() }
-        })
-        .eq('id', purchase.id);
-      if (error) console.error(`jotform-webhook: submission_data update failed for purchase ${purchase.id}:`, error.message);
-      else console.log(`SUCCESS: JotForm submission ${submissionID} matched purchase ${purchase.id} (${purchase.patient_email})`);
-    } else {
-      console.warn(`JotForm submission ${submissionID} (form ${formID}, ${submitterEmail || 'no email'}) matched no purchase`);
-    }
+    // Shared recorder: email-first matching, dedupe (`jotform:{submissionID}`),
+    // completed_at + submission_data write — identical to the email-ingest path.
+    const rec = await recordAssessmentSubmission({ formID, submissionID, pretty, answers, source: 'jotform-webhook' });
+    if (rec.status === 'duplicate' || rec.status === 'skipped') return;
+    const purchase = rec.purchase || null;
+    const submitterEmail = rec.submitterEmail || null;
 
     // Q&A email to the admin inbox regardless of match
     if (mailerConfigured) {
@@ -8832,6 +8776,15 @@ app.listen(PORT, () => {
       }
     }, intervalMs).unref();
     logger.info(`Keep-alive enabled: pinging ${keepAliveUrl}/api/health every ${intervalMs / 60000} min`);
+  }
+
+  // Capture assessment answers from JotForm notification emails (no API key
+  // or webhook needed) — see services/jotformEmailIngest.js. No-op unless
+  // EMAIL_USER/EMAIL_PASS are set; never crashes the server.
+  try {
+    require('./services/jotformEmailIngest').startJotformEmailIngest();
+  } catch (e) {
+    console.error('jotformEmailIngest failed to start:', e.message);
   }
 });
 

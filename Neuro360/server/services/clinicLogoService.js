@@ -7,9 +7,12 @@
  * PDF's first page, auto-crop to the non-white content bounding box, store the
  * PNG in the `clinic-logos` bucket and save the public URL on clinics.logo_url.
  *
- * Report side: resolveClinicLogoPath(clinicId) downloads that PNG to a temp
- * file for PDFKit / data-URI embedding. Every failure returns null — reports
- * must never fail because of the logo.
+ * Report side: the logo is NEVER looked up from stored state. The generation
+ * request must carry the logoUrl returned by the upload in the SAME admin
+ * session; resolveLogoUrlToPath(logoUrl) downloads that PNG to a temp file for
+ * PDFKit / data-URI embedding. No upload → no logoUrl → reports keep the
+ * default NeuroSense logo. Every failure returns null — reports must never
+ * fail because of the logo.
  */
 
 const fs = require('fs');
@@ -121,36 +124,40 @@ async function setClinicLogoFromUpload(filePath, originalName, clinicId) {
 }
 
 /**
- * Download the clinic's stored logo to a temp file for report generation.
- * Returns an absolute file path, or null (no clinic, no logo, any error).
+ * Download a just-uploaded logo to a temp file for report generation. Only
+ * accepts URLs inside our own public clinic-logos bucket — the URL comes from
+ * the client request, so anything else is rejected.
+ * Returns an absolute file path, or null (no/foreign URL, any error).
  */
-async function resolveClinicLogoPath(clinicId) {
+async function resolveLogoUrlToPath(logoUrl) {
   try {
-    if (!supabase || !clinicId) return null;
-    const { data: rows } = await supabase.from('clinics')
-      .select('logo_url').eq('id', clinicId).limit(1);
-    const logoUrl = rows?.[0]?.logo_url;
-    if (!logoUrl) return null;
+    const url = String(logoUrl || '').trim();
+    if (!url || !supabaseUrl) return null;
+    const allowedPrefix = `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/public/${LOGO_BUCKET}/`;
+    if (!url.startsWith(allowedPrefix)) {
+      console.warn('clinicLogo: rejected logoUrl outside clinic-logos bucket');
+      return null;
+    }
 
-    const resp = await fetch(logoUrl);
+    const resp = await fetch(url);
     if (!resp.ok) {
-      console.warn(`clinicLogo: fetch ${resp.status} for clinic ${clinicId}`);
+      console.warn(`clinicLogo: fetch ${resp.status} for ${url}`);
       return null;
     }
     const buf = Buffer.from(await resp.arrayBuffer());
     if (!buf.length) return null;
-    const tmpPath = path.join(os.tmpdir(), `clinic-logo-${clinicId}-${Date.now()}.png`);
+    const tmpPath = path.join(os.tmpdir(), `clinic-logo-${Date.now()}.png`);
     fs.writeFileSync(tmpPath, buf);
     return tmpPath;
   } catch (e) {
-    console.warn(`clinicLogo: resolve failed for clinic ${clinicId}:`, e.message);
+    console.warn('clinicLogo: resolve failed:', e.message);
     return null;
   }
 }
 
-/** Same as resolveClinicLogoPath but returns a data URI for HTML reports. */
-async function resolveClinicLogoDataUri(clinicId) {
-  const p = await resolveClinicLogoPath(clinicId);
+/** Same as resolveLogoUrlToPath but returns a data URI for HTML reports. */
+async function resolveClinicLogoDataUri(logoUrl) {
+  const p = await resolveLogoUrlToPath(logoUrl);
   if (!p) return null;
   try {
     const b64 = fs.readFileSync(p).toString('base64');
@@ -161,4 +168,4 @@ async function resolveClinicLogoDataUri(clinicId) {
   }
 }
 
-module.exports = { setClinicLogoFromUpload, resolveClinicLogoPath, resolveClinicLogoDataUri };
+module.exports = { setClinicLogoFromUpload, resolveLogoUrlToPath, resolveClinicLogoDataUri };

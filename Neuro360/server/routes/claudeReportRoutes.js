@@ -158,17 +158,17 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
       reportData = buildReportDataFromSource(source, patientMeta, algorithmResults);
     }
 
-    // Clinic's uploaded logo (clinics.logo_url, set via the Other Documents
-    // upload) — replaces the NeuroSense brand mark in the rendered report.
-    // Non-fatal: the report must never fail because of the logo.
-    const clinicId = (req.body && req.body.clinicId) || '';
-    if (clinicId) {
+    // Clinic logo ONLY when this request carries the logoUrl from an Other
+    // Documents upload made in the same admin session — never resolved from
+    // stored state. Non-fatal: the report must never fail because of the logo.
+    const clinicLogoUrl = (req.body && req.body.clinicLogoUrl) || '';
+    if (clinicLogoUrl) {
       try {
         const { resolveClinicLogoDataUri } = require('../services/clinicLogoService');
-        const logoDataUri = await resolveClinicLogoDataUri(clinicId);
+        const logoDataUri = await resolveClinicLogoDataUri(clinicLogoUrl);
         if (logoDataUri) {
           reportData.patient.clinicLogoDataUri = logoDataUri;
-          console.log('[Claude Report] 🎨 Using clinic logo for clinic:', clinicId);
+          console.log('[Claude Report] 🎨 Using session-uploaded clinic logo');
         }
       } catch (logoErr) {
         console.warn('[Claude Report] Clinic logo resolution failed (using default):', logoErr.message);

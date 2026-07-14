@@ -95,6 +95,17 @@ const AlgorithmDataProcessor = () => {
   const [isUploadingDoc, setIsUploadingDoc] = useState(false); // Uploading state for other docs
   const [processedDocBlob, setProcessedDocBlob] = useState(null); // Processed document blob ready for download
   const [processedDocName, setProcessedDocName] = useState(''); // Processed document filename
+  // Clinic logo extracted from an Other Documents upload in THIS session.
+  // Reports swap the NeuroSense logo ONLY when this is set for the selected
+  // patient's clinic; without a fresh upload every report keeps the default logo.
+  const [sessionClinicLogo, setSessionClinicLogo] = useState(null); // { clinicId, logoUrl }
+
+  // Logo URL to send with a generation request — only when an Other Documents
+  // upload happened this session for the SAME clinic as the given patient.
+  const sessionLogoUrlFor = (patient) => {
+    const cid = patient?.clinicId || patient?.clinic_id || patient?.org_id;
+    return sessionClinicLogo && cid && sessionClinicLogo.clinicId === cid ? sessionClinicLogo.logoUrl : '';
+  };
 
   // Report mode: 'neurosense' (default, shared with patient & clinic) or 'claude'
   // (NeuroSense report kept private to Super Admin; Claude report generated & sent instead)
@@ -650,7 +661,9 @@ const AlgorithmDataProcessor = () => {
             { timeoutMs: 120000, retries: 1 }
           );
           if (logoResp.ok) {
-            toast.success('Clinic logo saved — new NeuroSense & Performance reports for this clinic will use it.');
+            const logoJson = await logoResp.json().catch(() => ({}));
+            if (logoJson.logoUrl) setSessionClinicLogo({ clinicId, logoUrl: logoJson.logoUrl });
+            toast.success('Clinic logo saved — reports generated in this session will use it.');
           } else {
             const err = await logoResp.json().catch(() => ({}));
             console.error('upload-clinic-logo failed:', logoResp.status, err.message || err.error);
@@ -709,6 +722,7 @@ const AlgorithmDataProcessor = () => {
       formData.append('patientName', getPatientName(selectedPatient));
       formData.append('clinicName', selectedPatient.clinicName);
       formData.append('clinicId', selectedPatient.clinicId || selectedPatient.clinic_id || selectedPatient.org_id || '');
+      formData.append('clinicLogoUrl', sessionLogoUrlFor(selectedPatient));
       // Add complete patient data for PDF
       formData.append('dateOfBirth', selectedPatient.dateOfBirth || selectedPatient.date_of_birth || 'Not specified');
       formData.append('age', selectedPatient.age || calculateAge(selectedPatient.dateOfBirth || selectedPatient.date_of_birth) || 'N/A');
@@ -1153,6 +1167,7 @@ const AlgorithmDataProcessor = () => {
         patientId: record.patientId,
         clinicName: record.inputData?.clinicName || selectedPatient?.clinicName || 'Unknown-Clinic',
         clinicId: selectedPatient?.clinicId || record.inputData?.clinicId || null,
+        clinicLogoUrl: sessionLogoUrlFor(selectedPatient) || null,
         // Original creation timestamp so regenerated PDFs keep the original "Report generated on" date
         reportGeneratedAt: record.createdAt || record.created_at || record.processedAt || record.inputData?.processedAt || null,
       };
@@ -1386,6 +1401,7 @@ const AlgorithmDataProcessor = () => {
       formData.append('patientId', selectedPatient?.id || '');
       formData.append('patientName', getPatientName(selectedPatient) || '');
       formData.append('clinicName', selectedPatient?.clinicName || '');
+      formData.append('clinicLogoUrl', sessionLogoUrlFor(selectedPatient));
       // Clinic id lets the backend swap in the clinic's uploaded logo.
       formData.append('clinicId', selectedPatient?.clinicId || selectedPatient?.clinic_id || selectedPatient?.org_id || '');
       formData.append('assessmentDate', uploadDateIso);

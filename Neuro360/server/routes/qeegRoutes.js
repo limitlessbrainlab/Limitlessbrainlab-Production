@@ -463,12 +463,15 @@ router.post('/process', upload.fields([
         }
       }
 
-      // Clinic's custom logo (uploaded via the Other Documents / clinic-logo
-      // tool) — when present it replaces the NeuroSense logo in the report.
+      // Clinic logo ONLY when this request carries the logoUrl from an Other
+      // Documents upload made in the same admin session. Never resolved from
+      // stored state — no upload means the default NeuroSense logo.
       let clinicLogoPath = null;
       try {
-        clinicLogoPath = await require('../services/clinicLogoService').resolveClinicLogoPath(reqClinicId);
-        if (clinicLogoPath) console.log('   🎨 Using clinic logo for report:', reqClinicId);
+        if (req.body.clinicLogoUrl) {
+          clinicLogoPath = await require('../services/clinicLogoService').resolveLogoUrlToPath(req.body.clinicLogoUrl);
+          if (clinicLogoPath) console.log('   🎨 Using session-uploaded clinic logo for report');
+        }
       } catch (logoErr) {
         console.warn('   ⚠️ Clinic logo resolution failed (using default):', logoErr.message);
       }
@@ -854,11 +857,13 @@ router.post('/generate-pdf', async (req, res) => {
     console.log('🏥 Clinic:', patientData.clinicName || 'Not specified');
     console.log('📊 Parameters:', algorithmResults.parameters?.length);
 
-    // Clinic's custom logo (replaces the NeuroSense logo when present)
-    if (!patientData.clinicLogoPath && patientData.clinicId) {
+    // Clinic logo ONLY when this request carries the logoUrl from an Other
+    // Documents upload made in the same admin session (never from stored state).
+    patientData.clinicLogoPath = null;
+    if (patientData.clinicLogoUrl) {
       try {
-        patientData.clinicLogoPath = await require('../services/clinicLogoService').resolveClinicLogoPath(patientData.clinicId);
-        if (patientData.clinicLogoPath) console.log('🎨 Using clinic logo for report:', patientData.clinicId);
+        patientData.clinicLogoPath = await require('../services/clinicLogoService').resolveLogoUrlToPath(patientData.clinicLogoUrl);
+        if (patientData.clinicLogoPath) console.log('🎨 Using session-uploaded clinic logo for report');
       } catch (logoErr) {
         console.warn('⚠️ Clinic logo resolution failed (using default):', logoErr.message);
       }

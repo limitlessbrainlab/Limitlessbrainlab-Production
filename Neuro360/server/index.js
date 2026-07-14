@@ -548,9 +548,15 @@ const getAssessmentReadyEmailHtml = ({ customerName, assessmentName, amountLabel
                           <!-- Success Message -->
                           <tr>
                             <td style="padding: 32px 32px 16px; text-align: center;">
-                              <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 20px;">
+                              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                                 <tr>
-                                  <td width="80" height="80" align="center" valign="middle" style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; text-align: center; vertical-align: middle; font-size: 40px; line-height: 1; color: #ffffff;">&#10003;</td>
+                                  <td align="center" style="text-align: center;">
+                                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 20px;">
+                                      <tr>
+                                        <td width="80" height="80" align="center" valign="middle" style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; text-align: center; vertical-align: middle; font-size: 40px; line-height: 1; color: #ffffff;">&#10003;</td>
+                                      </tr>
+                                    </table>
+                                  </td>
                                 </tr>
                               </table>
                               <h2 style="color: #323956; margin: 0 0 8px; font-size: 24px;">Payment Successful!</h2>
@@ -3691,9 +3697,15 @@ app.post('/api/send-assessment-email', async (req, res) => {
                   <!-- Success Message -->
                   <tr>
                     <td style="padding: 32px 32px 16px; text-align: center;">
-                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 20px;">
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                         <tr>
-                          <td width="80" height="80" align="center" valign="middle" style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; text-align: center; vertical-align: middle; font-size: 40px; line-height: 1; color: #ffffff;">&#10003;</td>
+                          <td align="center" style="text-align: center;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 20px;">
+                              <tr>
+                                <td width="80" height="80" align="center" valign="middle" style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; text-align: center; vertical-align: middle; font-size: 40px; line-height: 1; color: #ffffff;">&#10003;</td>
+                              </tr>
+                            </table>
+                          </td>
                         </tr>
                       </table>
                       <h2 style="color: #323956; margin: 0 0 8px; font-size: 24px;">Payment Successful!</h2>
@@ -4370,9 +4382,15 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                         <!-- Success Message -->
                         <tr>
                           <td style="padding: 32px 32px 16px; text-align: center;">
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 20px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                               <tr>
-                                <td width="80" height="80" align="center" valign="middle" style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; text-align: center; vertical-align: middle; font-size: 40px; line-height: 1; color: #ffffff;">&#10003;</td>
+                                <td align="center" style="text-align: center;">
+                                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 20px;">
+                                    <tr>
+                                      <td width="80" height="80" align="center" valign="middle" style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; text-align: center; vertical-align: middle; font-size: 40px; line-height: 1; color: #ffffff;">&#10003;</td>
+                                    </tr>
+                                  </table>
+                                </td>
                               </tr>
                             </table>
                             <h2 style="color: #323956; margin: 0 0 8px; font-size: 26px;">Payment Successful!</h2>
@@ -5322,9 +5340,15 @@ app.post('/api/registration-confirmation', async (req, res) => {
                     <!-- Success Icon & Message -->
                     <tr>
                       <td style="padding: 32px 32px 16px; text-align: center;">
-                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 20px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                           <tr>
-                            <td width="80" height="80" align="center" valign="middle" style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; text-align: center; vertical-align: middle; font-size: 40px; line-height: 1; color: #ffffff;">&#10003;</td>
+                            <td align="center" style="text-align: center;">
+                              <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 20px;">
+                                <tr>
+                                  <td width="80" height="80" align="center" valign="middle" style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; text-align: center; vertical-align: middle; font-size: 40px; line-height: 1; color: #ffffff;">&#10003;</td>
+                                </tr>
+                              </table>
+                            </td>
                           </tr>
                         </table>
                         <h2 style="color: #323956; margin: 0 0 8px; font-size: 26px;">Welcome, ${displayName}! </h2>

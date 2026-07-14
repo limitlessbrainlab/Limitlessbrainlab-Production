@@ -154,13 +154,12 @@ function generateCoverPage(doc, patientData, options) {
   const ampm = hrs >= 12 ? 'pm' : 'am';
   hrs = hrs % 12 || 12;
   const timestamp = `${dd}/${mm}/${yyyy}, ${hrs}:${mins} ${ampm}`;
-  const reportId = patientData.patientId || 'N/A';
 
   doc.fontSize(6.5)
      .fillColor('#FFFFFF')
      .fillOpacity(0.7)
      .font(FONTS.regular)
-     .text(`Report generated on: ${timestamp} by ${reportId}`, 22, PH - 30, { lineBreak: false });
+     .text(`Report generated on: ${timestamp} by Limitless Brain Lab`, 22, PH - 30, { lineBreak: false });
   doc.fillOpacity(1);
 
   doc.fontSize(7.5)

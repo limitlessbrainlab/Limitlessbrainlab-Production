@@ -1898,11 +1898,9 @@ class GeminiPdfGenerator {
     const rightMargin = 565;
     doc.rect(0, footerY, 595, 42).fill('#227aff');
 
-    const userId = this.patientData?.patientId || 'N/A';
-
     // Line 1: Report generated info (left) | Page number (right)
     doc.fontSize(7).font('Helvetica').fillColor('#FFFFFF')
-       .text(`Report generated on: ${this.generatedAt} by ${userId}`, 30, footerY + 7, { lineBreak: false });
+       .text(`Report generated on: ${this.generatedAt} by Limitless Brain Lab`, 30, footerY + 7, { lineBreak: false });
 
     if (pageNumber) {
       doc.fontSize(8).font('Helvetica-Bold').fillColor('#FFFFFF')
@@ -4431,13 +4429,11 @@ class GeminiPdfGenerator {
     // Blue footer bar
     doc.rect(0, footerY, 595, 42).fill('#121e36');
 
-    const userId = this.patientData?.patientId || 'N/A';
-
     // Line 1: Report generated info (left) | Page number (right)
     doc.fillColor('#FFFFFF')
        .font('Helvetica')
        .fontSize(7)
-       .text(`Report generated on: ${this.generatedAt} by ${userId}`, 30, footerY + 8, { lineBreak: false });
+       .text(`Report generated on: ${this.generatedAt} by Limitless Brain Lab`, 30, footerY + 8, { lineBreak: false });
 
     if (pageNumber) {
       doc.fillColor('#FFFFFF')

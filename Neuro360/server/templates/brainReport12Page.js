@@ -430,7 +430,7 @@ function renderReportHtml(reportData, narrative = {}) {
       <div class="info-card"><div class="k">BRAIN TYPE</div><div class="v">${esc(bt.name)}</div></div>
       <div class="info-card"><div class="k">REPORT ID</div><div class="v">${esc(p.reportId)}</div></div>
     </div>
-    <div class="cover-foot">${(p.generatedOn && p.patientId) ? `Report generated on: ${esc(p.generatedOn)} by ${esc(p.patientId)}<br>` : ''}${esc(p.clinicName)} • This AI-generated report is for informational and wellness purposes only and is not a medical diagnosis.<br>limitlessbrainlab.com</div>
+    <div class="cover-foot">${p.generatedOn ? `Report generated on: ${esc(p.generatedOn)} by Limitless Brain Lab<br>` : ''}${esc(p.clinicName)} • This AI-generated report is for informational and wellness purposes only and is not a medical diagnosis.<br>limitlessbrainlab.com</div>
   </section>
 
   <!-- PAGE 2 — WELCOME / CONTENTS -->

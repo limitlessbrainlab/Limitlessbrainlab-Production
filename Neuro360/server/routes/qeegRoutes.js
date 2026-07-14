@@ -463,6 +463,16 @@ router.post('/process', upload.fields([
         }
       }
 
+      // Clinic's custom logo (uploaded via the Other Documents / clinic-logo
+      // tool) — when present it replaces the NeuroSense logo in the report.
+      let clinicLogoPath = null;
+      try {
+        clinicLogoPath = await require('../services/clinicLogoService').resolveClinicLogoPath(reqClinicId);
+        if (clinicLogoPath) console.log('   🎨 Using clinic logo for report:', reqClinicId);
+      } catch (logoErr) {
+        console.warn('   ⚠️ Clinic logo resolution failed (using default):', logoErr.message);
+      }
+
       const pdfPatientData = {
         name: patientName,
         dateOfBirth: dateOfBirth || 'N/A',
@@ -472,7 +482,8 @@ router.post('/process', upload.fields([
         occupation: patientOccupation,
         profession: patientOccupation,
         patientId: patientId,
-        clinic: clinicName
+        clinic: clinicName,
+        clinicLogoPath
       };
 
       // Prepare algorithm results for PDF
@@ -842,6 +853,16 @@ router.post('/generate-pdf', async (req, res) => {
     console.log('👤 Patient:', patientData.name);
     console.log('🏥 Clinic:', patientData.clinicName || 'Not specified');
     console.log('📊 Parameters:', algorithmResults.parameters?.length);
+
+    // Clinic's custom logo (replaces the NeuroSense logo when present)
+    if (!patientData.clinicLogoPath && patientData.clinicId) {
+      try {
+        patientData.clinicLogoPath = await require('../services/clinicLogoService').resolveClinicLogoPath(patientData.clinicId);
+        if (patientData.clinicLogoPath) console.log('🎨 Using clinic logo for report:', patientData.clinicId);
+      } catch (logoErr) {
+        console.warn('⚠️ Clinic logo resolution failed (using default):', logoErr.message);
+      }
+    }
     console.log('📝 Notes received from frontend:', parameterNotes ? `"${parameterNotes.substring(0, 50)}..."` : '(EMPTY - no notes provided)');
     console.log('📝 Notes type:', typeof parameterNotes);
     console.log('📝 Notes length:', parameterNotes ? parameterNotes.length : 0);
@@ -1423,6 +1444,43 @@ router.get('/patient-qeeg-files/:patientId', async (req, res) => {
       message: 'Failed to fetch QEEG files',
       details: error.message
     });
+  }
+});
+
+/**
+ * POST /api/qeeg/upload-clinic-logo
+ * Admin uploads a clinic's logo (PDF page containing the logo, or PNG/JPG).
+ * The logo is extracted (PDF page 1 rendered + auto-cropped), stored in the
+ * clinic-logos bucket and saved on clinics.logo_url — newly generated
+ * NeuroSense + Performance reports for that clinic then use it in place of
+ * the NeuroSense logo.
+ */
+const logoUpload = multer({
+  storage: storage,
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: function (req, file, cb) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (['.pdf', '.png', '.jpg', '.jpeg'].includes(ext)) cb(null, true);
+    else cb(new Error('Only .pdf, .png, .jpg files are allowed for the clinic logo'));
+  }
+});
+
+router.post('/upload-clinic-logo', logoUpload.single('document'), async (req, res) => {
+  const file = req.file;
+  try {
+    const clinicId = String(req.body?.clinicId || '').trim();
+    if (!file) return res.status(400).json({ error: true, message: 'No file uploaded' });
+    if (!clinicId) return res.status(400).json({ error: true, message: 'clinicId is required — select a patient/clinic first' });
+
+    console.log(`🎨 Clinic logo upload for ${clinicId}: ${file.originalname} (${(file.size / 1024).toFixed(1)} KB)`);
+    const clinicLogoService = require('../services/clinicLogoService');
+    const { logoUrl } = await clinicLogoService.setClinicLogoFromUpload(file.path, file.originalname, clinicId);
+    res.json({ success: true, logoUrl });
+  } catch (error) {
+    console.error('❌ Clinic logo upload failed:', error.message);
+    res.status(500).json({ error: true, message: error.message || 'Logo upload failed' });
+  } finally {
+    try { if (file && fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch { /* ignore */ }
   }
 });
 

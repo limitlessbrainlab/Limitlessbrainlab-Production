@@ -91,6 +91,19 @@ function logoMark(box) {
   return `<span class="lmark" style="width:${box}px;height:${box}px;">${BRAIN_SVG.replace(/\{S\}/g, icon)}</span>`;
 }
 
+// Clinic's uploaded logo (data URI) — set per render by renderReportHtml.
+// When present it replaces the whole NeuroSense brand lockup (badge + text).
+let CLINIC_LOGO = null;
+
+function brandLockup(box, textHtml) {
+  if (CLINIC_LOGO) {
+    const h = Math.round(box * 1.4);
+    // White chip behind the logo keeps it visible on the dark cover page.
+    return `<img src="${CLINIC_LOGO}" alt="Clinic logo" style="height:${h}px;max-width:${box * 6}px;object-fit:contain;background:#fff;border-radius:8px;padding:3px 6px;"/>`;
+  }
+  return `${logoMark(box)}${textHtml}`;
+}
+
 function badge(text, kind) {
   return `<span class="badge" style="background:${KIND_BG[kind]};color:${KIND_FG[kind]}">${esc(String(text).toUpperCase())}</span>`;
 }
@@ -139,7 +152,7 @@ function calloutBox(title, body, tone) {
 
 function pageHeader(num, section) {
   return `<div class="phead">
-    <div class="brand">${logoMark(30)}<div class="brand-txt"><div class="brand-name">NeuroSense Brain Health</div><div class="brand-sub">SMART EEG INTELLIGENCE</div></div></div>
+    <div class="brand">${brandLockup(30, '<div class="brand-txt"><div class="brand-name">NeuroSense Brain Health</div><div class="brand-sub">SMART EEG INTELLIGENCE</div></div>')}</div>
     <div class="phead-r">${esc(num)} / ${esc(section)}</div>
   </div>`;
 }
@@ -171,6 +184,11 @@ function renderReportHtml(reportData, narrative = {}) {
   const secondary = d.brainType.secondary;
   const p = d.patient;
   const n = narrative || {};
+
+  // Clinic logo swap — only accept an image data URI (never raw HTML/URLs).
+  CLINIC_LOGO = (typeof p.clinicLogoDataUri === 'string' && p.clinicLogoDataUri.startsWith('data:image/'))
+    ? p.clinicLogoDataUri
+    : null;
 
   // ── Deterministic defaults merged with Claude narrative ────────────────────
   const topStrength = n.topStrength || { title: 'Top Strength', points: bt.strengths.slice(0, 2) };
@@ -400,7 +418,7 @@ function renderReportHtml(reportData, narrative = {}) {
   <!-- PAGE 1 — COVER -->
   <section class="page dark">
     <div class="glow"></div>
-    <div class="brand">${logoMark(40)}<div><div class="cover-brand-name">NeuroSense</div><div class="cover-brand-sub">SMART EEG INTELLIGENCE</div></div></div>
+    <div class="brand">${brandLockup(40, '<div><div class="cover-brand-name">NeuroSense</div><div class="cover-brand-sub">SMART EEG INTELLIGENCE</div></div>')}</div>
     <div style="margin-top:150px;">
       <div class="eyebrow" style="color:#9ec2f0;">Personalized Neuro-Profile</div>
       <h1 style="font-size:52px;line-height:1.06;">Your Brain<br>Type &amp; Performance<br>Report</h1>

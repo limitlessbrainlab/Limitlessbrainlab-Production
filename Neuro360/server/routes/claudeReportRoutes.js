@@ -158,6 +158,23 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
       reportData = buildReportDataFromSource(source, patientMeta, algorithmResults);
     }
 
+    // Clinic's uploaded logo (clinics.logo_url, set via the Other Documents
+    // upload) — replaces the NeuroSense brand mark in the rendered report.
+    // Non-fatal: the report must never fail because of the logo.
+    const clinicId = (req.body && req.body.clinicId) || '';
+    if (clinicId) {
+      try {
+        const { resolveClinicLogoDataUri } = require('../services/clinicLogoService');
+        const logoDataUri = await resolveClinicLogoDataUri(clinicId);
+        if (logoDataUri) {
+          reportData.patient.clinicLogoDataUri = logoDataUri;
+          console.log('[Claude Report] 🎨 Using clinic logo for clinic:', clinicId);
+        }
+      } catch (logoErr) {
+        console.warn('[Claude Report] Clinic logo resolution failed (using default):', logoErr.message);
+      }
+    }
+
     // Call 2 (inside): fetch the doctor-readable narrative, then render to PDF.
     // onProgress fires 'narrative' then 'render' from inside the generator.
     let { pdf } = await generateBrainReportPdf(reportData, undefined, progress);

@@ -241,6 +241,13 @@ class GeminiPdfGenerator {
     this.inputPdfPaths = inputPdfPaths; // { eyesOpen: path, eyesClosed: path }
     this.parameterNotes = parameterNotes || ''; // Channel noisy notes from user
 
+    // Clinic's custom logo (temp PNG resolved by qeegRoutes from
+    // clinics.logo_url) — replaces the NeuroSense logo everywhere when set.
+    this.clinicLogoPath = (patientData?.clinicLogoPath && fs.existsSync(patientData.clinicLogoPath))
+      ? patientData.clinicLogoPath
+      : null;
+    if (this.clinicLogoPath) console.log('🎨 Report will use clinic logo:', this.clinicLogoPath);
+
     // Store report generation date/time — prefer the report's original creation
     // timestamp (passed on regeneration) so rebuilt PDFs keep the original date
     let now = patientData?.reportGeneratedAt ? new Date(patientData.reportGeneratedAt) : new Date();
@@ -430,6 +437,11 @@ class GeminiPdfGenerator {
       doc.info.Title = 'NeuroSense Report';
       doc.info.Author = 'Limitless Brain Lab';
       doc.info.Creator = 'Limitless Brain Lab';
+
+      // Clinic's custom logo — carried on the doc so shared page modules
+      // (pdfStyles.addPageHeader, coverPage) can swap it in without threading
+      // a parameter through every call.
+      doc._clinicLogoPath = this.clinicLogoPath || null;
 
       // Page limiting and blank page prevention
       let pageCount = 1; // First page is auto-created
@@ -766,7 +778,9 @@ class GeminiPdfGenerator {
       if (fs.existsSync(PAGE5_IMG)) {
         doc.image(PAGE5_IMG, 0, 0, { width: 595.28, height: 841.89 });
       }
-      if (fs.existsSync(LOGO_PATH_P5)) {
+      if (this.clinicLogoPath && fs.existsSync(this.clinicLogoPath)) {
+        require('./pdf/pdfStyles').drawClinicLogo(doc, this.clinicLogoPath, 494, 12, 87.85, 59.58);
+      } else if (fs.existsSync(LOGO_PATH_P5)) {
         doc.image(LOGO_PATH_P5, 494, 12, { fit: [87.85, 59.58], align: 'center', valign: 'center' });
       }
 
@@ -868,7 +882,9 @@ class GeminiPdfGenerator {
       if (fs.existsSync(PAGE7_IMG)) {
         doc.image(PAGE7_IMG, 0, 0, { width: 595.28, height: 841.89 });
       }
-      if (fs.existsSync(LOGO_PATH_P7)) {
+      if (this.clinicLogoPath && fs.existsSync(this.clinicLogoPath)) {
+        require('./pdf/pdfStyles').drawClinicLogo(doc, this.clinicLogoPath, 494, 12, 87.85, 59.58);
+      } else if (fs.existsSync(LOGO_PATH_P7)) {
         doc.image(LOGO_PATH_P7, 494, 12, { fit: [87.85, 59.58], align: 'center', valign: 'center' });
       }
 
@@ -1523,15 +1539,19 @@ class GeminiPdfGenerator {
       // White background
       doc.rect(0, 0, pw, ph).fill('#FFFFFF');
 
-      // NeuroSense Logo — centered
-      const logoPath = path.join(__dirname, '../../public/assets/Layer_1.png');
+      // NeuroSense Logo — centered (clinic's uploaded logo when set)
+      const logoPath = this.clinicLogoPath || path.join(__dirname, '../../public/assets/Layer_1.png');
       const logoGroupX = 137;
       const logoGroupY = 241;
       const logoGroupW = 321.45;
       const logoImgW = 300;
       const logoImgX = logoGroupX + (logoGroupW - logoImgW) / 2;
       if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, logoImgX, logoGroupY, { width: logoImgW });
+        if (this.clinicLogoPath) {
+          doc.image(logoPath, logoImgX, logoGroupY, { fit: [logoImgW, 150], align: 'center', valign: 'center' });
+        } else {
+          doc.image(logoPath, logoImgX, logoGroupY, { width: logoImgW });
+        }
       }
 
       // Contact Card — X:135, Y:474, W:322, H:200, R:13
@@ -2022,11 +2042,16 @@ class GeminiPdfGenerator {
     doc.rect(0, 0, 595, 60)
        .fill('#121e36');
 
-    // Add NeuroSense logo to top right (only use NeuroSense_Version_7 logo)
+    // Add NeuroSense logo to top right (clinic's uploaded logo when set)
     try {
-      const logoPath = path.join(__dirname, '../../public/assets/Layer_1.png');
-      if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, 494, 12, { width: 88 });
+      if (this.clinicLogoPath && fs.existsSync(this.clinicLogoPath)) {
+        // White chip keeps arbitrary clinic logos readable on the dark bar.
+        require('./pdf/pdfStyles').drawClinicLogo(doc, this.clinicLogoPath, 494, 10, 88, 42);
+      } else {
+        const logoPath = path.join(__dirname, '../../public/assets/Layer_1.png');
+        if (fs.existsSync(logoPath)) {
+          doc.image(logoPath, 494, 12, { width: 88 });
+        }
       }
     } catch (logoError) {
       console.log('Logo not found, continuing without it:', logoError.message);
@@ -4142,9 +4167,13 @@ class GeminiPdfGenerator {
    */
   addTopRightLogo(doc) {
     try {
-      const logoPath = path.join(__dirname, '../../public/assets/Layer_1.png');
-      if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, 494, 12, { width: 88 });
+      if (this.clinicLogoPath && fs.existsSync(this.clinicLogoPath)) {
+        require('./pdf/pdfStyles').drawClinicLogo(doc, this.clinicLogoPath, 494, 12, 88, 60);
+      } else {
+        const logoPath = path.join(__dirname, '../../public/assets/Layer_1.png');
+        if (fs.existsSync(logoPath)) {
+          doc.image(logoPath, 494, 12, { width: 88 });
+        }
       }
     } catch (e) {
       console.log('Logo not found:', e.message);
@@ -4359,6 +4388,16 @@ class GeminiPdfGenerator {
     const logoWidth = 88;
     const logoX = 494;
     const logoY = 12;
+
+    // Clinic's uploaded logo takes priority over the NeuroSense default.
+    if (this.clinicLogoPath && fs.existsSync(this.clinicLogoPath)) {
+      try {
+        require('./pdf/pdfStyles').drawClinicLogo(doc, this.clinicLogoPath, logoX, logoY, logoWidth, 60);
+        return;
+      } catch (error) {
+        // Fall through to the default logo
+      }
+    }
 
     const possibleLogoPaths = [
       path.join(__dirname, '../../public/assets/Layer_1.png'),

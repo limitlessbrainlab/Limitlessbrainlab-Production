@@ -38,6 +38,21 @@ function generateCoverPage(doc, patientData, options) {
     doc.image(bgPath, 0, 0, { width: PW, height: PH });
   }
 
+  // Clinic's uploaded logo replaces the NeuroSense logo, which is baked into
+  // the Page1.png background (top-left, white area) — white it out and draw
+  // the clinic logo in its place.
+  if (doc._clinicLogoPath && fs.existsSync(doc._clinicLogoPath)) {
+    try {
+      // Piecewise white-out: the blue title bubble's tab curl starts at
+      // x≈144 above y≈84, but the baked wordmark tail reaches x≈155 below it.
+      doc.rect(0, 0, 142, 132).fill('#FFFFFF');
+      doc.rect(142, 84, 20, 48).fill('#FFFFFF');
+      doc.image(doc._clinicLogoPath, 16, 16, { fit: [116, 100], align: 'center', valign: 'center' });
+    } catch (e) {
+      console.warn('   ⚠️ Cover clinic logo failed, keeping default:', e.message);
+    }
+  }
+
   // ===== LAYER 2: ELLIPSE 4.PNG — BLUE CURVED SECTION =====
   // Ellipse image: 637x564. Wider than page, top arc at doctor's waist level
   const ellipsePath = findAsset('Ellipse 4.png');

@@ -17,6 +17,31 @@ if (!fs.existsSync(LOGO_PATH_PRIMARY) && fs.existsSync(LOGO_PATH_HEADER)) {
 }
 console.log('Using LOGO_PATH:', LOGO_PATH);
 
+/**
+ * Logo to draw on report pages — the clinic's uploaded logo when set on the
+ * doc (doc._clinicLogoPath, populated by geminiPdfGenerator), else the
+ * NeuroSense default. Returns { path, isClinic }.
+ */
+function reportLogo(doc) {
+  try {
+    if (doc && doc._clinicLogoPath && fs.existsSync(doc._clinicLogoPath)) {
+      return { path: doc._clinicLogoPath, isClinic: true };
+    }
+  } catch (e) { /* fall through to default */ }
+  return { path: LOGO_PATH, isClinic: false };
+}
+
+/**
+ * Draw the clinic's uploaded logo inside a fit box, on a white rounded chip
+ * so it stays readable on dark page backgrounds (invisible on white pages).
+ */
+function drawClinicLogo(doc, logoPath, x, y, w, h) {
+  doc.save();
+  doc.roundedRect(x - 4, y - 4, w + 8, h + 8, 6).fill('#FFFFFF');
+  doc.restore();
+  doc.image(logoPath, x, y, { fit: [w, h], align: 'center', valign: 'center' });
+}
+
 const COLORS = {
   // Primary brand colors (NeuroSense Blue - consistent across header/footer)
   primary: '#121e36',      // NeuroSense Blue (header/footer color)
@@ -313,11 +338,17 @@ function addPageHeader(doc, title) {
   const logoY = 12;
 
   try {
-    if (fs.existsSync(LOGO_PATH)) {
-      // Use only width - no fit parameter for proper sizing
-      doc.image(LOGO_PATH, logoX, logoY, {
-        width: logoWidth
-      });
+    const logo = reportLogo(doc);
+    if (fs.existsSync(logo.path)) {
+      if (logo.isClinic) {
+        // Clinic logos have arbitrary aspect ratios — fit inside the header box.
+        drawClinicLogo(doc, logo.path, logoX, logoY, logoWidth, 60);
+      } else {
+        // Use only width - no fit parameter for proper sizing
+        doc.image(logo.path, logoX, logoY, {
+          width: logoWidth
+        });
+      }
     }
   } catch (error) {
     console.log('Logo not found, skipping header logo');
@@ -652,6 +683,8 @@ module.exports = {
   BRAIN_WAVES,
   SYMPTOMS_CHECKLIST,
   LOGO_PATH,
+  reportLogo,
+  drawClinicLogo,
   drawRoundedRect,
   drawGlassBubble,
   drawCoverCrossShapes,

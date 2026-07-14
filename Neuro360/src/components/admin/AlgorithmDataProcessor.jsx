@@ -631,6 +631,38 @@ const AlgorithmDataProcessor = () => {
       setProcessedDocName(file.name.replace('.pdf', '_NeuroSense.pdf'));
 
       toast.success('Logo replaced! Click Download to save.', { id: 'doc-process' });
+
+      // Also save the uploaded document's logo as the clinic's report logo —
+      // newly generated NeuroSense + Performance reports for this clinic will
+      // show it in place of the NeuroSense logo. Non-fatal: the download flow
+      // above already succeeded even if this save fails.
+      const clinicId = selectedPatient?.clinicId || selectedPatient?.clinic_id || selectedPatient?.org_id;
+      if (clinicId) {
+        try {
+          const logoForm = new FormData();
+          logoForm.append('document', file);
+          logoForm.append('clinicId', clinicId);
+          const logoOptions = { method: 'POST', body: logoForm };
+          if (token) logoOptions.headers = { 'Authorization': `Bearer ${token}` };
+          const logoResp = await fetchWithRetry(
+            `${apiUrl}/qeeg/upload-clinic-logo`,
+            logoOptions,
+            { timeoutMs: 120000, retries: 1 }
+          );
+          if (logoResp.ok) {
+            toast.success('Clinic logo saved — new NeuroSense & Performance reports for this clinic will use it.');
+          } else {
+            const err = await logoResp.json().catch(() => ({}));
+            console.error('upload-clinic-logo failed:', logoResp.status, err.message || err.error);
+            toast.error(`Could not save the clinic logo: ${err.message || `server error (${logoResp.status})`}`);
+          }
+        } catch (logoError) {
+          console.error('Error saving clinic logo:', logoError);
+          toast.error('Could not save the clinic logo for reports. The download above still worked.');
+        }
+      } else {
+        toast('Select a patient first if you want this logo saved for their clinic\'s reports.', { icon: 'ℹ️' });
+      }
     } catch (error) {
       console.error('Error processing document:', error);
       toast.error(getFriendlyErrorMessage(error, 'Document processing failed. Please try again.'), { id: 'doc-process' });
@@ -1354,6 +1386,8 @@ const AlgorithmDataProcessor = () => {
       formData.append('patientId', selectedPatient?.id || '');
       formData.append('patientName', getPatientName(selectedPatient) || '');
       formData.append('clinicName', selectedPatient?.clinicName || '');
+      // Clinic id lets the backend swap in the clinic's uploaded logo.
+      formData.append('clinicId', selectedPatient?.clinicId || selectedPatient?.clinic_id || selectedPatient?.org_id || '');
       formData.append('assessmentDate', uploadDateIso);
       formData.append('generatedAt', uploadDateIso);
       // Forward the raw algorithm results so the backend uses the same buckets and
@@ -2082,7 +2116,10 @@ const AlgorithmDataProcessor = () => {
         handedness: selectedPatient.handedness || 'Right', // Default to Right if not specified
         patientId: selectedPatient.id,
         occupation: selectedPatient.occupation || 'Not specified',
-        symptoms: selectedPatient.symptoms || []
+        symptoms: selectedPatient.symptoms || [],
+        clinicName: selectedPatient.clinicName || 'Unknown-Clinic',
+        // Clinic id lets the backend swap in the clinic's uploaded logo.
+        clinicId: selectedPatient.clinicId || selectedPatient.clinic_id || selectedPatient.org_id || null
       };
 
 
@@ -2890,7 +2927,7 @@ const AlgorithmDataProcessor = () => {
               Upload Other Documents
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              Upload a PDF — logo will be replaced with NeuroSense branding.
+              Upload a PDF — logo will be replaced with NeuroSense branding. The document's logo is also saved as the selected patient's clinic logo and used in their NeuroSense &amp; Performance reports.
             </p>
             <div className="relative">
               <input

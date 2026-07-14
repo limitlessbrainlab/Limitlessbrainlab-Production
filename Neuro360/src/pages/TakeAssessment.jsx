@@ -35,11 +35,21 @@ const TakeAssessment = () => {
   }, [token]);
 
   const markCompleted = useCallback(() => {
+    // Which JotForm form was just submitted — lets the server pull its answers
+    // via the JotForm API and store them for the admin view.
+    const formId = (String(activeLink || '').match(/jotform\.com\/(\d+)/) || [])[1] || '';
     // Bundles must NOT be expired by a single sub-form submission — the buyer
-    // still has the remaining parts to take. Return them to the parts list;
-    // the bundle link stays valid (consume never grace-expires bundles) until
-    // the 30-day expiry or a true completion signal.
+    // still has the remaining parts to take. Capture this part's answers,
+    // return them to the parts list; the bundle link stays valid (consume never
+    // grace-expires bundles) until the 30-day expiry or a true completion.
     if (state.isBundle) {
+      if (formId) {
+        fetch(`${API_BASE_URL}/assessment-link/capture`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, formId })
+        }).catch(() => {});
+      }
       setPartDone(true);
       setActiveLink(null);
       return;
@@ -47,11 +57,11 @@ const TakeAssessment = () => {
     fetch(`${API_BASE_URL}/assessment-link/complete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token })
+      body: JSON.stringify({ token, formId })
     }).catch(() => {});
     setJustCompleted(true);
     setActiveLink(null);
-  }, [token, state.isBundle]);
+  }, [token, state.isBundle, activeLink]);
 
   // The embedded JotForm posts messages to the parent window; a submission
   // lands on the thank-you screen and emits an event containing

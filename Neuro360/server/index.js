@@ -522,7 +522,47 @@ const getUserConfirmationHtml = (userName) => `
 // webhook assessment branch and /api/stripe/verify-session (they share the
 // `assessment:{sessionId}:emails` dedupe key, so whichever runs first must
 // send this same email — never the generic confirmation with the Academy CTA).
-const getAssessmentReadyEmailHtml = ({ customerName, assessmentName, amountLabel, orderId, link }) => `
+// JotForm URL → display name, used to label per-assessment buttons in bundle emails
+const ASSESSMENT_NAMES = {
+  'https://form.jotform.com/233250136675151': 'Brain Fitness Score',
+  'https://form.jotform.com/260117244562148': 'Brain Burnout Score',
+  'https://form.jotform.com/252245065792056': 'Neuro Age Estimator',
+  'https://form.jotform.com/260034749079159': 'Dementia Probability Index'
+};
+
+const getAssessmentReadyEmailHtml = ({ customerName, assessmentName, amountLabel, orderId, link }) => {
+  // Normally `link` is the single one-time gate URL (bundles included — the gate
+  // page lists the parts). Only the raw-link fallback can be a comma-joined
+  // bundle string; render one button per link so none of them break.
+  const links = String(link || '').split(',').map(l => l.trim()).filter(Boolean);
+  const linkButtonsHtml = links.length <= 1 ? `
+                          <tr>
+                            <td style="padding: 0 32px 8px;" align="center">
+                              <a href="${link}" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #4A6FA5 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-weight: 700; font-size: 16px;">
+                                Take Your Assessment Now
+                              </a>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 8px 32px 24px; text-align: center;">
+                              <p style="color: #999; font-size: 12px; margin: 0;">
+                                Or copy this link: <a href="${link}" style="color: #4A6FA5;">${link}</a><br>
+                                This link is for one-time use &mdash; it expires once the assessment is completed.
+                              </p>
+                            </td>
+                          </tr>` : `
+                          <tr>
+                            <td style="padding: 0 32px 24px;">
+                              <h3 style="color: #323956; margin: 0 0 16px; font-size: 16px; text-align: center;">Your Assessment Links</h3>
+                              ${links.map((l, i) => `
+                              <div style="margin-bottom: 12px; text-align: center;">
+                                <a href="${l}" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #4A6FA5 100%); color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 10px; font-weight: 600; font-size: 14px;">
+                                  ${ASSESSMENT_NAMES[l] || 'Assessment ' + (i + 1)}
+                                </a>
+                              </div>`).join('')}
+                            </td>
+                          </tr>`;
+  return `
                 <!DOCTYPE html>
                 <html>
                 <head>
@@ -2498,16 +2538,23 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
       const emailClaimKey = paymentType === 'assessment'
         ? `assessment:${sessionId}:emails`
         : `pack:${sessionId}:emails`;
+      // One-time gate URL, never the raw JotForm link. Resolved BEFORE the
+      // send-once claim: an assessment email without a link must not consume
+      // the claim, or the webhook path would be blocked from ever sending it.
+      const assessmentLink = paymentType === 'assessment'
+        ? (takeUrl || session.metadata?.assessment_link || '')
+        : '';
+      if (paymentType === 'assessment' && !assessmentLink) {
+        console.error(`Assessment email skipped - no link available for session ${sessionId}`);
+      }
       if (mailerConfigured && customerEmail && paymentType !== 'subscription'
+          && (paymentType !== 'assessment' || assessmentLink)
           && await claimNotificationOnce(emailClaimKey)) {
         let emailSubject = '';
-        let assessmentLink = '';
         let productName = '';
 
         if (paymentType === 'assessment') {
           productName = session.metadata?.assessment_name || 'Brain Assessment';
-          // One-time gate URL, never the raw JotForm link
-          assessmentLink = takeUrl || session.metadata?.assessment_link || '';
           emailSubject = `Your ${productName} is ready - Limitless Brain Lab`;
         } else if (paymentType === 'subscription') {
           productName = `${session.metadata?.tier || ''} Subscription`;
@@ -2547,6 +2594,7 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
         };
 
         emailTransporter.sendMail(confirmationMail)
+          .then(() => console.log(`SUCCESS: ${paymentType === 'assessment' ? 'Assessment' : 'Payment confirmation'} email sent to ${customerEmail} (verify-session)`))
           .catch(err => console.error('Payment confirmation email failed:', err.message));
 
         // Also notify admin
@@ -3121,6 +3169,70 @@ async function ensureAssessmentToken({ sessionId, email, assessmentId } = {}) {
   return `${APP_URL}/assessment/take/${row.link_token}`;
 }
 
+// Account-level JotForm API key. Lets us pull a submission's answers from the
+// JotForm REST API on completion, so results reach the admin view even when a
+// form's submission WebHook isn't configured (one global key instead of a
+// per-form webhook). The jotform-webhook below remains a fallback.
+const JOTFORM_API_KEY = process.env.JOTFORM_API_KEY || '';
+
+// Fetch a patient's latest submission for one JotForm form and shape it like
+// the jotform-webhook payload ({ formID, submissionID, pretty, answers, ... })
+// so AssessmentResults renders it identically. Returns null when unavailable
+// (no key, no matching submission, or API error).
+async function fetchJotformSubmission(formId, email) {
+  if (!JOTFORM_API_KEY || !formId) return null;
+  try {
+    const url = `https://api.jotform.com/form/${encodeURIComponent(formId)}/submissions`
+      + `?apiKey=${encodeURIComponent(JOTFORM_API_KEY)}&limit=30&orderby=created_at`;
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      console.error(`fetchJotformSubmission: JotForm API ${resp.status} for form ${formId}`);
+      return null;
+    }
+    const json = await resp.json();
+    const subs = Array.isArray(json?.content) ? json.content : [];
+    if (!subs.length) return null;
+
+    // Newest first, then prefer the submission carrying this buyer's email.
+    subs.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    const wantEmail = String(email || '').toLowerCase();
+    const sub = (wantEmail
+      && subs.find(s => JSON.stringify(s.answers || {}).toLowerCase().includes(wantEmail)))
+      || subs[0];
+    if (!sub) return null;
+
+    // Build a "Q:A, Q:A" pretty string + { question: answer } map, skipping
+    // control fields (headings, page breaks) and empty answers.
+    const flat = (v) => (v && typeof v === 'object')
+      ? Object.values(v).filter(Boolean).join(' ')
+      : String(v);
+    const entries = Object.values(sub.answers || {})
+      .filter(a => a && a.text && a.answer != null && a.answer !== '')
+      .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+    const answers = {};
+    const prettyParts = [];
+    for (const a of entries) {
+      const q = String(a.text).trim();
+      const val = flat(a.answer).trim();
+      if (!val) continue;
+      answers[q] = val;
+      prettyParts.push(`${q}:${val}`);
+    }
+    if (!prettyParts.length) return null;
+    return {
+      formID: String(formId),
+      submissionID: String(sub.id || ''),
+      pretty: prettyParts.join(', '),
+      answers,
+      source: 'jotform-api',
+      submitted_at: sub.created_at || new Date().toISOString()
+    };
+  } catch (e) {
+    console.error('fetchJotformSubmission error:', e.message);
+    return null;
+  }
+}
+
 app.post('/api/assessment-link/consume', async (req, res) => {
   try {
     if (!supabase) return res.status(500).json({ status: 'error' });
@@ -3172,10 +3284,11 @@ app.post('/api/assessment-link/complete', async (req, res) => {
   try {
     if (!supabase) return res.status(500).json({ status: 'error' });
     const token = String(req.body?.token || '').trim();
+    const formId = String(req.body?.formId || '').replace(/\D/g, '');
     if (!/^[a-f0-9]{24,64}$/.test(token)) return res.json({ status: 'invalid' });
 
     const { data: rows } = await supabase.from('assessment_purchases')
-      .select('id, assessment_completed_at')
+      .select('id, patient_email, assessment_link, assessment_completed_at, submission_data')
       .eq('link_token', token)
       .limit(1);
     const row = rows?.[0];
@@ -3185,10 +3298,87 @@ app.post('/api/assessment-link/complete', async (req, res) => {
         .update({ assessment_completed_at: new Date().toISOString() })
         .eq('id', row.id);
     }
+
+    // Capture the answers server-side via the JotForm API so results appear in
+    // the admin view even when the form's submission webhook isn't configured.
+    // Only pull the form that belongs to this purchase, and never clobber a
+    // submission the webhook may already have stored.
+    if (JOTFORM_API_KEY && formId && !row.submission_data) {
+      if (String(row.assessment_link || '').includes(formId)) {
+        let submission = await fetchJotformSubmission(formId, row.patient_email);
+        if (!submission) {
+          // JotForm may not have persisted the submission yet — retry once.
+          await new Promise(r => setTimeout(r, 2000));
+          submission = await fetchJotformSubmission(formId, row.patient_email);
+        }
+        if (submission) {
+          const { error } = await supabase.from('assessment_purchases')
+            .update({ submission_data: submission })
+            .eq('id', row.id)
+            .is('submission_data', null);
+          if (error) console.error(`assessment-link complete: submission_data update failed for ${row.id}:`, error.message);
+          else console.log(`assessment-link complete: captured JotForm submission for ${row.id} (form ${formId})`);
+        } else {
+          console.warn(`assessment-link complete: no JotForm submission found for ${row.id} (form ${formId}, ${row.patient_email})`);
+        }
+      } else {
+        console.warn(`assessment-link complete: formId ${formId} not in purchase ${row.id} link — skipping capture`);
+      }
+    }
     return res.json({ status: 'completed' });
   } catch (e) {
     console.error('assessment-link complete error:', e.message);
     res.status(500).json({ status: 'error' });
+  }
+});
+
+// Bundle part-completion: capture one sub-form's answers into submission_data
+// WITHOUT expiring the bundle link (the buyer still has other parts to take).
+// Bundles store submission_data as { submissions: [...] } — one entry per form.
+app.post('/api/assessment-link/capture', async (req, res) => {
+  try {
+    if (!supabase) return res.status(500).json({ status: 'error' });
+    const token = String(req.body?.token || '').trim();
+    const formId = String(req.body?.formId || '').replace(/\D/g, '');
+    if (!/^[a-f0-9]{24,64}$/.test(token)) return res.json({ status: 'invalid' });
+    res.json({ status: 'ok' }); // respond immediately; don't block the buyer's UI
+    if (!JOTFORM_API_KEY || !formId) return;
+
+    const { data: rows } = await supabase.from('assessment_purchases')
+      .select('id, patient_email, assessment_link, submission_data')
+      .eq('link_token', token)
+      .limit(1);
+    const row = rows?.[0];
+    if (!row) return;
+    if (!String(row.assessment_link || '').includes(formId)) {
+      console.warn(`assessment-link capture: formId ${formId} not in purchase ${row.id} link`);
+      return;
+    }
+    let submission = await fetchJotformSubmission(formId, row.patient_email);
+    if (!submission) {
+      await new Promise(r => setTimeout(r, 2000));
+      submission = await fetchJotformSubmission(formId, row.patient_email);
+    }
+    if (!submission) {
+      console.warn(`assessment-link capture: no JotForm submission for ${row.id} (form ${formId})`);
+      return;
+    }
+
+    // Merge into the submissions array (upsert by formID), tolerating an
+    // earlier flat webhook payload by wrapping it into the array.
+    const existing = (row.submission_data && typeof row.submission_data === 'object') ? row.submission_data : null;
+    const list = existing && Array.isArray(existing.submissions)
+      ? existing.submissions.slice()
+      : (existing ? [existing] : []);
+    const idx = list.findIndex(s => String(s.formID) === String(formId));
+    if (idx >= 0) list[idx] = submission; else list.push(submission);
+    const { error } = await supabase.from('assessment_purchases')
+      .update({ submission_data: { submissions: list } })
+      .eq('id', row.id);
+    if (error) console.error(`assessment-link capture: update failed for ${row.id}:`, error.message);
+    else console.log(`assessment-link capture: stored form ${formId} for ${row.id} (${list.length} total)`);
+  } catch (e) {
+    console.error('assessment-link capture error:', e.message);
   }
 });
 
@@ -3252,8 +3442,8 @@ app.post('/api/jotform-webhook', require('multer')().none(), async (req, res) =>
           submission_data: { formID, submissionID, pretty, answers, submitted_at: new Date().toISOString() }
         })
         .eq('id', purchase.id);
-      if (error) console.error('jotform-webhook purchase update failed:', error.message);
-      console.log(`SUCCESS: JotForm submission ${submissionID} matched purchase ${purchase.id} (${purchase.patient_email})`);
+      if (error) console.error(`jotform-webhook: submission_data update failed for purchase ${purchase.id}:`, error.message);
+      else console.log(`SUCCESS: JotForm submission ${submissionID} matched purchase ${purchase.id} (${purchase.patient_email})`);
     } else {
       console.warn(`JotForm submission ${submissionID} (form ${formID}, ${submitterEmail || 'no email'}) matched no purchase`);
     }
@@ -4169,8 +4359,13 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
           // Send assessment link + admin emails exactly once across this
           // webhook and the /api/stripe/verify-session confirm path (shared
-          // dedupe key) — whichever runs first sends the pair.
-          const assessmentEmailsClaimed = mailerConfigured
+          // dedupe key) — whichever runs first sends the pair. Never claim
+          // without a link in hand: that would block the other path from
+          // sending while the customer got nothing.
+          if (!assessmentEmailLink) {
+            console.error(`Assessment email skipped - no link available for session ${session.id} (webhook)`);
+          }
+          const assessmentEmailsClaimed = (mailerConfigured && assessmentEmailLink)
             ? await claimNotificationOnce(`assessment:${session.id}:emails`)
             : false;
 
@@ -4191,6 +4386,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
             };
 
             emailTransporter.sendMail(assessmentMailOptions)
+              .then(() => console.log(`SUCCESS: Assessment email sent to ${session.customer_email} (webhook)`))
               .catch(err => console.error('Assessment email sending failed:', err.message));
           }
 

@@ -41,6 +41,14 @@ const AssessmentResults = () => {
     return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600"><CircleDashed className="h-3 w-3" /> Not started</span>;
   };
 
+  // A row's submission_data is either one submission (webhook / single-form
+  // API capture) or a bundle: { submissions: [...] }. Normalize to an array.
+  const submissionsOf = (data) => {
+    if (!data) return [];
+    if (Array.isArray(data.submissions)) return data.submissions;
+    return [data];
+  };
+
   const answerRows = (submission) => {
     if (!submission) return [];
     if (submission.pretty) {
@@ -122,21 +130,34 @@ const AssessmentResults = () => {
               </div>
               <button onClick={() => setViewing(null)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
             </div>
-            <div className="p-4 overflow-y-auto">
-              {answerRows(viewing.submission_data).length ? (
-                <table className="w-full text-sm">
-                  <tbody>
-                    {answerRows(viewing.submission_data).map(([q, a], i) => (
-                      <tr key={i} className="border-b border-gray-100 dark:border-gray-700/50">
-                        <td className="px-3 py-2 text-gray-500 align-top w-1/2">{q}</td>
-                        <td className="px-3 py-2 text-gray-900 dark:text-white font-medium">{a}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <pre className="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{JSON.stringify(viewing.submission_data, null, 2)}</pre>
-              )}
+            <div className="p-4 overflow-y-auto space-y-5">
+              {submissionsOf(viewing.submission_data).map((sub, si) => {
+                const rows = answerRows(sub);
+                const multi = submissionsOf(viewing.submission_data).length > 1;
+                return (
+                  <div key={si}>
+                    {multi && (
+                      <p className="text-xs font-semibold text-gray-500 mb-1">
+                        Assessment {si + 1}{sub.submitted_at ? ` · ${new Date(sub.submitted_at).toLocaleString()}` : ''}
+                      </p>
+                    )}
+                    {rows.length ? (
+                      <table className="w-full text-sm">
+                        <tbody>
+                          {rows.map(([q, a], i) => (
+                            <tr key={i} className="border-b border-gray-100 dark:border-gray-700/50">
+                              <td className="px-3 py-2 text-gray-500 align-top w-1/2">{q}</td>
+                              <td className="px-3 py-2 text-gray-900 dark:text-white font-medium">{a}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <pre className="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{JSON.stringify(sub, null, 2)}</pre>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

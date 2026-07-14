@@ -97,7 +97,7 @@ const SupplementsNootropics = () => {
   const sortedProducts = [...filteredProducts].sort((a, b) => {
     if (sortBy === 'price_low') return a.price - b.price;
     if (sortBy === 'price_high') return b.price - a.price;
-    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
     return 0; // best_selling — default order
   });
 
@@ -214,7 +214,7 @@ const SupplementsNootropics = () => {
                   <option value="best_selling">Best selling</option>
                   <option value="price_low">Price: Low to High</option>
                   <option value="price_high">Price: High to Low</option>
-                  <option value="name">Name</option>
+                  <option value="name">Name, A-Z</option>
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>

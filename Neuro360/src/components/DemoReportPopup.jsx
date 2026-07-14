@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabaseClient';
 import { countryCodes } from '../utils/countryCodes';
@@ -12,8 +12,17 @@ const DemoReportPopup = ({ isOpen, onClose }) => {
   const [countryCode, setCountryCode] = useState('+91');
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleClose = () => {
+    setEmail('');
+    setCountryCode('+91');
+    setPhone('');
+    setSubmitted(false);
+    onClose();
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,22 +48,18 @@ const DemoReportPopup = ({ isOpen, onClose }) => {
 
       if (dbError) throw dbError;
 
-      // Send email notification
-      try {
-        await fetch(`${BASE_URL}/api/request-demo-report`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, phone: fullPhone })
-        });
-      } catch (emailError) {
-        console.error('Email notification failed:', emailError);
+      // Send the demo report to the requester's email
+      const response = await fetch(`${BASE_URL}/api/request-demo-report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, phone: fullPhone })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to send the demo report email');
       }
 
-      toast.success('Demo report request submitted successfully!');
-      setEmail('');
-      setCountryCode('+91');
-      setPhone('');
-      onClose();
+      setSubmitted(true);
     } catch (error) {
       console.error('Error submitting demo report request:', error);
       toast.error('Failed to submit request. Please try again.');
@@ -67,12 +72,31 @@ const DemoReportPopup = ({ isOpen, onClose }) => {
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center px-3 sm:px-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[95vw] sm:max-w-[85vw] md:max-w-md p-4 sm:p-6 relative animate-fade-in-up max-h-[90vh] overflow-y-auto">
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
         >
           <X className="h-5 w-5" />
         </button>
 
+        {submitted ? (
+          <div className="text-center py-4">
+            <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="h-8 w-8 text-green-600" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900">Thank You!</h3>
+            <p className="text-sm text-gray-600 mt-3">
+              Your request has been received. We've sent the demo report to{' '}
+              <strong className="text-[#323956]">{email}</strong> &mdash; please check your inbox (and spam folder).
+            </p>
+            <button
+              onClick={handleClose}
+              className="mt-6 w-full py-2.5 bg-gradient-to-r from-[#323956] to-[#4A6FA5] text-white rounded-lg font-semibold text-sm hover:shadow-lg transition-all duration-300"
+            >
+              Close
+            </button>
+          </div>
+        ) : (
+        <>
         <div className="text-center mb-6">
           <div className="w-14 h-14 bg-gradient-to-br from-[#323956] to-[#4A6FA5] rounded-xl flex items-center justify-center mx-auto mb-3">
             <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -142,6 +166,8 @@ const DemoReportPopup = ({ isOpen, onClose }) => {
             )}
           </button>
         </form>
+        </>
+        )}
       </div>
     </div>
   );

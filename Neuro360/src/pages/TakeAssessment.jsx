@@ -42,14 +42,15 @@ const TakeAssessment = () => {
     // still has the remaining parts to take. Capture this part's answers,
     // return them to the parts list; the bundle link stays valid (consume never
     // grace-expires bundles) until the 30-day expiry or a true completion.
+    // Alias links (form.jotform.com/<user>/<slug>) carry no numeric id — send
+    // the link too so the server can resolve the form id itself.
+    const link = String(activeLink || '');
     if (state.isBundle) {
-      if (formId) {
-        fetch(`${API_BASE_URL}/assessment-link/capture`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, formId })
-        }).catch(() => {});
-      }
+      fetch(`${API_BASE_URL}/assessment-link/capture`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, formId, link })
+      }).catch(() => {});
       setPartDone(true);
       setActiveLink(null);
       return;
@@ -57,7 +58,7 @@ const TakeAssessment = () => {
     fetch(`${API_BASE_URL}/assessment-link/complete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, formId })
+      body: JSON.stringify({ token, formId, link })
     }).catch(() => {});
     setJustCompleted(true);
     setActiveLink(null);

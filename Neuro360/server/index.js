@@ -3222,6 +3222,31 @@ async function fetchJotformSubmission(formId, email) {
   }
 }
 
+// Some assessment links use JotForm's named alias (form.jotform.com/<user>/<slug>)
+// while the whole capture pipeline keys on the numeric form id. Resolve an
+// alias by fetching the form page once and reading the embedded formID;
+// numeric links resolve without a network call. Cached for the process life.
+const jotformFormIdCache = new Map();
+async function resolveJotformFormId(link) {
+  const url = String(link || '').split('?')[0].trim();
+  if (!url) return '';
+  const direct = url.match(/jotform\.com\/(?:form\/)?(\d{10,})/);
+  if (direct) return direct[1];
+  if (jotformFormIdCache.has(url)) return jotformFormIdCache.get(url);
+  try {
+    const resp = await fetch(url, { redirect: 'follow' });
+    const html = await resp.text();
+    const m = html.match(/"formID"\s*:\s*"?(\d{10,})/) || html.match(/\bform\/(\d{10,})/);
+    const id = m ? m[1] : '';
+    if (id) jotformFormIdCache.set(url, id);
+    else console.warn(`resolveJotformFormId: no numeric formID found at ${url}`);
+    return id;
+  } catch (e) {
+    console.error(`resolveJotformFormId: fetch failed for ${url}:`, e.message);
+    return '';
+  }
+}
+
 // Best-effort score pickup for the admin Assessment Results view: the first
 // answered field whose question/key mentions score/result/total/points —
 // JotForm calculation widgets ("Your Score") land here. Returns null when the
@@ -3312,13 +3337,20 @@ app.post('/api/assessment-link/complete', async (req, res) => {
     // the admin view even when the form's submission webhook isn't configured.
     // Only pull the form that belongs to this purchase, and never clobber a
     // submission the webhook may already have stored.
-    if (JOTFORM_API_KEY && formId && !row.submission_data) {
-      if (String(row.assessment_link || '').includes(formId)) {
-        let submission = await fetchJotformSubmission(formId, row.patient_email);
+    if (JOTFORM_API_KEY && !row.submission_data) {
+      // Trust the client-sent formId only when it matches this purchase's own
+      // link; otherwise (alias links yield no numeric id client-side) resolve
+      // the id from the stored link instead of skipping capture.
+      let effectiveFormId = formId && String(row.assessment_link || '').includes(formId) ? formId : '';
+      if (!effectiveFormId) {
+        effectiveFormId = await resolveJotformFormId(String(row.assessment_link || '').split(',')[0]);
+      }
+      if (effectiveFormId) {
+        let submission = await fetchJotformSubmission(effectiveFormId, row.patient_email);
         if (!submission) {
           // JotForm may not have persisted the submission yet — retry once.
           await new Promise(r => setTimeout(r, 2000));
-          submission = await fetchJotformSubmission(formId, row.patient_email);
+          submission = await fetchJotformSubmission(effectiveFormId, row.patient_email);
         }
         if (submission) {
           const { error } = await supabase.from('assessment_purchases')
@@ -3326,12 +3358,12 @@ app.post('/api/assessment-link/complete', async (req, res) => {
             .eq('id', row.id)
             .is('submission_data', null);
           if (error) console.error(`assessment-link complete: submission_data update failed for ${row.id}:`, error.message);
-          else console.log(`assessment-link complete: captured JotForm submission for ${row.id} (form ${formId})`);
+          else console.log(`assessment-link complete: captured JotForm submission for ${row.id} (form ${effectiveFormId})`);
         } else {
-          console.warn(`assessment-link complete: no JotForm submission found for ${row.id} (form ${formId}, ${row.patient_email})`);
+          console.warn(`assessment-link complete: no JotForm submission found for ${row.id} (form ${effectiveFormId}, ${row.patient_email})`);
         }
       } else {
-        console.warn(`assessment-link complete: formId ${formId} not in purchase ${row.id} link — skipping capture`);
+        console.warn(`assessment-link complete: no resolvable formId for purchase ${row.id} (sent "${formId}", link "${row.assessment_link}") — skipping capture`);
       }
     }
     return res.json({ status: 'completed' });
@@ -3349,9 +3381,10 @@ app.post('/api/assessment-link/capture', async (req, res) => {
     if (!supabase) return res.status(500).json({ status: 'error' });
     const token = String(req.body?.token || '').trim();
     const formId = String(req.body?.formId || '').replace(/\D/g, '');
+    const partLink = String(req.body?.link || '').split('?')[0].trim();
     if (!/^[a-f0-9]{24,64}$/.test(token)) return res.json({ status: 'invalid' });
     res.json({ status: 'ok' }); // respond immediately; don't block the buyer's UI
-    if (!JOTFORM_API_KEY || !formId) return;
+    if (!JOTFORM_API_KEY) return;
 
     const { data: rows } = await supabase.from('assessment_purchases')
       .select('id, patient_email, assessment_link, submission_data')
@@ -3359,17 +3392,25 @@ app.post('/api/assessment-link/capture', async (req, res) => {
       .limit(1);
     const row = rows?.[0];
     if (!row) return;
-    if (!String(row.assessment_link || '').includes(formId)) {
-      console.warn(`assessment-link capture: formId ${formId} not in purchase ${row.id} link`);
+    // Trust the client-sent formId only when it matches this purchase's own
+    // links; alias links have no numeric id client-side, so fall back to the
+    // part link — but only if it is one of the purchase's stored links.
+    let effectiveFormId = formId && String(row.assessment_link || '').includes(formId) ? formId : '';
+    if (!effectiveFormId && partLink) {
+      const ownLinks = String(row.assessment_link || '').split(',').map(s => s.trim().split('?')[0]).filter(Boolean);
+      if (ownLinks.includes(partLink)) effectiveFormId = await resolveJotformFormId(partLink);
+    }
+    if (!effectiveFormId) {
+      console.warn(`assessment-link capture: no resolvable formId for purchase ${row.id} (sent "${formId}", link "${partLink}")`);
       return;
     }
-    let submission = await fetchJotformSubmission(formId, row.patient_email);
+    let submission = await fetchJotformSubmission(effectiveFormId, row.patient_email);
     if (!submission) {
       await new Promise(r => setTimeout(r, 2000));
-      submission = await fetchJotformSubmission(formId, row.patient_email);
+      submission = await fetchJotformSubmission(effectiveFormId, row.patient_email);
     }
     if (!submission) {
-      console.warn(`assessment-link capture: no JotForm submission for ${row.id} (form ${formId})`);
+      console.warn(`assessment-link capture: no JotForm submission for ${row.id} (form ${effectiveFormId})`);
       return;
     }
 
@@ -3379,13 +3420,13 @@ app.post('/api/assessment-link/capture', async (req, res) => {
     const list = existing && Array.isArray(existing.submissions)
       ? existing.submissions.slice()
       : (existing ? [existing] : []);
-    const idx = list.findIndex(s => String(s.formID) === String(formId));
+    const idx = list.findIndex(s => String(s.formID) === String(effectiveFormId));
     if (idx >= 0) list[idx] = submission; else list.push(submission);
     const { error } = await supabase.from('assessment_purchases')
       .update({ submission_data: { submissions: list } })
       .eq('id', row.id);
     if (error) console.error(`assessment-link capture: update failed for ${row.id}:`, error.message);
-    else console.log(`assessment-link capture: stored form ${formId} for ${row.id} (${list.length} total)`);
+    else console.log(`assessment-link capture: stored form ${effectiveFormId} for ${row.id} (${list.length} total)`);
   } catch (e) {
     console.error('assessment-link capture error:', e.message);
   }

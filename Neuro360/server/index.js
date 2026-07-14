@@ -548,9 +548,11 @@ const getAssessmentReadyEmailHtml = ({ customerName, assessmentName, amountLabel
                           <!-- Success Message -->
                           <tr>
                             <td style="padding: 32px 32px 16px; text-align: center;">
-                              <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; margin: 0 auto 20px; line-height: 80px;">
-                                <span style="font-size: 40px; color: #ffffff;">&#10003;</span>
-                              </div>
+                              <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 20px;">
+                                <tr>
+                                  <td width="80" height="80" align="center" valign="middle" style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; text-align: center; vertical-align: middle; font-size: 40px; line-height: 1; color: #ffffff;">&#10003;</td>
+                                </tr>
+                              </table>
                               <h2 style="color: #323956; margin: 0 0 8px; font-size: 24px;">Payment Successful!</h2>
                               <p style="color: #666; margin: 0; font-size: 15px;">
                                 ${customerName ? `Hi ${customerName},` : 'Hi,'} you purchased <strong>${assessmentName}</strong> &mdash; it is now ready to take.
@@ -3689,9 +3691,11 @@ app.post('/api/send-assessment-email', async (req, res) => {
                   <!-- Success Message -->
                   <tr>
                     <td style="padding: 32px 32px 16px; text-align: center;">
-                      <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; margin: 0 auto 20px; line-height: 80px;">
-                        <span style="font-size: 40px; color: #ffffff;">&#10003;</span>
-                      </div>
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 20px;">
+                        <tr>
+                          <td width="80" height="80" align="center" valign="middle" style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; text-align: center; vertical-align: middle; font-size: 40px; line-height: 1; color: #ffffff;">&#10003;</td>
+                        </tr>
+                      </table>
                       <h2 style="color: #323956; margin: 0 0 8px; font-size: 24px;">Payment Successful!</h2>
                       <p style="color: #666; margin: 0; font-size: 15px;">
                         ${customerName ? 'Hi ' + customerName + ',' : 'Hi,'} your <strong>${assessmentName}</strong> is now ready to take.
@@ -4366,9 +4370,11 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
                         <!-- Success Message -->
                         <tr>
                           <td style="padding: 32px 32px 16px; text-align: center;">
-                            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; margin: 0 auto 20px; line-height: 80px;">
-                              <span style="font-size: 40px;">✓</span>
-                            </div>
+                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 20px;">
+                              <tr>
+                                <td width="80" height="80" align="center" valign="middle" style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; text-align: center; vertical-align: middle; font-size: 40px; line-height: 1; color: #ffffff;">&#10003;</td>
+                              </tr>
+                            </table>
                             <h2 style="color: #323956; margin: 0 0 8px; font-size: 26px;">Payment Successful!</h2>
                             <p style="color: #666; margin: 0; font-size: 15px;">
                               Your ${packName} is now unlocked and ready to use.
@@ -5316,9 +5322,11 @@ app.post('/api/registration-confirmation', async (req, res) => {
                     <!-- Success Icon & Message -->
                     <tr>
                       <td style="padding: 32px 32px 16px; text-align: center;">
-                        <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; margin: 0 auto 20px; line-height: 80px; text-align: center;">
-                          <span style="font-size: 40px; color: #ffffff;">✓</span>
-                        </div>
+                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 0 auto 20px;">
+                          <tr>
+                            <td width="80" height="80" align="center" valign="middle" style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; text-align: center; vertical-align: middle; font-size: 40px; line-height: 1; color: #ffffff;">&#10003;</td>
+                          </tr>
+                        </table>
                         <h2 style="color: #323956; margin: 0 0 8px; font-size: 26px;">Welcome, ${displayName}! </h2>
                         <p style="color: #666; margin: 0; font-size: 15px; line-height: 1.6;">
                           Your clinic registration has been successfully completed.

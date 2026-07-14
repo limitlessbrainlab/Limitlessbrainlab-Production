@@ -132,6 +132,13 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
     const patientMeta = {
       name: (req.body && req.body.patientName) || undefined,
       clinicName: (req.body && req.body.clinicName) || undefined,
+      id: (req.body && req.body.patientId) || undefined,
+      // Upload/creation date of the source NeuroSense report — makes the
+      // Performance report's Date of Assessment match the NeuroSense report,
+      // and feeds the "Report generated on … by <patientId>" cover line.
+      assessmentDate: (req.body && req.body.assessmentDate) || undefined,
+      processedAt: (req.body && req.body.assessmentDate) || undefined,
+      generatedAt: (req.body && req.body.generatedAt) || undefined,
     };
 
     // Deterministic build. The performance report imports EVERY value verbatim
@@ -153,7 +160,7 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
 
     // Call 2 (inside): fetch the doctor-readable narrative, then render to PDF.
     // onProgress fires 'narrative' then 'render' from inside the generator.
-    const { pdf } = await generateBrainReportPdf(reportData, undefined, progress);
+    let { pdf } = await generateBrainReportPdf(reportData, undefined, progress);
 
     // Storage key + download name use the report id (e.g. NS-1773769 -> 1773769)
     // so files are short and unique per patient+assessment: NPR-<id>-<ts>.pdf.
@@ -161,6 +168,26 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
     const base = reportIdDigits
       ? `NPR-${reportIdDigits}`
       : (reportData.patient.name || req.file.originalname || 'report').replace(/[^a-z0-9]/gi, '-');
+
+    // Stamp PDF Title metadata with the download name (NPR-<id>-<YYYYMMDD>.pdf,
+    // same as the frontend's buildNprFilename) so the browser tab shows it
+    // instead of "about:blank" when the file is opened. The VPS Chromium
+    // renderer returns the PDF without any Title metadata. Best-effort only —
+    // a stamping failure must never block the report.
+    try {
+      const { PDFDocument } = require('pdf-lib');
+      const stampDate = patientMeta.generatedAt ? new Date(patientMeta.generatedAt) : new Date();
+      const ymd = isNaN(stampDate.getTime())
+        ? new Date().toISOString().slice(0, 10).replace(/-/g, '')
+        : stampDate.toISOString().slice(0, 10).replace(/-/g, '');
+      const pdfDoc = await PDFDocument.load(pdf);
+      pdfDoc.setTitle(`${base}-${ymd}.pdf`);
+      pdfDoc.setAuthor('Limitless Brain Lab');
+      pdfDoc.setCreator('Limitless Brain Lab');
+      pdf = Buffer.from(await pdfDoc.save());
+    } catch (metaErr) {
+      console.warn('[Claude Report] PDF title stamping failed (using unstamped PDF):', metaErr.message);
+    }
 
     // Upload the generated PDF to the same 'neurosense-reports' bucket the QEEG
     // flow uses, then stream its public URL in the terminal `done` event. A

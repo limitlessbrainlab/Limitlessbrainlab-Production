@@ -117,6 +117,23 @@ function formatDate(iso) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+// "DD/MM/YYYY, h:mm am/pm" — matches the NeuroSense report footer format in
+// server/services/pdf/coverPage.js so both reports' "Report generated on" lines
+// read identically. Returns '' when no valid date is supplied.
+function formatGeneratedOn(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  let hrs = d.getHours();
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hrs >= 12 ? 'pm' : 'am';
+  hrs = hrs % 12 || 12;
+  return `${dd}/${mm}/${yyyy}, ${hrs}:${mins} ${ampm}`;
+}
+
 // Status labels for the snapshot bars / performance markers.
 function positiveStatus(s) {
   if (s >= 3) return 'Excellent';
@@ -526,7 +543,9 @@ function buildReportDataFromNeuroSenseMd(mdText, patient = {}, algorithmResults 
     brainType = { primary: TYPES[fallbackId] || TYPES[1], secondary: null, fitScores: {}, signals: {} };
   }
 
-  const assessmentDate = formatDate(parsed.patient.assessmentDate || patient.processedAt);
+  // Prefer the explicitly-passed upload date so the Performance report's Date of
+  // Assessment matches the NeuroSense report exactly.
+  const assessmentDate = formatDate(patient.assessmentDate || parsed.patient.assessmentDate || patient.processedAt);
 
   // Bars: percent + status straight from the NeuroSense report — no re-bucketing.
   const bars = parsed.parameters.map((p) => ({
@@ -598,6 +617,8 @@ function buildReportDataFromNeuroSenseMd(mdText, patient = {}, algorithmResults 
       assessmentDate,
       clinicName: patient.clinicName || 'Limitless Brain Lab',
       firstName: name.split(/\s+/)[0],
+      patientId: patient.id || '',
+      generatedOn: formatGeneratedOn(patient.generatedAt || patient.assessmentDate || patient.processedAt),
     },
     overall,
     bars,

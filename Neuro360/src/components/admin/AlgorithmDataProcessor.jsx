@@ -1347,6 +1347,15 @@ const AlgorithmDataProcessor = () => {
       console.log(`[Claude Report] Step 2: NeuroSense PDF loaded (${(blob.size / 1024).toFixed(1)} KB), building upload payload…`);
       const formData = new FormData();
       formData.append('pdf', new File([blob], 'neurosense-report.pdf', { type: 'application/pdf' }));
+      // Forward patient identity + the report's upload/creation date so the
+      // Performance report shows the SAME Date of Assessment as the NeuroSense
+      // report and can render the "Report generated on … by <patientId>" line.
+      const uploadDateIso = selectedPatient?.lastProcessed || new Date().toISOString();
+      formData.append('patientId', selectedPatient?.id || '');
+      formData.append('patientName', getPatientName(selectedPatient) || '');
+      formData.append('clinicName', selectedPatient?.clinicName || '');
+      formData.append('assessmentDate', uploadDateIso);
+      formData.append('generatedAt', uploadDateIso);
       // Forward the raw algorithm results so the backend uses the same buckets and
       // metric values that generated the NeuroSense report.
       try {

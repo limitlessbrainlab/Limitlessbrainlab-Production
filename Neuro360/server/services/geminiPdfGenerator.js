@@ -425,6 +425,12 @@ class GeminiPdfGenerator {
         bufferPages: true  // Buffer pages for better control
       });
 
+      // PDF document metadata so the browser tab shows the report name (not
+      // about:blank) when the downloaded file is opened.
+      doc.info.Title = 'NeuroSense Report';
+      doc.info.Author = 'Limitless Brain Lab';
+      doc.info.Creator = 'Limitless Brain Lab';
+
       // Page limiting and blank page prevention
       let pageCount = 1; // First page is auto-created
       const maxPages = 35;

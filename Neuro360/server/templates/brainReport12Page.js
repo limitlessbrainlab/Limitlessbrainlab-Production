@@ -144,7 +144,7 @@ function pageHeader(num, section) {
   </div>`;
 }
 function pageFooter(label) {
-  return `<div class="pfoot"><span>NeuroSense • Limitless Brain Lab</span><span>${esc(label)}</span></div>`;
+  return `<div class="pfoot"><span>NeuroSense • Limitless Brain Lab • limitlessbrainlab.com</span><span>${esc(label)}</span></div>`;
 }
 
 // Split a strategy line ("4-7-8 breathing — twice daily...") into title/body on
@@ -412,7 +412,7 @@ function renderReportHtml(reportData, narrative = {}) {
       <div class="info-card"><div class="k">BRAIN TYPE</div><div class="v">${esc(bt.name)}</div></div>
       <div class="info-card"><div class="k">REPORT ID</div><div class="v">${esc(p.reportId)}</div></div>
     </div>
-    <div class="cover-foot">${esc(p.clinicName)} • This AI-generated report is for informational and wellness purposes only and is not a medical diagnosis.</div>
+    <div class="cover-foot">${(p.generatedOn && p.patientId) ? `Report generated on: ${esc(p.generatedOn)} by ${esc(p.patientId)}<br>` : ''}${esc(p.clinicName)} • This AI-generated report is for informational and wellness purposes only and is not a medical diagnosis.<br>limitlessbrainlab.com</div>
   </section>
 
   <!-- PAGE 2 — WELCOME / CONTENTS -->

@@ -518,6 +518,107 @@ const getUserConfirmationHtml = (userName) => `
 </html>
 `;
 
+// Post-purchase "your assessment is ready" email. Used by BOTH the Stripe
+// webhook assessment branch and /api/stripe/verify-session (they share the
+// `assessment:{sessionId}:emails` dedupe key, so whichever runs first must
+// send this same email — never the generic confirmation with the Academy CTA).
+const getAssessmentReadyEmailHtml = ({ customerName, assessmentName, amountLabel, orderId, link }) => `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <meta charset="utf-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                </head>
+                <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
+                  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f7fa; padding: 40px 20px;">
+                    <tr>
+                      <td align="center">
+                        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.1);">
+                          <!-- Header -->
+                          <tr>
+                            <td style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 24px 32px; text-align: center;">
+                              <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;" />
+                              <h1 style="color: #ffffff; margin: 10px 0 0; font-size: 22px; font-weight: 700;">Limitless Brain Lab</h1>
+                              <p style="color: #F5D05D; margin: 4px 0 0; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600;">
+                                ASSESSMENT ACCESS
+                              </p>
+                            </td>
+                          </tr>
+
+                          <!-- Success Message -->
+                          <tr>
+                            <td style="padding: 32px 32px 16px; text-align: center;">
+                              <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; margin: 0 auto 20px; line-height: 80px;">
+                                <span style="font-size: 40px; color: #ffffff;">&#10003;</span>
+                              </div>
+                              <h2 style="color: #323956; margin: 0 0 8px; font-size: 24px;">Payment Successful!</h2>
+                              <p style="color: #666; margin: 0; font-size: 15px;">
+                                ${customerName ? `Hi ${customerName},` : 'Hi,'} you purchased <strong>${assessmentName}</strong> &mdash; it is now ready to take.
+                              </p>
+                            </td>
+                          </tr>
+
+                          <!-- Order Details -->
+                          <tr>
+                            <td style="padding: 0 32px 24px;">
+                              <div style="background: #f8f9fc; border-radius: 12px; padding: 20px;">
+                                <h3 style="color: #323956; margin: 0 0 16px; font-size: 16px;">Order Details</h3>
+                                <table width="100%">
+                                  <tr>
+                                    <td style="padding: 8px 0; color: #666;">Assessment:</td>
+                                    <td style="padding: 8px 0; color: #323956; font-weight: 600; text-align: right;">${assessmentName}</td>
+                                  </tr>
+                                  <tr>
+                                    <td style="padding: 8px 0; color: #666;">Amount Paid:</td>
+                                    <td style="padding: 8px 0; color: #323956; font-weight: 600; text-align: right;">${amountLabel}</td>
+                                  </tr>
+                                  <tr>
+                                    <td style="padding: 8px 0; color: #666;">Date &amp; Time:</td>
+                                    <td style="padding: 8px 0; color: #323956; font-weight: 600; text-align: right;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</td>
+                                  </tr>
+                                  <tr>
+                                    <td style="padding: 8px 0; color: #666;">Order ID:</td>
+                                    <td style="padding: 8px 0; color: #666; font-size: 12px; text-align: right;">${orderId}</td>
+                                  </tr>
+                                </table>
+                              </div>
+                            </td>
+                          </tr>
+
+                          <!-- Assessment Link Button — always the one-time gate URL
+                               (for bundles the gate page lists the individual parts) -->
+                          <tr>
+                            <td style="padding: 0 32px 8px;" align="center">
+                              <a href="${link}" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #4A6FA5 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-weight: 700; font-size: 16px;">
+                                Take Your Assessment Now
+                              </a>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 8px 32px 24px; text-align: center;">
+                              <p style="color: #999; font-size: 12px; margin: 0;">
+                                Or copy this link: <a href="${link}" style="color: #4A6FA5;">${link}</a><br>
+                                This link is for one-time use &mdash; it expires once the assessment is completed.
+                              </p>
+                            </td>
+                          </tr>
+
+                          <!-- Footer -->
+                          <tr>
+                            <td style="background: #f8f9fc; padding: 20px 32px; border-top: 1px solid #e5e7eb;">
+                              <p style="color: #888; margin: 0; font-size: 12px; text-align: center;">
+                                Thank you for choosing Limitless Brain Lab! If you have any questions, contact us at info@limitlessbrainlab.com
+                              </p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </body>
+                </html>
+              `;
+
 const getReportReceivedHtml = (patientName, clinicName) => `
 <!DOCTYPE html>
 <html>
@@ -2399,7 +2500,7 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
           productName = session.metadata?.assessment_name || 'Brain Assessment';
           // One-time gate URL, never the raw JotForm link
           assessmentLink = takeUrl || session.metadata?.assessment_link || '';
-          emailSubject = `Payment Confirmation - ${productName} - Limitless Brain Lab`;
+          emailSubject = `Your ${productName} is ready - Limitless Brain Lab`;
         } else if (paymentType === 'subscription') {
           productName = `${session.metadata?.tier || ''} Subscription`;
           emailSubject = `Payment Confirmation - ${productName} - Limitless Brain Lab`;
@@ -2408,20 +2509,31 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
           emailSubject = `Payment Confirmation - Limitless Brain Lab`;
         }
 
-        const confirmationMail = {
+        // Assessments get the dedicated "ready to take" email (take-link CTA,
+        // no Academy block) — same template the Stripe webhook branch sends.
+        // Other purchases keep the generic confirmation with payment details.
+        const confirmationMail = paymentType === 'assessment' ? {
+          from: EMAIL_FROM,
+          to: customerEmail,
+          subject: emailSubject,
+          html: getAssessmentReadyEmailHtml({
+            customerName,
+            assessmentName: productName,
+            amountLabel: amountPaid,
+            orderId: sessionId.slice(-12),
+            link: assessmentLink
+          }),
+          attachments: getLogoAttachment()
+        } : {
           from: EMAIL_FROM,
           to: customerEmail,
           subject: emailSubject,
           html: getUserConfirmationHtml(customerName || 'User').replace(
-            'Thank you for submitting your application. We have successfully received it, and our team will get in touch with you within <strong style="color: #323956;">two working days</strong> to guide you through the next steps.',
+            'Thank you for reaching out. We have successfully received your submission and our team will get in touch with you within <strong style="color: #323956;">two working days</strong>.',
             `Thank you for your payment! You purchased <strong style="color: #323956;">${productName}</strong>.<br><br>
             <strong>Amount Paid:</strong> ${amountPaid}<br>
             <strong>Date:</strong> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST<br>
-            <strong>Order ID:</strong> ${sessionId.slice(-12)}
-            ${assessmentLink ? `<br><br><div style="text-align: center; margin: 20px 0;">
-              <a href="${assessmentLink}" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 700; font-size: 15px;">Take Your Assessment Now</a>
-              <p style="color: #888; font-size: 12px; margin: 8px 0 0;">Or copy: <a href="${assessmentLink}" style="color: #323956;">${assessmentLink}</a></p>
-            </div>` : ''}`
+            <strong>Order ID:</strong> ${sessionId.slice(-12)}`
           ),
           attachments: getFullAttachments()
         };
@@ -3008,7 +3120,7 @@ app.post('/api/assessment-link/consume', async (req, res) => {
     if (!/^[a-f0-9]{24,64}$/.test(token)) return res.json({ status: 'invalid' });
 
     const { data: rows } = await supabase.from('assessment_purchases')
-      .select('id, assessment_name, assessment_link, link_expires_at, link_opened_at, assessment_completed_at')
+      .select('id, patient_email, assessment_name, assessment_link, link_expires_at, link_opened_at, assessment_completed_at')
       .eq('link_token', token)
       .limit(1);
     const row = rows?.[0];
@@ -3020,7 +3132,14 @@ app.post('/api/assessment-link/consume', async (req, res) => {
       return res.json({ status: 'expired', assessmentName });
     }
 
-    const links = String(row.assessment_link || '').split(',').map(s => s.trim()).filter(Boolean);
+    // Prefill the buyer's email into the JotForm (standard `email` unique
+    // name) so the submission carries it — the jotform-webhook matches
+    // purchases email-first, which otherwise depends on the customer
+    // retyping the exact purchase email into the form.
+    const links = String(row.assessment_link || '').split(',').map(s => s.trim()).filter(Boolean)
+      .map(l => row.patient_email
+        ? `${l}${l.includes('?') ? '&' : '?'}email=${encodeURIComponent(row.patient_email)}`
+        : l);
     if (!links.length) return res.json({ status: 'invalid' });
     const isBundle = links.length > 1;
 
@@ -4046,102 +4165,13 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
               to: session.customer_email,
               subject: `Your ${assessmentName} is ready - Limitless Brain Lab`,
               attachments: getLogoAttachment(),
-              html: `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                  <meta charset="utf-8">
-                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                </head>
-                <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7fa;">
-                  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f7fa; padding: 40px 20px;">
-                    <tr>
-                      <td align="center">
-                        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.1);">
-                          <!-- Header -->
-                          <tr>
-                            <td style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 24px 32px; text-align: center;">
-                              <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;" />
-                              <h1 style="color: #ffffff; margin: 10px 0 0; font-size: 22px; font-weight: 700;">Limitless Brain Lab</h1>
-                              <p style="color: #F5D05D; margin: 4px 0 0; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600;">
-                                ASSESSMENT ACCESS
-                              </p>
-                            </td>
-                          </tr>
-
-                          <!-- Success Message -->
-                          <tr>
-                            <td style="padding: 32px 32px 16px; text-align: center;">
-                              <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; margin: 0 auto 20px; line-height: 80px;">
-                                <span style="font-size: 40px; color: #ffffff;">&#10003;</span>
-                              </div>
-                              <h2 style="color: #323956; margin: 0 0 8px; font-size: 24px;">Payment Successful!</h2>
-                              <p style="color: #666; margin: 0; font-size: 15px;">
-                                ${customerName ? `Hi ${customerName},` : 'Hi,'} you purchased <strong>${assessmentName}</strong> — it is now ready to take.
-                              </p>
-                            </td>
-                          </tr>
-
-                          <!-- Order Details -->
-                          <tr>
-                            <td style="padding: 0 32px 24px;">
-                              <div style="background: #f8f9fc; border-radius: 12px; padding: 20px;">
-                                <h3 style="color: #323956; margin: 0 0 16px; font-size: 16px;">Order Details</h3>
-                                <table width="100%">
-                                  <tr>
-                                    <td style="padding: 8px 0; color: #666;">Assessment:</td>
-                                    <td style="padding: 8px 0; color: #323956; font-weight: 600; text-align: right;">${assessmentName}</td>
-                                  </tr>
-                                  <tr>
-                                    <td style="padding: 8px 0; color: #666;">Amount Paid:</td>
-                                    <td style="padding: 8px 0; color: #323956; font-weight: 600; text-align: right;">${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}</td>
-                                  </tr>
-                                  <tr>
-                                    <td style="padding: 8px 0; color: #666;">Date &amp; Time:</td>
-                                    <td style="padding: 8px 0; color: #323956; font-weight: 600; text-align: right;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</td>
-                                  </tr>
-                                  <tr>
-                                    <td style="padding: 8px 0; color: #666;">Order ID:</td>
-                                    <td style="padding: 8px 0; color: #666; font-size: 12px; text-align: right;">${session.id.slice(-12)}</td>
-                                  </tr>
-                                </table>
-                              </div>
-                            </td>
-                          </tr>
-
-                          <!-- Assessment Link Button — always the one-time gate URL
-                               (for bundles the gate page lists the individual parts) -->
-                          <tr>
-                            <td style="padding: 0 32px 8px;" align="center">
-                              <a href="${assessmentEmailLink}" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #4A6FA5 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-weight: 700; font-size: 16px;">
-                                Take Your Assessment Now
-                              </a>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 8px 32px 24px; text-align: center;">
-                              <p style="color: #999; font-size: 12px; margin: 0;">
-                                Or copy this link: <a href="${assessmentEmailLink}" style="color: #4A6FA5;">${assessmentEmailLink}</a><br>
-                                This link is for one-time use — it expires once the assessment is completed.
-                              </p>
-                            </td>
-                          </tr>
-
-                          <!-- Footer -->
-                          <tr>
-                            <td style="background: #f8f9fc; padding: 20px 32px; border-top: 1px solid #e5e7eb;">
-                              <p style="color: #888; margin: 0; font-size: 12px; text-align: center;">
-                                Thank you for choosing Limitless Brain Lab! If you have any questions, contact us at info@limitlessbrainlab.com
-                              </p>
-                            </td>
-                          </tr>
-                        </table>
-                      </td>
-                    </tr>
-                  </table>
-                </body>
-                </html>
-              `
+              html: getAssessmentReadyEmailHtml({
+                customerName,
+                assessmentName,
+                amountLabel: `${session.currency?.toUpperCase()} ${(session.amount_total / 100).toFixed(2)}`,
+                orderId: session.id.slice(-12),
+                link: assessmentEmailLink
+              })
             };
 
             emailTransporter.sendMail(assessmentMailOptions)

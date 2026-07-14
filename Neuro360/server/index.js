@@ -633,23 +633,9 @@ const getAssessmentReadyEmailHtml = ({ customerName, assessmentName, amountLabel
                             </td>
                           </tr>
 
-                          <!-- Assessment Link Button — always the one-time gate URL
+                          <!-- Assessment Link Button — normally the one-time gate URL
                                (for bundles the gate page lists the individual parts) -->
-                          <tr>
-                            <td style="padding: 0 32px 8px;" align="center">
-                              <a href="${link}" style="display: inline-block; background: linear-gradient(135deg, #323956 0%, #4A6FA5 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 12px; font-weight: 700; font-size: 16px;">
-                                Take Your Assessment Now
-                              </a>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td style="padding: 8px 32px 24px; text-align: center;">
-                              <p style="color: #999; font-size: 12px; margin: 0;">
-                                Or copy this link: <a href="${link}" style="color: #4A6FA5;">${link}</a><br>
-                                This link is for one-time use &mdash; it expires once the assessment is completed.
-                              </p>
-                            </td>
-                          </tr>
+${linkButtonsHtml}
 
                           <!-- Footer -->
                           <tr>
@@ -666,6 +652,7 @@ const getAssessmentReadyEmailHtml = ({ customerName, assessmentName, amountLabel
                 </body>
                 </html>
               `;
+};
 
 const getReportReceivedHtml = (patientName, clinicName) => `
 <!DOCTYPE html>
@@ -3219,11 +3206,13 @@ async function fetchJotformSubmission(formId, email) {
       prettyParts.push(`${q}:${val}`);
     }
     if (!prettyParts.length) return null;
+    const score = extractAssessmentScore(answers);
     return {
       formID: String(formId),
       submissionID: String(sub.id || ''),
       pretty: prettyParts.join(', '),
       answers,
+      ...(score ? { score } : {}),
       source: 'jotform-api',
       submitted_at: sub.created_at || new Date().toISOString()
     };
@@ -3231,6 +3220,26 @@ async function fetchJotformSubmission(formId, email) {
     console.error('fetchJotformSubmission error:', e.message);
     return null;
   }
+}
+
+// Best-effort score pickup for the admin Assessment Results view: the first
+// answered field whose question/key mentions score/result/total/points —
+// JotForm calculation widgets ("Your Score") land here. Returns null when the
+// form simply has no such field.
+function extractAssessmentScore(answers) {
+  if (!answers || typeof answers !== 'object') return null;
+  const isScoreKey = (s) => /score|result|total|points/i.test(String(s || ''));
+  for (const [key, val] of Object.entries(answers)) {
+    // JotForm-API map ({ "Your Score": "42" }) and webhook rawRequest
+    // ({ q12_yourScore: "42" } or { text, answer } objects) both pass here.
+    const nested = (val && typeof val === 'object') ? val : null;
+    const label = nested?.text ? String(nested.text) : key;
+    if (!isScoreKey(label)) continue;
+    const raw = nested ? (nested.answer ?? Object.values(nested).filter(v => typeof v !== 'object').join(' ')) : val;
+    const value = String(raw ?? '').trim();
+    if (value) return value;
+  }
+  return null;
 }
 
 app.post('/api/assessment-link/consume', async (req, res) => {
@@ -3436,10 +3445,11 @@ app.post('/api/jotform-webhook', require('multer')().none(), async (req, res) =>
     }
 
     if (purchase) {
+      const score = extractAssessmentScore(answers);
       const { error } = await supabase.from('assessment_purchases')
         .update({
           assessment_completed_at: purchase.assessment_completed_at || new Date().toISOString(),
-          submission_data: { formID, submissionID, pretty, answers, submitted_at: new Date().toISOString() }
+          submission_data: { formID, submissionID, pretty, answers, ...(score ? { score } : {}), submitted_at: new Date().toISOString() }
         })
         .eq('id', purchase.id);
       if (error) console.error(`jotform-webhook: submission_data update failed for purchase ${purchase.id}:`, error.message);
@@ -3819,12 +3829,7 @@ app.post('/api/send-assessment-email', async (req, res) => {
     const emailLink = takeUrl || assessmentLink;
 
     const links = takeUrl ? [takeUrl] : (assessmentLink || '').split(',').filter(l => l.trim());
-    const assessmentNames = {
-      'https://form.jotform.com/233250136675151': 'Brain Fitness Score',
-      'https://form.jotform.com/260117244562148': 'Brain Burnout Score',
-      'https://form.jotform.com/252245065792056': 'Neuro Age Estimator',
-      'https://form.jotform.com/260034749079159': 'Dementia Probability Index'
-    };
+    const assessmentNames = ASSESSMENT_NAMES;
 
     const linkButtonsHtml = links.length <= 1
       ? `

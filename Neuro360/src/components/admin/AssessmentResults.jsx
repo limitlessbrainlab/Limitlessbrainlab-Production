@@ -49,6 +49,10 @@ const AssessmentResults = () => {
     return [data];
   };
 
+  // Score(s) captured from the submission (extractAssessmentScore on the
+  // server); a bundle may have one per completed part.
+  const scoreOf = (data) => submissionsOf(data).map((s) => s.score).filter(Boolean).join(' · ');
+
   const answerRows = (submission) => {
     if (!submission) return [];
     if (submission.pretty) {
@@ -102,12 +106,19 @@ const AssessmentResults = () => {
                   <td className="px-4 py-3">{stateBadge(r)}</td>
                   <td className="px-4 py-3">
                     {r.submission_data ? (
-                      <button
-                        onClick={() => setViewing(r)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#323956] text-white rounded-lg text-xs font-medium hover:bg-[#232D3C] transition-colors"
-                      >
-                        <Eye className="h-3 w-3" /> View
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setViewing(r)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#323956] text-white rounded-lg text-xs font-medium hover:bg-[#232D3C] transition-colors"
+                        >
+                          <Eye className="h-3 w-3" /> View
+                        </button>
+                        {scoreOf(r.submission_data) && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 whitespace-nowrap">
+                            Score: {scoreOf(r.submission_data)}
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-xs text-gray-400">—</span>
                     )}
@@ -139,6 +150,11 @@ const AssessmentResults = () => {
                     {multi && (
                       <p className="text-xs font-semibold text-gray-500 mb-1">
                         Assessment {si + 1}{sub.submitted_at ? ` · ${new Date(sub.submitted_at).toLocaleString()}` : ''}
+                      </p>
+                    )}
+                    {sub.score && (
+                      <p className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">
+                        Score: <span className="text-purple-700 dark:text-purple-300">{sub.score}</span>
                       </p>
                     )}
                     {rows.length ? (

@@ -5316,8 +5316,8 @@ app.post('/api/registration-confirmation', async (req, res) => {
                     <!-- Success Icon & Message -->
                     <tr>
                       <td style="padding: 32px 32px 16px; text-align: center;">
-                        <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;">
-                          <span style="font-size: 40px; line-height: 80px;">✓</span>
+                        <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; margin: 0 auto 20px; line-height: 80px; text-align: center;">
+                          <span style="font-size: 40px; color: #ffffff;">✓</span>
                         </div>
                         <h2 style="color: #323956; margin: 0 0 8px; font-size: 26px;">Welcome, ${displayName}! </h2>
                         <p style="color: #666; margin: 0; font-size: 15px; line-height: 1.6;">

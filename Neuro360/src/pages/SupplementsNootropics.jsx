@@ -214,7 +214,7 @@ const SupplementsNootropics = () => {
                   <option value="best_selling">Best selling</option>
                   <option value="price_low">Price: Low to High</option>
                   <option value="price_high">Price: High to Low</option>
-                  <option value="name">Name, A-Z</option>
+                  <option value="name">A-Z</option>
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>

@@ -10,7 +10,7 @@ const {
 } = require('./pdf/staticPages');
 const { generateBrainwaveProfilesPage } = require('./pdf/brainwaveProfilesPage');
 const { generateBrainMapComparisonPageSync, generateBrainMapComparisonPage } = require('./pdf/brainMapComparisonPage');
-const { generateCoverPage } = require('./pdf/coverPage');
+const { generateCoverPage, formatDateDDMMYYYY } = require('./pdf/coverPage');
 const { generateCongratulationsPage } = require('./pdf/congratulationsPage');
 const { generateIntroductionPage } = require('./pdf/introductionPage');
 const { generateYourNumbersPage, generateYourNumbersPageAsync } = require('./pdf/yourNumbersPage');
@@ -3659,7 +3659,7 @@ class GeminiPdfGenerator {
     const patientFields = [
       { label: 'Name', value: this.patientData.name || '' },
       { label: 'Age', value: this.patientData.age ? String(this.patientData.age) : '' },
-      { label: 'Date of Birth', value: this.patientData.dateOfBirth || this.patientData.dob || '' },
+      { label: 'Date of Birth', value: formatDateDDMMYYYY(this.patientData.dateOfBirth || this.patientData.dob) },
       { label: 'Gender', value: this.patientData.gender || '' }
     ];
 

@@ -135,7 +135,7 @@ function generateCoverPage(doc, patientData, options) {
   const parsedReportDate = patientData.reportGeneratedAt ? new Date(patientData.reportGeneratedAt) : null;
   const reportDate = parsedReportDate && !isNaN(parsedReportDate.getTime()) ? parsedReportDate : new Date();
 
-  drawBubbleValue(doc, patientData.dateOfBirth || patientData.dob || 'N/A', colL, row2Y);
+  drawBubbleValue(doc, formatDateDDMMYYYY(patientData.dateOfBirth || patientData.dob) || 'N/A', colL, row2Y);
   drawBubbleValue(doc, patientData.assessmentDate || patientData.dateOfRecording || reportDate.toLocaleDateString('en-GB'), colR, row2Y);
 
   // Row 3: AGE (left) + PROFESSION (right)
@@ -196,4 +196,12 @@ function drawBubbleValue(doc, value, x, y) {
      });
 }
 
-module.exports = { generateCoverPage };
+// Patient DOB arrives as the raw DB value (ISO yyyy-mm-dd) — render day-first.
+// Anything else (already dd/mm/yyyy, 'Not specified', empty) passes through.
+function formatDateDDMMYYYY(value) {
+  const s = String(value || '').trim();
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : s;
+}
+
+module.exports = { generateCoverPage, formatDateDDMMYYYY };

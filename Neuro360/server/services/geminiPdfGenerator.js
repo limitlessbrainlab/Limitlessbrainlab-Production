@@ -241,8 +241,10 @@ class GeminiPdfGenerator {
     this.inputPdfPaths = inputPdfPaths; // { eyesOpen: path, eyesClosed: path }
     this.parameterNotes = parameterNotes || ''; // Channel noisy notes from user
 
-    // Store report generation date/time
-    const now = new Date();
+    // Store report generation date/time — prefer the report's original creation
+    // timestamp (passed on regeneration) so rebuilt PDFs keep the original date
+    let now = patientData?.reportGeneratedAt ? new Date(patientData.reportGeneratedAt) : new Date();
+    if (isNaN(now.getTime())) now = new Date();
     this.generatedAt = now.toLocaleString('en-IN', {
       day: '2-digit',
       month: '2-digit',

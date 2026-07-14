@@ -115,8 +115,13 @@ function generateCoverPage(doc, patientData, options) {
   const colL = frameX + 82;
   const colR = frameX + 282;
 
+  // Report date — prefer the original creation timestamp (passed on regeneration)
+  // so rebuilt PDFs keep the original date for both assessment date and footer
+  const parsedReportDate = patientData.reportGeneratedAt ? new Date(patientData.reportGeneratedAt) : null;
+  const reportDate = parsedReportDate && !isNaN(parsedReportDate.getTime()) ? parsedReportDate : new Date();
+
   drawBubbleValue(doc, patientData.dateOfBirth || patientData.dob || 'N/A', colL, row2Y);
-  drawBubbleValue(doc, patientData.assessmentDate || patientData.dateOfRecording || new Date().toLocaleDateString('en-GB') || 'N/A', colR, row2Y);
+  drawBubbleValue(doc, patientData.assessmentDate || patientData.dateOfRecording || reportDate.toLocaleDateString('en-GB'), colR, row2Y);
 
   // Row 3: AGE (left) + PROFESSION (right)
   const row3Y = frameY + 146;
@@ -125,7 +130,7 @@ function generateCoverPage(doc, patientData, options) {
   drawBubbleValue(doc, patientData.profession || patientData.occupation || 'N/A', colR, row3Y);
 
   // ===== LAYER 6: FOOTER =====
-  const now = new Date();
+  const now = reportDate;
   const dd = String(now.getDate()).padStart(2, '0');
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const yyyy = now.getFullYear();

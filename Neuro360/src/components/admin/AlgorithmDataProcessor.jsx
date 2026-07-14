@@ -1121,6 +1121,8 @@ const AlgorithmDataProcessor = () => {
         patientId: record.patientId,
         clinicName: record.inputData?.clinicName || selectedPatient?.clinicName || 'Unknown-Clinic',
         clinicId: selectedPatient?.clinicId || record.inputData?.clinicId || null,
+        // Original creation timestamp so regenerated PDFs keep the original "Report generated on" date
+        reportGeneratedAt: record.createdAt || record.created_at || record.processedAt || record.inputData?.processedAt || null,
       };
 
       // Prepare algorithm results

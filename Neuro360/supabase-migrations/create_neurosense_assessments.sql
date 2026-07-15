@@ -91,7 +91,7 @@ INSERT INTO neurosense_assessments (title, description, link, is_free, is_inquir
 (
   'Brain (Neuro) Fitness Score Advanced',
   'Your Brain (Neuro) Fitness Score Advanced is an at-a-glance score that summarizes how efficiently your brain is operating across key systems like focus, resilience, recovery, and cognitive stamina.',
-  'https://form.jotform.com/232184893262057',
+  'https://form.jotform.com/261594031348457',
   true, false,
   9.99, 0,
   37, 0,

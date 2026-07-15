@@ -524,6 +524,9 @@ const getUserConfirmationHtml = (userName) => `
 // send this same email — never the generic confirmation with the Academy CTA).
 // JotForm URL → display name, used to label per-assessment buttons in bundle emails
 const ASSESSMENT_NAMES = {
+  'https://form.jotform.com/261594031348457': 'Brain Fitness Score',
+  // Retired form — bundles bought before the swap have this URL frozen in their
+  // Stripe metadata, so the key must stay for their emails to label correctly.
   'https://form.jotform.com/233250136675151': 'Brain Fitness Score',
   'https://form.jotform.com/260117244562148': 'Brain Burnout Score',
   'https://form.jotform.com/252245065792056': 'Neuro Age Estimator',

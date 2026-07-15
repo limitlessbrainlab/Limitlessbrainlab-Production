@@ -127,13 +127,13 @@ const getGuideThumbnailUrl = (url) => {
 };
 
 const LEGACY_ASSESSMENTS = {
-  brain_fitness: { title: 'Brain Fitness Score', link: 'https://form.jotform.com/233250136675151', price: 2.99 },
+  brain_fitness: { title: 'Brain Fitness Score', link: 'https://form.jotform.com/261594031348457', price: 2.99 },
   brain_burnout: { title: 'Brain Burnout Score', link: 'https://form.jotform.com/260117244562148', price: 2.99 },
   brain_age: { title: 'Neuro Age Estimator', link: 'https://form.jotform.com/252245065792056', price: 2.99 },
   dementia_index: { title: 'Dementia Probability Index', link: 'https://form.jotform.com/260034749079159', price: 2.99 },
   assessment_bundle: {
     title: 'Complete Brain Assessment Bundle',
-    link: 'https://form.jotform.com/233250136675151,https://form.jotform.com/260117244562148,https://form.jotform.com/252245065792056,https://form.jotform.com/260034749079159',
+    link: 'https://form.jotform.com/261594031348457,https://form.jotform.com/260117244562148,https://form.jotform.com/252245065792056,https://form.jotform.com/260034749079159',
     price: 19.99,
     bundleIds: ['brain_fitness', 'brain_burnout', 'brain_age', 'dementia_index']
   }

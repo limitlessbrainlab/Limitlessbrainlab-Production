@@ -55,7 +55,7 @@ const Landing = () => {
           customerName: bfsPaymentName.toUpperCase(),
           currency: 'USD',
           amount: 2.99,
-          assessmentLink: 'https://form.jotform.com/232184893262057',
+          assessmentLink: 'https://form.jotform.com/233250136675151',
           source: 'landing',
           successUrl: `${window.location.origin}/?payment=success&session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: `${window.location.origin}/?payment=cancelled`

@@ -366,9 +366,11 @@ const PaymentHistory = ({ selectedClinic }) => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
+                {/* Actions column hidden — see the matching <td> below.
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
+                */}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -425,6 +427,10 @@ const PaymentHistory = ({ selectedClinic }) => {
                         {new Date(payment.createdAt || payment.timestamp).toLocaleTimeString()}
                       </div>
                     </td>
+                    {/* Actions hidden: receipt download was never implemented (the button
+                        only toasted "Receipt generated"), and the details modal's own
+                        download throws because normalize() never emits payment.paymentId.
+                        Uncomment this and the matching <th> once download actually works.
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end space-x-2">
                         <button
@@ -446,6 +452,7 @@ const PaymentHistory = ({ selectedClinic }) => {
                         </button>
                       </div>
                     </td>
+                    */}
                   </tr>
                 );
               })}

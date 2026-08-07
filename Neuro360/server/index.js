@@ -59,6 +59,7 @@ if (process.env.STRIPE_SECRET_KEY) {
 // Email transporter — Gmail SMTP (info@limitlessbrainlab.com via app password).
 // Requires SMTP port 465 to be reachable: Render paid plan (free tier blocks 25/465/587).
 const gmailConfigured = !!(process.env.EMAIL_USER && process.env.EMAIL_PASS);
+const productionMailRelaySecret = process.env.PRODUCTION_MAIL_RELAY_SECRET || '';
 
 const activeTransporter = (() => {
   if (gmailConfigured) {
@@ -1025,6 +1026,34 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV
   });
+});
+
+// Protected mail-only endpoint for staging. It does not write to production DB.
+app.post('/api/internal/mail-relay', async (req, res) => {
+  if (!productionMailRelaySecret || req.get('x-production-mail-relay-secret') !== productionMailRelaySecret) {
+    return res.status(403).json({ success: false, message: 'Forbidden' });
+  }
+  const { to, cc, bcc, subject, html, text, replyTo, headers, attachments } = req.body || {};
+  if ((!to || (Array.isArray(to) && !to.length)) && (!cc || (Array.isArray(cc) && !cc.length)) && (!bcc || (Array.isArray(bcc) && !bcc.length))) {
+    return res.status(400).json({ success: false, message: 'At least one recipient is required' });
+  }
+  if (!subject || (!html && !text)) return res.status(400).json({ success: false, message: 'Subject and message content are required' });
+  if (!emailTransporter) return res.status(503).json({ success: false, message: 'Production mail is not configured' });
+  try {
+    const info = await emailTransporter.sendMail({
+      from: EMAIL_FROM, to, cc, bcc, subject, html, text, replyTo, headers,
+      attachments: Array.isArray(attachments) ? attachments.map((attachment) => ({
+        filename: attachment.filename || attachment.name || 'attachment',
+        content: Buffer.from(attachment.content || '', 'base64'),
+        ...(attachment.cid ? { cid: attachment.cid } : {}),
+        ...(attachment.contentType ? { contentType: attachment.contentType } : {}),
+      })) : [],
+    });
+    return res.status(200).json({ success: true, messageId: info.messageId || '', accepted: info.accepted || [] });
+  } catch (error) {
+    console.error('Production mail relay failed:', error.message);
+    return res.status(502).json({ success: false, message: 'Production mail delivery failed' });
+  }
 });
 
 // Per-deploy backend version — the frontend polls this to force logout on a new deploy.

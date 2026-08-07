@@ -1040,8 +1040,11 @@ app.post('/api/internal/mail-relay', async (req, res) => {
   if (!subject || (!html && !text)) return res.status(400).json({ success: false, message: 'Subject and message content are required' });
   if (!emailTransporter) return res.status(503).json({ success: false, message: 'Production mail is not configured' });
   try {
+    const normalizeRecipients = (value) => Array.isArray(value)
+      ? value.map((recipient) => typeof recipient === 'object' ? (recipient.address || recipient.email || '') : recipient).filter(Boolean)
+      : value;
     const info = await emailTransporter.sendMail({
-      from: EMAIL_FROM, to, cc, bcc, subject, html, text, replyTo, headers,
+      from: EMAIL_FROM, to: normalizeRecipients(to), cc: normalizeRecipients(cc), bcc: normalizeRecipients(bcc), subject, html, text, replyTo, headers,
       attachments: Array.isArray(attachments) ? attachments.map((attachment) => ({
         filename: attachment.filename || attachment.name || 'attachment',
         content: Buffer.from(attachment.content || '', 'base64'),

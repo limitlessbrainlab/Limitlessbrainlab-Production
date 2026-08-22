@@ -1302,11 +1302,11 @@ const AlgorithmDataProcessor = () => {
   // Ordered stages shown in the progress panel. `upload` is the browser->server
   // fetch (before the first SSE event); the rest are streamed by the backend.
   const CLAUDE_STAGE_ORDER = [
-    { key: 'upload', label: 'Uploading to Claude…', pct: 5 },
+    { key: 'upload', label: 'Uploading your document…', pct: 5 },
     { key: 'reading', label: 'Reading the document…', pct: 10 },
-    { key: 'extract', label: 'Claude is reading your numbers…', pct: 25 },
+    { key: 'extract', label: 'AI is reading your numbers…', pct: 25 },
     { key: 'build', label: 'Building your report…', pct: 55 },
-    { key: 'narrative', label: 'Claude is writing your report…', pct: 60 },
+    { key: 'narrative', label: 'AI is writing your report…', pct: 60 },
     { key: 'render', label: 'Rendering the 12-page PDF…', pct: 88 },
     { key: 'saving', label: 'Saving your report…', pct: 95 },
   ];

@@ -57,6 +57,8 @@ failed for all patients. Do NOT violate these rules without explicit discussion.
    - If it is missing from render.yaml, the key is NOT picked up on redeploy.
    - See `render.yaml` — it must be listed under env vars even if the value is secret.
 
+**Shared quota note:** with `REPORT_AI_PROVIDER=gemini` (the default), the NeuroSense Performance Report's two AI calls run on the same `GEMINI_API_KEY` and rate limiter as the QEEG flow; quota exhaustion (`GEMINI_DAILY_QUOTA_EXCEEDED`) fails the paid report loudly with no fallback to Claude. `REPORT_AI_PROVIDER=claude` flips the report AI back to the Nexaproc gateway (PDF rendering stays on the VPS either way).
+
 ### Deployment Checklist — Before every production push
 
 See `skills/qeeg-production-checklist.md` for the full pre-deployment checklist.
@@ -70,6 +72,7 @@ Run through this before any push that touches: `server/routes/qeegRoutes.js`,
 | `GEMINI_API_KEY` | Render dashboard + render.yaml (sync:false) | Murali |
 | `GEMINI_REQUEST_DELAY_MS` | render.yaml value: "2000" | Claude / Murali |
 | `GEMINI_DAILY_LIMIT` | render.yaml value: "50" | Claude / Murali |
+| `REPORT_AI_PROVIDER` | render.yaml value: "gemini" | Claude / Murali |
 
 ---
 

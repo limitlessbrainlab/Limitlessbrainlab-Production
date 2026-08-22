@@ -24,6 +24,15 @@ services:
         value: "2000"
       - key: GEMINI_DAILY_LIMIT
         value: "50"
+      # The performance report fires extract + narrative seconds apart; the
+      # limiter's default of 2/min (shared with qEEG) would stall the second
+      # call ~60s. 10/min is well inside 2.5-flash limits.
+      - key: GEMINI_REQUESTS_PER_MINUTE
+        value: "10"
+      # Performance-report AI provider: gemini (default; pinned gemini-2.5-flash)
+      # or claude (Nexaproc gateway flip-back). Non-secret.
+      - key: REPORT_AI_PROVIDER
+        value: gemini
       - key: NEXAPROC_GATEWAY_URL
         value: http://187.127.176.1/neuro-sidecar
       - key: NEXAPROC_MASTER_KEY

@@ -51,6 +51,8 @@ if (!process.env.GEMINI_API_KEY) {
 
 Run this checklist before every push that touches QEEG, Gemini, or render.yaml.
 
+> Also run it for changes to `server/services/reportAiProvider.js` or `server/routes/claudeReportRoutes.js`: with `REPORT_AI_PROVIDER=gemini` (default), the NeuroSense Performance Report's AI calls draw from the same `GEMINI_API_KEY` daily quota as QEEG, and a quota/limit change here affects both flows.
+
 ### render.yaml verification
 - [ ] `GEMINI_API_KEY` present with `sync: false`
 - [ ] `GEMINI_REQUEST_DELAY_MS` set to `"2000"` (not higher)

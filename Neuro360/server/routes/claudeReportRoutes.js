@@ -5,7 +5,8 @@ const fs = require('fs');
 const pdfParse = require('pdf-parse');
 const axios = require('axios');
 const { sidecarAuth } = require('../middleware/sidecarAuth');
-const { extractReportSource, postLesson, GATEWAY_URL } = require('../services/nexaprocService');
+const { postLesson, GATEWAY_URL } = require('../services/nexaprocService');
+const { extractReportSource, getReportAiProvider, REPORT_GEMINI_MODEL } = require('../services/reportAiProvider');
 const { buildReportDataFromSource, buildReportDataFromNeuroSenseMd } = require('../services/claudeReportData');
 const { buildNeuroSenseMarkdown } = require('../services/neurosenseMarkdown');
 const { generateBrainReportPdf } = require('../services/claudeReportGenerator');
@@ -13,13 +14,18 @@ const SupabaseStorage = require('../services/supabaseStorage');
 
 const router = express.Router();
 
-// GET /api/qeeg/claude-report/health — proxy VPS sidecar health (no auth, read-only)
+// GET /api/qeeg/claude-report/health — proxy VPS sidecar health (no auth, read-only).
+// The VPS is still needed in both provider modes (it renders the PDF), so the
+// proxy stays. The provider fields are CONFIG-ONLY — no live Gemini call here
+// (it would burn quota and delay the preflight; see the QEEG production rules).
 router.get('/health', async (req, res) => {
+  const provider = getReportAiProvider();
+  const extra = { provider, geminiConfigured: provider === 'gemini' ? !!process.env.GEMINI_API_KEY : null };
   try {
     const response = await axios.get(`${GATEWAY_URL}/health`, { timeout: 6000 });
-    res.json({ ok: true, ...response.data });
+    res.json({ ok: true, ...extra, ...response.data });
   } catch (error) {
-    res.status(503).json({ ok: false, error: error.message });
+    res.status(503).json({ ok: false, ...extra, error: error.message });
   }
 });
 
@@ -59,9 +65,9 @@ const upload = multer({
 // Human-readable label for each streamed stage (frontend shows these verbatim).
 const STAGE_LABELS = {
   reading: 'Reading the document…',
-  extract: 'Claude is reading your numbers…',
+  extract: 'AI is reading your numbers…',
   build: 'Building your report…',
-  narrative: 'Claude is writing your report…',
+  narrative: 'AI is writing your report…',
   render: 'Rendering the 12-page PDF…',
   saving: 'Saving your report…',
 };
@@ -103,6 +109,9 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
   req.on('close', () => { clientGone = true; clearInterval(heartbeat); });
 
   try {
+    const provider = getReportAiProvider();
+    console.log(`[Claude Report] AI provider: ${provider}${provider === 'gemini' ? ` (${REPORT_GEMINI_MODEL})` : ''}`);
+
     // Extract the uploaded report's text (fast; the values are textual).
     progress('reading');
     let text;
@@ -123,6 +132,11 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
     // Call 1: transcribe the numbers off the uploaded report (fast, small output).
     progress('extract');
     const source = await extractReportSource(text);
+    // A null source would silently build an all-N/A report and ship it as a
+    // paid PDF — fail loudly instead so the admin can retry.
+    if (!source) {
+      throw new Error('Could not read the numbers from the uploaded report — the AI response was not usable. Please try again.');
+    }
 
     let algorithmResults = null;
     if (req.body && req.body.algorithmResults) {

@@ -38,7 +38,7 @@ Before deploying, you must have active accounts on:
 - [ ] **Hostinger VPS** — Claude AI Gateway (VPS plan)
 - [ ] **Stripe** — Payment processing (test + live keys)
 - [ ] **Google Gmail** — Transactional email (App Password required)
-- [ ] **Anthropic** — Claude API (for VPS gateway)
+- [ ] **Anthropic** — Claude API (for VPS gateway; only used by this app when `REPORT_AI_PROVIDER=claude`)
 
 ---
 
@@ -77,6 +77,8 @@ Enable RLS on all tables. Patients can only read their own records.
 ## Part 2 — VPS Claude Gateway (Hostinger)
 
 The VPS runs the Nexaproc AI Gateway — it wraps the Claude CLI and provides PDF rendering via headless Chromium.
+
+> **Performance Report AI provider:** the NeuroSense Performance Report (`POST /api/qeeg/claude-report`) runs its two AI calls (number extraction + narrative) on the **Gemini API on Render** by default (`REPORT_AI_PROVIDER=gemini`, pinned to `gemini-2.5-flash`, using the existing `GEMINI_API_KEY`). Set `REPORT_AI_PROVIDER=claude` to flip those AI calls back to this VPS gateway. The VPS is still required in **both** modes — it renders the 12-page PDF (`/api/html-to-pdf`) and stores the learned narrative examples.
 
 ### 2.1 VPS Requirements
 - Ubuntu 22.04 LTS
@@ -191,6 +193,7 @@ Set these in **Render Dashboard → neuro360-backend → Environment**:
 | `GEMINI_API_KEY` | `AIza...` | From Google AI Studio |
 | `GEMINI_REQUEST_DELAY_MS` | `2000` | |
 | `GEMINI_DAILY_LIMIT` | `50` | |
+| `REPORT_AI_PROVIDER` | `gemini` | Performance-report AI: `gemini` (default) or `claude` (VPS gateway); set in `render.yaml` |
 | `STRIPE_SECRET_KEY` | `sk_live_...` | From Stripe Dashboard |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_...` | From Stripe Webhooks |
 | `EMAIL_USER` | `noreply@yourdomain.com` | Gmail address |
@@ -301,7 +304,7 @@ Run through this after every deployment:
 ### Report Generation
 - [ ] Upload EEG files → QEEG report generates
 - [ ] "Upload to Claude" → sidecar health check shows `✅ Sidecar online`
-- [ ] Claude report generates (12 pages, no blank pages)
+- [ ] Performance report generates (12 pages, no blank pages)
 - [ ] Report appears in patient portal under "Neurosense Reports"
 
 ### Payments
@@ -325,6 +328,8 @@ SUPABASE_SERVICE_ROLE_KEY  ← Never expose to frontend
 STRIPE_SECRET_KEY          ← Use sk_live_ for production
 ```
 
+> `NEXAPROC_GATEWAY_URL` and `NEXAPROC_MASTER_KEY` stay required even with `REPORT_AI_PROVIDER=gemini` — the VPS still renders the report PDF and stores learned examples. `REPORT_AI_PROVIDER` itself is set in `render.yaml` (default `gemini`), not manually in the dashboard.
+
 ### Critical — Must Set Manually in Vercel Dashboard
 
 ```
@@ -341,6 +346,8 @@ VITE_API_URL               ← Must point to Render backend URL
 |---|---|---|
 | Blank pages in PDF | Chromium paper size mismatch | Already fixed via `@page { size: A4 }` in template |
 | "Sidecar offline" error | VPS gateway not running | `pm2 restart nexaproc-aiinmail` on VPS |
+| Performance report fails with `GEMINI_DAILY_QUOTA_EXCEEDED` | Shared Gemini daily limit hit (QEEG + performance report use the same key/limiter) | Raise `GEMINI_DAILY_LIMIT`, or set `REPORT_AI_PROVIDER=claude` in render.yaml + redeploy |
+| Performance report fails with "GEMINI_API_KEY is not set" | `REPORT_AI_PROVIDER=gemini` but the key is missing | Set `GEMINI_API_KEY` in Render (and keep it in render.yaml with `sync: false`) |
 | "NEXAPROC_MASTER_KEY not set" | Missing in Render dashboard | Add secret in Render → Environment |
 | Backend cold start slow | Render free tier spins down | Upgrade to Starter ($7/mo) or keep-warm cron |
 | Report credits not updating | `clinics` and `organizations` out of sync | Update both tables in Supabase |

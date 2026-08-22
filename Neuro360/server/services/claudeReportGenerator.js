@@ -3,15 +3,17 @@
  * polished 12-page "Brain Type & Performance Report" PDF.
  *
  *   reportData (numbers, from algorithmCalculator + buildReportData)
- *      → Claude narrative (VPS gateway, prose only)
+ *      → AI narrative (Gemini by default, or the VPS Claude gateway when
+ *        REPORT_AI_PROVIDER=claude — prose only, via reportAiProvider)
  *      → 12-page HTML template (numbers filled deterministically)
  *      → VPS gateway renders HTML to PDF via headless Chromium (no Puppeteer on Render)
  *
- * Claude never computes or alters numbers — see nexaprocService.generateReportNarrative.
+ * The AI never computes or alters numbers — see reportAiProvider.generateReportNarrative.
  * PDF rendering is offloaded to the VPS (/api/html-to-pdf) to avoid OOM on Render free tier.
  */
 
-const { generateReportNarrative, renderHtmlOnVps, postLesson } = require('./nexaprocService');
+const { generateReportNarrative } = require('./reportAiProvider');
+const { renderHtmlOnVps, postLesson } = require('./nexaprocService');
 const { renderReportHtml } = require('../templates/brainReport12Page');
 const { inlineEmojis } = require('../utils/inlineEmojis');
 
@@ -31,13 +33,16 @@ async function generateBrainReportPdf(reportData, narrative, onProgress) {
   }
 
   // Narrative is best-effort — the template falls back to framework copy if it's
-  // missing, so a Claude hiccup never blocks the report.
+  // missing, so an AI hiccup never blocks the report.
   let prose = narrative && typeof narrative === 'object' ? narrative : null;
   if (!prose) {
     try {
       if (typeof onProgress === 'function') onProgress('narrative');
       prose = await generateReportNarrative(reportData);
     } catch (e) {
+      // A paid report must fail loudly with the quota reason rather than
+      // silently degrade to template copy (the gateway path never sets this code).
+      if (e && e.code === 'GEMINI_DAILY_QUOTA_EXCEEDED') throw e;
       console.warn('[Claude Report] Narrative generation failed, using framework defaults:', e.message);
       postLesson('narrative', e.message,
         `Narrative generation failed: "${e.message}". Ensure the JSON schema is followed exactly and output has no markdown fences.`);

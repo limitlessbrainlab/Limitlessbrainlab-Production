@@ -261,20 +261,14 @@ async function generateReportNarrative(reportData) {
 }
 
 /**
- * Read an ALREADY-GENERATED brain/qEEG report's text and TRANSCRIBE its numbers
- * verbatim into the `source` object. We never recompute — the uploaded report
- * already prints these values; Claude only transcribes them. Kept deliberately
- * small/fast (numbers only, no prose) so it stays well under the gateway's 300s
- * cap; the doctor-readable prose is fetched separately via generateReportNarrative.
+ * The number-transcription prompt shared by every report AI provider (gateway
+ * Claude and Gemini alike) — the wording must stay identical across providers
+ * so the transcribed `source` shape never drifts.
  * @param {string} pdfText  Text extracted (pdf-parse) from the uploaded report.
- * @returns {Promise<object|null>}  The `source` object (or null on failure).
+ * @returns {string}  The full prompt.
  */
-async function extractReportSource(pdfText) {
-  if (!MASTER_KEY) {
-    throw new Error('NEXAPROC_MASTER_KEY is not set on the server. Cannot authenticate to the AIaaS gateway.');
-  }
-
-  const payload = `You are given the raw text of an EXISTING brain / qEEG performance report for a
+function buildExtractSourcePrompt(pdfText) {
+  return `You are given the raw text of an EXISTING brain / qEEG performance report for a
 single patient. It already prints the patient's scores and EEG metric values.
 
 TRANSCRIBE the numbers EXACTLY as they appear. Do NOT compute, invert, infer, or
@@ -326,6 +320,23 @@ Rules:
 
 Here is the report text:
 ${pdfText}`;
+}
+
+/**
+ * Read an ALREADY-GENERATED brain/qEEG report's text and TRANSCRIBE its numbers
+ * verbatim into the `source` object. We never recompute — the uploaded report
+ * already prints these values; Claude only transcribes them. Kept deliberately
+ * small/fast (numbers only, no prose) so it stays well under the gateway's 300s
+ * cap; the doctor-readable prose is fetched separately via generateReportNarrative.
+ * @param {string} pdfText  Text extracted (pdf-parse) from the uploaded report.
+ * @returns {Promise<object|null>}  The `source` object (or null on failure).
+ */
+async function extractReportSource(pdfText) {
+  if (!MASTER_KEY) {
+    throw new Error('NEXAPROC_MASTER_KEY is not set on the server. Cannot authenticate to the AIaaS gateway.');
+  }
+
+  const payload = buildExtractSourcePrompt(pdfText);
 
   // The gateway is single-flight (one CLI call at a time) and shared with other
   // products, so a "busy" (429) is common. Extract is the FIRST call and has NO
@@ -445,5 +456,7 @@ module.exports = {
   postLesson,
   fetchReportExamples,
   saveReportExample,
+  buildNarrativePrompt,
+  buildExtractSourcePrompt,
   GATEWAY_URL,
 };

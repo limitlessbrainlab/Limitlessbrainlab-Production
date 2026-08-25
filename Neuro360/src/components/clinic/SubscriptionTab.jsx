@@ -19,6 +19,7 @@ import PaymentHistory from '../payment/PaymentHistory';
 import PaymentSuccessModal from '../payment/PaymentSuccessModal';
 import toast from 'react-hot-toast';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
+import { formatCurrency } from '../../utils/currency';
 
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
@@ -398,7 +399,7 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
             <div>
               <h4 className="font-medium text-gray-900">Total Spent</h4>
               <p className="text-2xl font-bold text-[#323956]">
-                {userCurrency.symbol}{(usageStats.totalSpent || 0).toLocaleString()}
+                {formatCurrency(usageStats.totalSpent, userCurrency.currency)}
               </p>
             </div>
             <div className="text-right">
@@ -484,10 +485,10 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
               </div>
               <div className="text-right">
                 <p className="text-xl font-bold text-[#323956]">
-                  {userCurrency.symbol}{getPackagePrice(pkg).toLocaleString()}
+                  {formatCurrency(getPackagePrice(pkg), userCurrency.currency)}
                 </p>
                 <p className="text-xs text-gray-500">
-                  {userCurrency.symbol}{Math.round(getPackagePrice(pkg) / pkg.reports).toLocaleString()}/report
+                  {formatCurrency(Math.round(getPackagePrice(pkg) / pkg.reports), userCurrency.currency)}/report
                 </p>
               </div>
             </div>
@@ -548,12 +549,12 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
                       <div>
                         <p className="font-semibold text-gray-900">{pkg.label}</p>
                         <p className="text-sm text-gray-500">
-                          {userCurrency.symbol}{Math.round(getPackagePrice(pkg) / pkg.reports).toLocaleString()} per report
+                          {formatCurrency(Math.round(getPackagePrice(pkg) / pkg.reports), userCurrency.currency)} per report
                         </p>
                       </div>
                     </div>
                     <p className="text-xl font-bold text-[#323956]">
-                      {userCurrency.symbol}{getPackagePrice(pkg).toLocaleString()}
+                      {formatCurrency(getPackagePrice(pkg), userCurrency.currency)}
                     </p>
                   </div>
                 </button>
@@ -565,7 +566,7 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
               <div className="bg-gray-50 rounded-xl p-4 text-center">
                 <p className="text-sm text-gray-500 mb-1">Total Amount</p>
                 <p className="text-3xl font-bold text-[#323956]">
-                  {userCurrency.symbol}{totalPrice.toLocaleString()}
+                  {formatCurrency(totalPrice, userCurrency.currency)}
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
                   {selectedPackage.reports} report credits
@@ -588,7 +589,7 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
               ) : (
                 <>
                   <CreditCard className="h-5 w-5 mr-2" />
-                  Pay {userCurrency.symbol}{totalPrice.toLocaleString()} with Stripe
+                  Pay {formatCurrency(totalPrice, userCurrency.currency)} with Stripe
                 </>
               )}
             </button>

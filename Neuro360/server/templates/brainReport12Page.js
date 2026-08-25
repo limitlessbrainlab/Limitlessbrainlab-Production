@@ -338,6 +338,19 @@ function renderReportHtml(reportData, narrative = {}) {
   .pfill { height:100%; border-radius:6px; }
   .mt8{margin-top:8px;} .mt14{margin-top:14px;} .mt18{margin-top:18px;} .mt24{margin-top:24px;}
   .h3 { font-size:17px; font-weight:800; color:#15315f; margin:20px 0 12px; }
+  /* Page-specific fit: keep variable narrative lengths inside the A4 frame. */
+  .strategy-page .grid3, .strategy-page .grid2 { align-items:stretch; }
+  .strategy-page .card, .strategy-page .tcard { height:100%; }
+  .strategy-page .h3 { margin-top:16px; margin-bottom:9px; }
+  .strategy-page .callout { margin-top:14px; }
+  .inner-bandwidth-page .lead { margin-top:7px; line-height:1.45; }
+  .inner-bandwidth-page .grid3 { gap:12px; margin-top:13px; align-items:stretch; }
+  .inner-bandwidth-page .card { height:100%; padding:13px; }
+  .inner-bandwidth-page .perf2-body { line-height:1.42; margin-top:6px; }
+  .inner-bandwidth-page .callout { margin-top:12px; padding:11px 14px; }
+  .inner-bandwidth-page .callout p { line-height:1.45; }
+  .inner-bandwidth-page .h3 { margin-top:13px; margin-bottom:7px; }
+  .inner-bandwidth-page .advice-col li { line-height:1.35; margin:4px 0; }
   /* cover */
   .glow { position:absolute; top:-140px; right:-120px; width:520px; height:520px; border-radius:50%; background:radial-gradient(circle, rgba(120,175,255,.40), rgba(120,175,255,0) 70%); }
   .cover-brand-name { font-weight:800; font-size:20px; color:#fff; }
@@ -535,7 +548,7 @@ function renderReportHtml(reportData, narrative = {}) {
   </section>
 
   <!-- PAGE 7 — STRATEGY GUIDE -->
-  <section class="page">
+  <section class="page strategy-page">
     ${pageHeader('04', 'TYPE STRATEGY')}
     <div class="eyebrow">What Works For Your Type</div>
     <h2>${esc(bt.name)}-brain <span class="hl">strategy guide</span></h2>
@@ -569,7 +582,7 @@ function renderReportHtml(reportData, narrative = {}) {
   </section>
 
   <!-- PAGE 9 — EMOTION / LEARNING / CREATIVITY -->
-  <section class="page">
+  <section class="page inner-bandwidth-page">
     ${pageHeader('05', 'INNER BANDWIDTH')}
     <div class="eyebrow">Section 5 — Inner Bandwidth</div>
     <h2>Emotion, learning &amp; <span class="hl">creativity</span></h2>

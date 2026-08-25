@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 import DatabaseService from '../../services/databaseService';
 import PaymentHistoryModal from '../payment/PaymentHistoryModal';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
+import { formatCurrency } from '../../utils/currency';
 
 const PaymentHistory = ({ selectedClinic }) => {
   const [payments, setPayments] = useState([]);
@@ -146,11 +147,8 @@ const PaymentHistory = ({ selectedClinic }) => {
     return 'Payment';
   };
 
-  const formatAmount = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR'
-    }).format(amount || 0);
+  const formatAmount = (amount, currency = 'INR') => {
+    return formatCurrency(amount, currency);
   };
 
   const handleViewPaymentDetails = (payment) => {
@@ -202,13 +200,13 @@ const PaymentHistory = ({ selectedClinic }) => {
   };
 
   const getMonthlyRevenue = () => {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
     return payments
       .filter(p => {
         const paymentDate = new Date(p.createdAt || p.timestamp);
-        return paymentDate >= thirtyDaysAgo && getPaymentStatus(p).status === 'success';
+        return paymentDate >= monthStart && getPaymentStatus(p).status === 'success';
       })
       .reduce((sum, p) => sum + (p.amount || 0), 0);
   };
@@ -239,7 +237,7 @@ const PaymentHistory = ({ selectedClinic }) => {
               </div>
             </div>
             <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Total Revenue</p>
-            <p className="text-3xl font-black text-slate-800">{formatAmount(getTotalRevenue())}</p>
+            <p className="text-3xl font-black text-slate-800">{formatAmount(getTotalRevenue(), payments[0]?.currency)}</p>
             <div className="flex items-center space-x-2 mt-4">
               <div className="flex items-center space-x-2 px-3 py-1 bg-green-100 rounded-full">
                 <TrendingUp className="h-4 w-4 text-[#323956]" />
@@ -250,15 +248,15 @@ const PaymentHistory = ({ selectedClinic }) => {
         </div>
         
         <div className="group relative overflow-hidden bg-white/80 backdrop-blur-sm border border-white/20 rounded-3xl shadow-xl hover:shadow-2xl transition-all duration-500 hover:scale-[1.02]">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#E4EFFF]0 to-blue-600"></div>
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-blue-600"></div>
           <div className="p-8">
             <div className="flex items-center justify-between mb-4">
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-[#E4EFFF]0 to-blue-600 shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <TrendingUp className="h-8 w-8 text-white" />
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Calendar className="h-8 w-8 text-white" />
               </div>
             </div>
             <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-2">Monthly Revenue</p>
-            <p className="text-3xl font-black text-slate-800">{formatAmount(getMonthlyRevenue())}</p>
+            <p className="text-3xl font-black text-slate-800">{formatAmount(getMonthlyRevenue(), payments[0]?.currency)}</p>
             <div className="flex items-center space-x-2 mt-4">
               <div className="flex items-center space-x-2 px-3 py-1 bg-[#CAE0FF] rounded-full">
                 <Calendar className="h-4 w-4 text-[#323956]" />

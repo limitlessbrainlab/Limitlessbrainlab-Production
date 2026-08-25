@@ -1,5 +1,5 @@
 import React from 'react';
-import { 
+import {
   CheckCircle, 
   Download, 
   FileText, 
@@ -7,6 +7,7 @@ import {
   CreditCard,
   X
 } from 'lucide-react';
+import { formatCurrency } from '../../utils/currency';
 
 const PaymentSuccessModal = ({ 
   isOpen = true,
@@ -25,6 +26,7 @@ const PaymentSuccessModal = ({
         paymentId: paymentData.paymentId,
         orderId: paymentData.orderId,
         amount: paymentData.amount,
+        currency: paymentData.currency || 'INR',
         packageName: paymentData.packageName,
         reports: packageInfo?.reports || 0,
         date: new Date(paymentData.createdAt).toLocaleDateString(),
@@ -41,7 +43,7 @@ Date: ${invoiceData.timestamp}
 
 Package: ${invoiceData.packageName}
 Reports: ${invoiceData.reports}
-Amount: ₹${invoiceData.amount.toLocaleString()}
+Amount: ${formatCurrency(invoiceData.amount, invoiceData.currency)}
 
 Payment Method: Stripe
 Status: Completed
@@ -105,7 +107,7 @@ Thank you for your business!
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">Amount Paid</span>
               <span className="text-lg font-bold text-gray-900">
-                ₹{paymentData.amount?.toLocaleString() || 'N/A'}
+                {formatCurrency(paymentData.amount, paymentData.currency)}
               </span>
             </div>
             

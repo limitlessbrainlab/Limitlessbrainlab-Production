@@ -127,7 +127,7 @@ const PatientSubscriptions = () => {
         amount: f.amount_paid,
         currency: f.currency,
         created_at: f.purchased_at,
-        status: 'completed',
+        status: Number(f.amount_paid) || f.stripe_session_id ? 'completed' : 'granted',
         stripe_session_id: f.stripe_session_id,
       }));
       (meds.data || []).forEach((m) => rows.push({
@@ -137,7 +137,7 @@ const PatientSubscriptions = () => {
         amount: m.amount_paid,
         currency: m.currency,
         created_at: m.purchased_at,
-        status: 'completed',
+        status: Number(m.amount_paid) || m.stripe_session_id ? 'completed' : 'granted',
         stripe_session_id: m.stripe_session_id,
       }));
 
@@ -403,8 +403,8 @@ const PatientSubscriptions = () => {
                         <span className="font-medium text-gray-900 dark:text-white text-sm">
                           {payment.payment_type === 'subscription' ? `${(payment.tier || 'Plan').toUpperCase()} Subscription` : payment.payment_type || 'Payment'}
                         </span>
-                        <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                          {payment.currency || 'USD'} {(payment.amount || 0).toFixed(2)}
+                        <span className={`text-sm font-semibold ${payment.status === 'granted' ? 'text-blue-600 dark:text-blue-400' : 'text-green-600 dark:text-green-400'}`}>
+                          {payment.status === 'granted' ? 'Free Access' : `${payment.currency || 'USD'} ${(Number(payment.amount) || 0).toFixed(2)}`}
                         </span>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
@@ -419,6 +419,7 @@ const PatientSubscriptions = () => {
                         {payment.status && (
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                             payment.status === 'completed' ? 'bg-green-100 text-green-700' :
+                            payment.status === 'granted' ? 'bg-blue-100 text-blue-700' :
                             payment.status === 'failed' ? 'bg-red-100 text-red-700' :
                             'bg-gray-100 text-gray-600'
                           }`}>

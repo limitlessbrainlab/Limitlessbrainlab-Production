@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Calendar, CreditCard, FileText, Clock, CheckCircle, Download, Package, IndianRupee, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { formatCurrency } from '../../utils/currency';
 
 const PaymentHistoryModal = ({ isOpen, payment, onClose }) => {
   if (!isOpen || !payment) return null;
@@ -35,7 +36,9 @@ const PaymentHistoryModal = ({ isOpen, payment, onClose }) => {
     const pkgName = packageInfo.name || payment.packageName || 'EEG Reports';
     const reportsCount = packageInfo.reportsIncluded || payment.reports || 0;
     const amount = payment.amount || 0;
-    const currency = payment.currency === 'USD' ? 'USD ' : '\u20b9';
+    const currency = payment.currency || 'INR';
+    const formattedAmount = formatCurrency(amount, currency);
+    const formattedPerReport = formatCurrency(reportsCount ? amount / reportsCount : 0, currency);
     const logoUrl = window.location.origin + '/IBW%20Logo.png';
 
     return `<!DOCTYPE html>
@@ -143,17 +146,17 @@ const PaymentHistoryModal = ({ isOpen, payment, onClose }) => {
       <div class="desc">${reportsCount} EEG Report Credits</div>
     </div>
     <div>
-      <div class="price">${currency}${amount.toLocaleString()}</div>
-      <div class="per">${currency}${reportsCount ? Math.round(amount / reportsCount).toLocaleString() : 0}/report</div>
+      <div class="price">${formattedAmount}</div>
+      <div class="per">${formattedPerReport}/report</div>
     </div>
   </div>
 
   <!-- PAYMENT SUMMARY -->
   <div class="sec">Payment Summary</div>
   <div class="summary">
-    <div class="srow"><span>Package Amount</span><span>${currency}${amount.toLocaleString()}</span></div>
+    <div class="srow"><span>Package Amount</span><span>${formattedAmount}</span></div>
     <div class="srow"><span>Payment Method</span><span>Online Payment</span></div>
-    <div class="srow total"><span>Total Paid</span><span>${currency}${amount.toLocaleString()}</span></div>
+    <div class="srow total"><span>Total Paid</span><span>${formattedAmount}</span></div>
   </div>
 
   <!-- VALIDITY & INCLUDES -->
@@ -292,11 +295,11 @@ const PaymentHistoryModal = ({ isOpen, payment, onClose }) => {
                 </div>
                 <div className="text-right">
                   <div className="text-xl font-bold text-gray-900">
-                    ₹{payment.amount?.toLocaleString()}
+                    {formatCurrency(payment.amount, payment.currency)}
                   </div>
                   {packageInfo.originalPrice && packageInfo.originalPrice !== payment.amount && (
                     <div className="text-sm text-gray-500 line-through">
-                      ₹{packageInfo.originalPrice.toLocaleString()}
+                      {formatCurrency(packageInfo.originalPrice, payment.currency)}
                     </div>
                   )}
                 </div>
@@ -411,7 +414,7 @@ const PaymentHistoryModal = ({ isOpen, payment, onClose }) => {
               <div>
                 <span className="text-gray-600">Transaction Fee:</span>
                 <div className="font-medium text-gray-900 mt-1">
-                  ₹{paymentDetails.transactionFee || Math.round((payment.amount || 0) * 0.02)}
+                  {formatCurrency(paymentDetails.transactionFee || Math.round((payment.amount || 0) * 0.02), payment.currency)}
                 </div>
               </div>
               <div>

@@ -2144,8 +2144,9 @@ const AlgorithmDataProcessor = () => {
         occupation: selectedPatient.occupation || 'Not specified',
         symptoms: selectedPatient.symptoms || [],
         clinicName: selectedPatient.clinicName || 'Unknown-Clinic',
-        // Clinic id lets the backend swap in the clinic's uploaded logo.
-        clinicId: selectedPatient.clinicId || selectedPatient.clinic_id || selectedPatient.org_id || null
+        // Only a logo uploaded in this admin session may replace the default branding.
+        clinicId: selectedPatient.clinicId || selectedPatient.clinic_id || selectedPatient.org_id || null,
+        clinicLogoUrl: sessionLogoUrlFor(selectedPatient) || null
       };
 
 
@@ -2712,33 +2713,33 @@ const AlgorithmDataProcessor = () => {
 
               {/* Patient Table */}
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[980px] table-fixed">
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="w-[24%] px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Patient Name
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="w-[28%] px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Email
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="w-[23%] px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Previous Scans
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="w-[15%] px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Report Status
                       </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="w-[10%] px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Action
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {clinicPatients.map(patient => (
-                      <tr key={patient.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 ${(patient.referred_by === 'Limitless Brain Lab' || patient.referredBy === 'Limitless Brain Lab') ? 'bg-amber-50 dark:bg-amber-900/20 border-l-4 border-l-[#F5D05D]' : ''}`}>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                      <tr key={patient.id} className={`align-middle hover:bg-gray-50 dark:hover:bg-gray-700/50 ${(patient.referred_by === 'Limitless Brain Lab' || patient.referredBy === 'Limitless Brain Lab') ? 'bg-amber-50 dark:bg-amber-900/20 border-l-4 border-l-[#F5D05D]' : ''}`}>
+                        <td className="max-w-0 px-6 py-4">
                           <div className="flex items-center">
                             <User className={`h-4 w-4 mr-2 ${(patient.referred_by === 'Limitless Brain Lab' || patient.referredBy === 'Limitless Brain Lab') ? 'text-amber-500' : 'text-gray-400 dark:text-gray-500'}`} />
-                            <span className="text-sm font-medium text-gray-900 dark:text-white">
+                            <span className="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white" title={getPatientName(patient)}>
                               {getPatientName(patient)}
                               {(patient.referred_by === 'Limitless Brain Lab' || patient.referredBy === 'Limitless Brain Lab') && (
                                 <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#F5D05D] text-gray-900">LBL</span>
@@ -2746,10 +2747,10 @@ const AlgorithmDataProcessor = () => {
                             </span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                          {patient.email || 'N/A'}
+                        <td className="max-w-0 px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                          <span className="block truncate" title={patient.email || 'N/A'}>{patient.email || 'N/A'}</span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                           <span className="flex items-center">
                             <Calendar className="h-4 w-4 mr-1" />
                             {patient.lastProcessed
@@ -2757,13 +2758,13 @@ const AlgorithmDataProcessor = () => {
                               : 'No scans'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4">
                           {getStatusBadge(patient.algorithmStatus, patient.lastProcessed)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => handleGenerateReport(patient)}
-                            className="bg-primary hover:bg-navy-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-md flex items-center ml-auto"
+                            className="ml-auto flex w-[150px] items-center justify-center bg-primary hover:bg-navy-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-md"
                           >
                             <FileText className="h-4 w-4 mr-2" />
                             {patient.algorithmStatus === 'completed' ? 'View/Generate' : 'Generate Report'}
@@ -2953,7 +2954,7 @@ const AlgorithmDataProcessor = () => {
               Upload Other Documents
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              Upload a PDF — logo will be replaced with NeuroSense branding. The document's logo is also saved as the selected patient's clinic logo and used in their NeuroSense &amp; Performance reports.
+              Upload a PDF to use its logo in this clinic's NeuroSense &amp; Performance reports. Without an upload, reports use the default NeuroSense branding.
             </p>
             <div className="relative">
               <input

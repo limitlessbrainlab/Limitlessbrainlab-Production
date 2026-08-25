@@ -15,6 +15,7 @@ import {
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import PaymentHistoryModal from './PaymentHistoryModal';
+import { formatCurrency } from '../../utils/currency';
 
 const PaymentHistory = ({ clinicId }) => {
   const { user } = useAuth();
@@ -199,13 +200,6 @@ const PaymentHistory = ({ clinicId }) => {
     }
   };
 
-  const formatCurrency = (amount, currency = 'USD') => {
-    if (currency === 'INR') {
-      return `₹${amount?.toLocaleString() || 0}`;
-    }
-    return `USD ${amount?.toLocaleString() || 0}`;
-  };
-
   // Handle viewing detailed transaction history
   const handleViewHistory = (payment) => {
     setSelectedPayment(payment);
@@ -295,7 +289,7 @@ const PaymentHistory = ({ clinicId }) => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Spent</p>
               <p className="text-2xl font-semibold text-gray-900">
-                {formatCurrency(payments.reduce((sum, p) => sum + (p.amount || 0), 0), payments[0]?.currency)}
+                {formatCurrency(payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0), payments[0]?.currency || 'INR')}
               </p>
             </div>
           </div>

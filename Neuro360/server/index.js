@@ -52,8 +52,13 @@ async function claimNotificationOnce(key) {
 
 // Initialize Stripe (conditionally)
 let stripe = null;
-if (process.env.STRIPE_SECRET_KEY) {
-  stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const hasPlaceholderStripeKey = !stripeSecretKey || /YOUR_|REPLACE|\*{3,}|_KEY$/i.test(stripeSecretKey);
+const STRIPE_PRODUCT_IMAGE_URL = process.env.STRIPE_PRODUCT_IMAGE_URL || 'https://limitlessbrainlab.com/IBW%20Logo.png';
+if (stripeSecretKey && !hasPlaceholderStripeKey) {
+  stripe = require('stripe')(stripeSecretKey);
+} else {
+  console.warn('Stripe is not configured with a usable secret key. Set STRIPE_SECRET_KEY in server/.env.');
 }
 
 // Email transporter — Gmail SMTP (info@limitlessbrainlab.com via app password).
@@ -1631,6 +1636,10 @@ app.get('/api/website-payments', async (req, res) => {
 
     if (frequencies) {
       frequencies.forEach(item => {
+        // Care-program support grants create access rows without payment data;
+        // they are not website payments. Real purchases are also represented in
+        // patient_payments, which is loaded below.
+        if (!Number(item.amount_paid) && !item.stripe_session_id) return;
         allPayments.push({
           id: item.id,
           type: 'Frequency',
@@ -1653,6 +1662,7 @@ app.get('/api/website-payments', async (req, res) => {
 
     if (meditations) {
       meditations.forEach(item => {
+        if (!Number(item.amount_paid) && !item.stripe_session_id) return;
         allPayments.push({
           id: item.id,
           type: 'Meditation',
@@ -2092,6 +2102,23 @@ app.post('/api/geocode', async (req, res) => {
 });
 
 // =====================================================
+// STRIPE PAYMENT INTEGRATION - Shared helpers
+// =====================================================
+
+// Stripe Link ("Pay with Link" one-click wallet) is only supported for a subset
+// of currencies. Requesting it for an unsupported currency (e.g. INR, AED)
+// makes checkout session creation fail with an invalid_request_error, so the
+// 'link' payment method is gated by currency. Card is always enabled.
+const LINK_SUPPORTED_CURRENCIES = new Set([
+  'USD', 'AUD', 'CAD', 'CHF', 'DKK', 'EUR', 'GBP', 'HKD', 'NOK', 'NZD', 'SEK', 'SGD'
+]);
+
+function getStripePaymentMethodTypes(currency) {
+  const code = String(currency || 'USD').trim().toUpperCase();
+  return LINK_SUPPORTED_CURRENCIES.has(code) ? ['card', 'link'] : ['card'];
+}
+
+// =====================================================
 // STRIPE PAYMENT INTEGRATION - Frequency Music Packs
 // =====================================================
 
@@ -2131,7 +2158,7 @@ app.post('/api/create-frequency-checkout', async (req, res) => {
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: getStripePaymentMethodTypes(currency),
       line_items: [
         {
           price_data: {
@@ -2141,7 +2168,7 @@ app.post('/api/create-frequency-checkout', async (req, res) => {
               description: isBundle
                 ? 'Unlock all 6 brainwave frequency packs: Delta, Theta, Alpha, Beta, Gamma, and Solfeggio frequencies for complete brain optimization.'
                 : `Unlock the full ${packName} frequency pack for enhanced brain performance.`,
-              images: [`${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/IBW%20Logo.png`],
+              images: [STRIPE_PRODUCT_IMAGE_URL],
               metadata: {
                 pack_id: packId,
                 is_bundle: isBundle ? 'true' : 'false'
@@ -2225,7 +2252,7 @@ app.post('/api/create-meditation-checkout', async (req, res) => {
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: getStripePaymentMethodTypes(currency),
       line_items: [
         {
           price_data: {
@@ -2235,7 +2262,7 @@ app.post('/api/create-meditation-checkout', async (req, res) => {
               description: isBundle
                 ? 'Unlock all 6 guided meditation packs: Morning Awakening, Stress Relief, Focus & Clarity, Deep Sleep, Gratitude & Joy, and Body Healing.'
                 : `Unlock the full ${packName} meditation pack for enhanced mental wellness.`,
-              images: [`${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/IBW%20Logo.png`],
+              images: [STRIPE_PRODUCT_IMAGE_URL],
               metadata: {
                 pack_id: packId,
                 is_bundle: isBundle ? 'true' : 'false',
@@ -2313,7 +2340,7 @@ app.post('/api/stripe/create-checkout-session', async (req, res) => {
     }
 
     let sessionConfig = {
-      payment_method_types: ['card'],
+      payment_method_types: getStripePaymentMethodTypes(currency),
       mode: 'payment',
       customer_email: customerEmail,
       success_url: successUrl || `${req.headers.origin}/dashboard?payment=success&tier=${tierId}&session_id={CHECKOUT_SESSION_ID}`,
@@ -2340,7 +2367,7 @@ app.post('/api/stripe/create-checkout-session', async (req, res) => {
           product_data: {
             name: `Limitless Brain Lab ${tierName} Subscription`,
             description: `Access to ${tierName} features - Monthly subscription`,
-            images: [`${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/favicon.ico`]
+            images: [STRIPE_PRODUCT_IMAGE_URL]
           },
           unit_amount: Math.round(price * 100) // Convert to cents
         },
@@ -2697,7 +2724,7 @@ app.post('/api/create-report-checkout', async (req, res) => {
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: getStripePaymentMethodTypes(currency),
       line_items: [
         {
           price_data: {
@@ -2705,7 +2732,7 @@ app.post('/api/create-report-checkout', async (req, res) => {
             product_data: {
               name: `${packageName} - ${reports} EEG Reports`,
               description: `Purchase ${reports} EEG brain reports for your clinic`,
-              images: [`${baseUrl}/IBW%20Logo.png`],
+              images: [STRIPE_PRODUCT_IMAGE_URL],
               metadata: {
                 package_id: packageId,
                 reports: reports.toString(),
@@ -3567,7 +3594,7 @@ app.post('/api/create-coaching-checkout', async (req, res) => {
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: getStripePaymentMethodTypes(currency),
       line_items: [
         {
           price_data: {
@@ -3575,7 +3602,7 @@ app.post('/api/create-coaching-checkout', async (req, res) => {
             product_data: {
               name: `Brain Coaching Session with ${coachName}`,
               description: '30-minute online brain coaching session',
-              images: [`${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/IBW%20Logo.png`],
+              images: [STRIPE_PRODUCT_IMAGE_URL],
               metadata: {
                 type: 'coaching_session',
                 coach_id: coachId,
@@ -3674,7 +3701,7 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: getStripePaymentMethodTypes(currency),
       line_items: [
         {
           price_data: {
@@ -3682,7 +3709,7 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
             product_data: {
               name: `${assessmentName} - Brain Assessment`,
               description: `Unlock your ${assessmentName} to understand your brain health better.`,
-              images: [`${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/IBW%20Logo.png`],
+              images: [STRIPE_PRODUCT_IMAGE_URL],
               metadata: {
                 assessment_id: assessmentId,
                 type: 'assessment'

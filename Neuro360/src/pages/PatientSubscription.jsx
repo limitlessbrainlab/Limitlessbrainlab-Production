@@ -18,7 +18,8 @@ import {
   Music,
   Users,
   Star,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import AccessControlService, { SUBSCRIPTION_TIERS } from '../services/accessControlService';
@@ -38,6 +39,7 @@ const PatientSubscription = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [localizedPackages, setLocalizedPackages] = useState([]);
   const [showContactForm, setShowContactForm] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     loadSubscription();
@@ -70,6 +72,11 @@ const PatientSubscription = () => {
     } catch (error) {
       console.error('Error loading location:', error);
     }
+  };
+
+  const handleSyncCurrentPlan = () => {
+    setIsSyncing(true);
+    window.location.reload();
   };
 
   // Handle payment callback from Stripe redirect
@@ -343,12 +350,21 @@ const PatientSubscription = () => {
             <p className="text-lg text-blue-100 max-w-2xl mx-auto">
               Unlock your brain's full potential with our comprehensive training programs
             </p>
-            {currentTier !== 'FREE' && (
-              <div className="mt-4 inline-flex items-center px-4 py-2 bg-white/20 rounded-full">
+            <div className="mt-4 inline-flex items-center gap-3 px-4 py-2 bg-white/20 rounded-full">
                 <Shield className="h-4 w-4 mr-2" />
                 <span>Current Plan: <strong>{currentTier}</strong></span>
-              </div>
-            )}
+                <button
+                  type="button"
+                  onClick={handleSyncCurrentPlan}
+                  disabled={isSyncing}
+                  title="Sync current plan"
+                  aria-label="Sync current plan"
+                  className="inline-flex items-center gap-1 text-xs text-blue-100 hover:text-white disabled:opacity-60"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                  {isSyncing ? 'Syncing…' : 'Sync'}
+                </button>
+            </div>
             {userLocation && (
               <div className="mt-2 text-sm text-blue-200">
                 Prices shown in {userLocation.currency} • Secure Stripe Checkout

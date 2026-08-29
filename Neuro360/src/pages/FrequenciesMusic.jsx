@@ -185,6 +185,7 @@ const FrequenciesMusic = () => {
           customerName: paymentName.toUpperCase(),
           currency: 'USD',
           amount: selectedPack.price,
+          patientId: user?.id,
           successUrl: `${window.location.origin}/dashboard/frequencies?payment=success&pack=${selectedPack.id}&session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: `${window.location.origin}/dashboard/frequencies?payment=cancelled`
         })
@@ -203,11 +204,14 @@ const FrequenciesMusic = () => {
     }
   };
 
-  // Check for successful payment on mount
+  // Check for successful payment on mount. The pack is only unlocked after
+  // the server confirms the Stripe session was actually paid — never trust
+  // the redirect URL/localStorage alone (that used to let anyone grant
+  // themselves a free pack by replaying/faking the success redirect).
   useEffect(() => {
     // Capture the payment intent to localStorage and clear the URL BEFORE requiring
     // a hydrated user, so a redirect that lands logged-out (or before auth restores)
-    // is not lost. The DB write runs once user?.email is available (deps re-run).
+    // is not lost. Verification runs once user?.email is available (deps re-run).
     const urlParams = new URLSearchParams(window.location.search);
     let paymentPackId = urlParams.get('pack');
     let paymentSessionId = urlParams.get('session_id');
@@ -225,134 +229,47 @@ const FrequenciesMusic = () => {
     if (!pending) return;
     if (!user?.email) return; // wait for auth to hydrate; pending persists for next run
 
-    const { packId: pId, sessionId: sId } = JSON.parse(pending);
+    const { sessionId: sId } = JSON.parse(pending);
     localStorage.removeItem('pendingFreqPayment');
 
-    // Derive the price/name from the canonical frequencyPacks source of truth so the
-    // recorded amount always matches the offered (and Stripe-charged) price. Keying off a
-    // separate map previously caused gamma/solfeggio packs to fall back to a wrong $29.
-    const purchasedPack = frequencyPacks.find(p => p.id === pId);
-    const amount = purchasedPack?.price ?? 29;
-    const packName = purchasedPack?.name || 'Frequency Pack';
+    if (!sId) {
+      toast.error('We could not confirm your payment. If you were charged, please contact support.');
+      return;
+    }
 
-    // Show success popup immediately and optimistically unlock the pack
-    setPurchasedPackId(pId);
-    setPurchasedPacks(prev => [...new Set([...prev, pId])]);
-    setPaymentSuccessDetails({
-      name: packName, amount: `USD ${amount}`, email: user?.email || '',
-      date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      transactionId: sId || 'N/A'
-    });
-    setShowPaymentSuccessPopup(true);
-
-    // Save payment data in background
-    const saveFrequencyPayment = async () => {
+    const verifyAndUnlock = async () => {
       try {
-        // Check duplicate
-        if (sId) {
-          const { data: existing } = await supabase
-            .from('patient_payments')
-            .select('id')
-            .eq('stripe_session_id', sId)
-            .limit(1);
-          if (existing && existing.length > 0) {
-            return;
-          }
+        const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
+        const response = await fetch(`${API_URL}/stripe/verify-session/${sId}`);
+        const data = await response.json().catch(() => null);
+
+        if (!data?.success || data.status !== 'paid' || !data.packId) {
+          toast.error('We could not verify your payment. If you were charged, please contact support.');
+          return;
         }
 
-          // Get clinic_id from patients table
-          let clinicIdForPayment = null;
-          let clinicNameForEmail = '';
-          let patientRecord = null;
+        const pId = data.packId;
+        // Derive the name from the canonical frequencyPacks source of truth.
+        const purchasedPack = frequencyPacks.find(p => p.id === pId);
+        const packName = purchasedPack?.name || 'Frequency Pack';
 
-          if (user?.id) {
-            const { data: p } = await supabase.from('patients').select('*').eq('id', user.id).limit(1).single();
-            if (p) {
-              patientRecord = p;
-              clinicIdForPayment = p.clinic_id || p.org_id || null;
-            }
-          }
-          if (!patientRecord && user?.email) {
-            const { data: ps } = await supabase.from('patients').select('*').eq('email', user.email.toLowerCase()).order('created_at', { ascending: false }).limit(1);
-            if (ps && ps.length > 0) {
-              patientRecord = ps[0];
-              clinicIdForPayment = ps[0].clinic_id || ps[0].org_id || null;
-            }
-          }
-          if (clinicIdForPayment) {
-            const { data: clinicRow } = await supabase.from('clinics').select('name').eq('id', clinicIdForPayment).single();
-            clinicNameForEmail = clinicRow?.name || '';
-          }
+        setPurchasedPackId(pId);
+        setPurchasedPacks(prev => [...new Set([...prev, pId])]);
+        setPaymentSuccessDetails({
+          name: packName, amount: `${data.currency || 'USD'} ${data.amount}`, email: user?.email || '',
+          date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+          time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          transactionId: sId
+        });
+        setShowPaymentSuccessPopup(true);
+        fetchPurchasedPacks();
+      } catch (err) {
+        console.error('Error verifying frequency payment:', err);
+        toast.error('We could not verify your payment. If you were charged, please contact support.');
+      }
+    };
 
-          const amt = amount;
-
-          // Save to patient_payments
-          await supabase.from('patient_payments').insert({
-            clinic_id: clinicIdForPayment,
-            patient_id: user.id || null,
-            patient_email: user.email.toLowerCase(),
-            patient_name: patientRecord?.full_name || patientRecord?.name || user.name || '',
-            amount: amt,
-            currency: 'USD',
-            status: 'completed',
-            type: 'frequency',
-            item_name: packName,
-            assessment_id: pId,
-            stripe_session_id: sId || null,
-            source: 'Frequencies',
-            created_at: new Date().toISOString()
-          }).then(({ error }) => {
-            if (error) console.warn('patient_payments save error:', error.message);
-            else console.log('SUCCESS: Frequency payment saved to patient_payments');
-          });
-
-          // Save to frequency_purchases (columns must match the live table:
-          // patient_email, frequency_id, pack_id, purchased_at). Sending extra
-          // columns like amount_paid/currency made every insert fail silently,
-          // so purchases were never recorded and the pack reverted to "Buy Now".
-          await supabase.from('frequency_purchases').insert({
-            patient_email: user.email.toLowerCase(),
-            pack_id: pId,
-            frequency_id: pId,
-            purchased_at: new Date().toISOString()
-          }).catch(err => console.warn('frequency_purchases save:', err.message));
-
-          // Send emails (patient + admin)
-          try {
-            const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
-            await fetch(`${API_URL}/send-assessment-email`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                customerEmail: user.email,
-                customerName: patientRecord?.full_name || patientRecord?.name || user.name || '',
-                assessmentName: packName,
-                assessmentLink: 'no_link',
-                amountPaid: amt.toFixed(2),
-                currency: 'USD',
-                transactionId: sId || '',
-                source: 'patient_dashboard',
-                clinicName: clinicNameForEmail,
-                clinicId: clinicIdForPayment || '',
-                patientPhone: patientRecord?.phone || '',
-                patientDob: patientRecord?.date_of_birth || '',
-                patientGender: patientRecord?.gender || '',
-                patientUid: patientRecord?.external_id || ''
-              })
-            });
-          } catch (emailErr) {
-            console.warn('Email sending failed:', emailErr.message);
-          }
-
-          // Re-fetch to confirm from DB
-          fetchPurchasedPacks();
-        } catch (err) {
-          console.error('Error saving frequency payment:', err);
-        }
-      };
-
-      saveFrequencyPayment();
+    verifyAndUnlock();
   }, [user?.id, user?.email]);
 
   // Handle cancelled payment

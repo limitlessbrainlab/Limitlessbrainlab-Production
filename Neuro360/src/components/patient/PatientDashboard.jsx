@@ -684,6 +684,7 @@ const PatientDashboard = () => {
           patientId: user.id,
           clinicId: patientClinicId,
           source: 'patient_dashboard',
+          bundleIds: getAssessmentDetails(assessmentId).bundleIds,
           successUrl: `${returnBase}/dashboard/about-brain?payment=success&assessment=${assessmentId}&session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: `${returnBase}/dashboard/about-brain?payment=cancelled`
         }),
@@ -704,7 +705,10 @@ const PatientDashboard = () => {
     }
   };
 
-  // Check for successful assessment payment on mount
+  // Check for successful assessment payment on mount. Access is only granted
+  // after the server confirms the Stripe session was actually paid — never
+  // trust the redirect URL alone (that used to let anyone grant themselves a
+  // free assessment by hand-typing ?payment=success&assessment=<id>).
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const paymentStatus = urlParams.get('payment') || urlParams.get('assessment_payment');
@@ -712,199 +716,50 @@ const PatientDashboard = () => {
     const sessionId = urlParams.get('session_id');
 
     if (paymentStatus === 'success' && assessmentId) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      if (!sessionId) {
+        toast.error('We could not confirm your payment. If you were charged, please contact support.');
+        return;
+      }
+
       if (!LEGACY_ASSESSMENTS[assessmentId] && assessmentsLoading) return;
 
       const assessmentDetails = getAssessmentDetails(assessmentId);
 
-      // Save payment directly to database
-      const savePatientPayment = async () => {
+      const verifyAndUnlock = async () => {
         try {
-          // Check if already saved (prevent duplicates on page refresh)
-          if (sessionId) {
-            const { data: existing } = await supabase
-              .from('patient_payments')
-              .select('id')
-              .eq('stripe_session_id', sessionId)
-              .limit(1);
-            if (existing && existing.length > 0) {
-              return;
-            }
+          const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
+          const response = await fetch(`${API_URL}/stripe/verify-session/${sessionId}`);
+          const data = await response.json().catch(() => null);
+
+          if (!data?.success || data.status !== 'paid') {
+            toast.error('We could not verify your payment. If you were charged, please contact support.');
+            return;
           }
 
-          // Fetch clinic_id from patients table directly (patientClinicId may not be set yet after redirect)
-          let clinicIdForPayment = patientClinicId || null;
-          let patientRecordForEmail = null;
-          if (!clinicIdForPayment) {
-            // Try by user id first (unique, most accurate)
-            if (user?.id) {
-              const { data: patientRow } = await supabase
-                .from('patients')
-                .select('*')
-                .eq('id', user.id)
-                .limit(1)
-                .single();
-              if (patientRow) {
-                patientRecordForEmail = patientRow;
-                clinicIdForPayment = patientRow.clinic_id || patientRow.org_id || null;
-              }
-            }
-            // Fallback: try by email with most recent record
-            if (!clinicIdForPayment && user?.email) {
-              const { data: patientsByEmail } = await supabase
-                .from('patients')
-                .select('*')
-                .eq('email', user.email.toLowerCase())
-                .order('created_at', { ascending: false })
-                .limit(1);
-              if (patientsByEmail && patientsByEmail.length > 0) {
-                patientRecordForEmail = patientsByEmail[0];
-                clinicIdForPayment = patientsByEmail[0].clinic_id || patientsByEmail[0].org_id || null;
-              }
-            }
-          }
-
-          // Save to patient_payments
-          const { error: ppError } = await supabase
-            .from('patient_payments')
-            .insert({
-              clinic_id: clinicIdForPayment,
-              patient_id: user.id || null,
-              patient_email: user.email.toLowerCase(),
-              patient_name: user.name || user.user_metadata?.full_name || '',
-              amount: assessmentDetails.price,
-              currency: 'USD',
-              status: 'completed',
-              type: 'assessment',
-              item_name: assessmentDetails.name,
-              assessment_id: assessmentId,
-              assessment_link: assessmentDetails.link,
-              stripe_session_id: sessionId || null,
-              source: 'About the Brain',
-              created_at: new Date().toISOString()
-            });
-
-          if (ppError) {
-            console.error('patient_payments save error:', ppError);
-          } else {
-          }
-
-          // Also save to assessment_purchases for button state
-          const { error: apError } = await supabase
-            .from('assessment_purchases')
-            .insert({
-              patient_email: user.email.toLowerCase(),
-              assessment_id: assessmentId,
-              assessment_name: assessmentDetails.name,
-              assessment_link: assessmentDetails.link,
-              stripe_session_id: sessionId || null,
-              amount_paid: assessmentDetails.price,
-              currency: 'USD',
-              status: 'completed',
-              purchased_at: new Date().toISOString()
-            });
-
-          if (apError) {
-          }
-
-          // Handle bundle — mark all included assessments as purchased.
-          if (assessmentDetails.bundleIds.length > 0) {
-            // Insert all bundle items in parallel (was sequential awaits).
-            await Promise.all(assessmentDetails.bundleIds.map((bId) => {
-              const bundleDetails = getAssessmentDetails(bId);
-              return supabase.from('assessment_purchases').insert({
-                patient_email: user.email.toLowerCase(),
-                assessment_id: bId,
-                assessment_name: bundleDetails.name,
-                assessment_link: bundleDetails.link,
-                stripe_session_id: sessionId ? `${sessionId}_${bId}` : null,
-                amount_paid: 0,
-                currency: 'USD',
-                status: 'completed',
-                purchased_at: new Date().toISOString()
-              }).catch(err => console.warn(`Bundle item ${bId} save skipped:`, err.message));
-            }));
-          }
-          // Send JotForm link email to patient
-          try {
-            const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
-            const emailAssessmentLink = assessmentDetails.link;
-            const emailAmountPaid = assessmentDetails.price.toFixed(2);
-
-            // Fetch clinic name and patient details from DB directly (patientData may still be loading)
-            let emailClinicName = '';
-            if (clinicIdForPayment) {
-              const { data: clinicRow } = await supabase
-                .from('clinics')
-                .select('name')
-                .eq('id', clinicIdForPayment)
-                .limit(1)
-                .single();
-              emailClinicName = clinicRow?.name || '';
-            }
-
-            // Use patient record already fetched above (patientRecordForEmail)
-            const patRow = patientRecordForEmail;
-            let patientDetails = {
-              name: patRow?.full_name || patRow?.name || user.name || user.user_metadata?.full_name || '',
-              email: patRow?.email || user.email || '',
-              phone: patRow?.phone || '',
-              dob: patRow?.date_of_birth || '',
-              gender: patRow?.gender || '',
-              patientId: patRow?.external_id || ''
-            };
-
-            const emailResp = await fetch(`${API_URL}/send-assessment-email`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                customerEmail: user.email,
-                customerName: patientDetails.name,
-                assessmentName: assessmentDetails.name,
-                assessmentLink: emailAssessmentLink,
-                amountPaid: emailAmountPaid,
-                currency: 'USD',
-                transactionId: sessionId || '',
-                source: 'patient_dashboard',
-                clinicName: emailClinicName,
-                clinicId: clinicIdForPayment || '',
-                patientPhone: patientDetails.phone,
-                patientDob: patientDetails.dob,
-                patientGender: patientDetails.gender,
-                patientUid: patientDetails.patientId,
-                // Shared with the Stripe webhook so the pair sends exactly once
-                dedupeKey: sessionId ? `assessment:${sessionId}:emails` : undefined
-              })
-            });
-            const emailData = await emailResp.json().catch(() => null);
-            if (emailData?.takeUrl) {
-              // Surface the one-time gate link in the success popup
-              setPaymentSuccessDetails(prev => prev ? { ...prev, takeUrl: emailData.takeUrl } : prev);
-            }
-          } catch (emailErr) {
-          }
-
+          setPaymentSuccessDetails({
+            name: data.assessmentName || assessmentDetails.name,
+            amount: `${data.currency || 'USD'} ${Number(data.amount ?? assessmentDetails.price).toFixed(2)}`,
+            email: user?.email || '',
+            date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+            transactionId: sessionId,
+            takeUrl: data.takeUrl || null
+          });
+          setShowPaymentSuccessPopup(true);
+          fetchPurchasedAssessments();
         } catch (err) {
-          console.error('Error saving payment data:', err);
+          console.error('Error verifying assessment payment:', err);
+          toast.error('We could not verify your payment. If you were charged, please contact support.');
         }
       };
 
-      setPaymentSuccessDetails({
-        name: assessmentDetails.name,
-        amount: assessmentDetails.amountLabel,
-        email: user?.email || '',
-        date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-        transactionId: sessionId || 'N/A'
-      });
-      setShowPaymentSuccessPopup(true);
-
-      savePatientPayment();
-      window.history.replaceState({}, document.title, window.location.pathname);
-      fetchPurchasedAssessments();
+      verifyAndUnlock();
     } else if (paymentStatus === 'cancelled') {
       toast.error('Payment was cancelled');
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [assessmentsLoading, fetchPurchasedAssessments, getAssessmentDetails, user?.id, user?.email, patientClinicId]);
+  }, [assessmentsLoading, fetchPurchasedAssessments, getAssessmentDetails, user?.id, user?.email]);
 
   const handleLogout = async () => {
     await logout();
@@ -8215,6 +8070,7 @@ const PatientDashboard = () => {
             customerName: medPaymentName.toUpperCase(),
             currency: 'USD',
             amount: selectedMedPack.price,
+            patientId: user?.id,
             successUrl: `${window.location.origin}/dashboard/meditations?meditation_payment=success&pack=${selectedMedPack.id}&session_id={CHECKOUT_SESSION_ID}`,
             cancelUrl: `${window.location.origin}/dashboard/meditations?meditation_payment=cancelled`
           })
@@ -8234,7 +8090,11 @@ const PatientDashboard = () => {
       }
     };
 
-    // Check for successful meditation payment on mount
+    // Check for successful meditation payment on mount. The pack is only
+    // unlocked after the server confirms the Stripe session was actually
+    // paid — never trust the redirect URL/localStorage alone (that used to
+    // let anyone grant themselves a free pack by replaying/faking the
+    // success redirect).
     useEffect(() => {
       if (!user?.email) return;
 
@@ -8270,95 +8130,49 @@ const PatientDashboard = () => {
         return;
       }
 
-      const { packId: pId, sessionId: sId } = JSON.parse(pending);
+      const { sessionId: sId } = JSON.parse(pending);
       localStorage.removeItem('pendingMedPayment');
+
+      if (!sId) {
+        toast.error('We could not confirm your payment. If you were charged, please contact support.');
+        return;
+      }
 
       const medPackNames = {
         gamma: 'Gamma Meditation Music', solfeggio_852: '852Hz Solfeggio Music', solfeggio_963: '963Hz Solfeggio Music'
       };
-      const medPackPrices = { gamma: 22, solfeggio_852: 25, solfeggio_963: 25 };
-      const packName = medPackNames[pId] || 'Meditation Pack';
-      const amount = medPackPrices[pId] || 25;
 
-      // Show success popup immediately and optimistically unlock the pack
-      setPurchasedMedPackId(pId);
-      setPurchasedPacks(prev => [...new Set([...prev, pId])]);
-      setMedPaymentSuccessDetails({
-        name: packName, amount: `USD ${amount}`, email: user?.email || '',
-        date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        transactionId: sId || 'N/A'
-      });
-      setShowMedPaymentSuccessPopup(true);
-
-      // Save payment data in background
-      const saveMedPayment = async () => {
+      const verifyAndUnlock = async () => {
         try {
-          // Check duplicate
-          if (sId) {
-            const { data: existing } = await supabase.from('patient_payments').select('id').eq('stripe_session_id', sId).limit(1);
-            if (existing && existing.length > 0) return;
+          const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
+          const response = await fetch(`${API_URL}/stripe/verify-session/${sId}`);
+          const data = await response.json().catch(() => null);
+
+          if (!data?.success || data.status !== 'paid' || !data.packId) {
+            toast.error('We could not verify your payment. If you were charged, please contact support.');
+            return;
           }
 
-          // Get clinic info
-          let clinicIdForPayment = null;
-          let clinicNameForEmail = '';
-          let patientRecord = null;
-          if (user?.id) {
-            const { data: p } = await supabase.from('patients').select('*').eq('id', user.id).limit(1).single();
-            if (p) { patientRecord = p; clinicIdForPayment = p.clinic_id || p.org_id || null; }
-          }
-          if (!patientRecord && user?.email) {
-            const { data: ps } = await supabase.from('patients').select('*').eq('email', user.email.toLowerCase()).order('created_at', { ascending: false }).limit(1);
-            if (ps && ps.length > 0) { patientRecord = ps[0]; clinicIdForPayment = ps[0].clinic_id || ps[0].org_id || null; }
-          }
-          if (clinicIdForPayment) {
-            const { data: c } = await supabase.from('clinics').select('name').eq('id', clinicIdForPayment).single();
-            clinicNameForEmail = c?.name || '';
-          }
+          const pId = data.packId;
+          const packName = medPackNames[pId] || 'Meditation Pack';
 
-          // Save to patient_payments
-          await supabase.from('patient_payments').insert({
-            clinic_id: clinicIdForPayment, patient_id: user.id || null,
-            patient_email: user.email.toLowerCase(),
-            patient_name: patientRecord?.full_name || patientRecord?.name || user.name || '',
-            amount, currency: 'USD', status: 'completed', type: 'meditation',
-            item_name: packName, assessment_id: pId,
-            stripe_session_id: sId || null, source: 'Meditations',
-            created_at: new Date().toISOString()
-          }).then(({ error }) => {
-            if (error) console.warn('patient_payments save error:', error.message);
+          setPurchasedMedPackId(pId);
+          setPurchasedPacks(prev => [...new Set([...prev, pId])]);
+          setMedPaymentSuccessDetails({
+            name: packName, amount: `${data.currency || 'USD'} ${data.amount}`, email: user?.email || '',
+            date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+            time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+            transactionId: sId
           });
-
-          // Save to meditation_purchases
-          await supabase.from('meditation_purchases').insert({
-            patient_email: user.email.toLowerCase(), meditation_id: pId,
-            stripe_session_id: sId || null, amount_paid: amount, currency: 'USD',
-            payment_status: 'completed', purchased_at: new Date().toISOString()
-          }).catch(err => console.warn('meditation_purchases save:', err.message));
-
-          // Send emails
-          try {
-            const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
-            await fetch(`${API_URL}/send-assessment-email`, {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                customerEmail: user.email, customerName: patientRecord?.full_name || patientRecord?.name || user.name || '',
-                assessmentName: packName, assessmentLink: 'no_link', amountPaid: amount.toFixed(2),
-                currency: 'USD', transactionId: sId || '', source: 'patient_dashboard',
-                clinicName: clinicNameForEmail, clinicId: clinicIdForPayment || '',
-                patientPhone: patientRecord?.phone || '', patientDob: patientRecord?.date_of_birth || '',
-                patientGender: patientRecord?.gender || '', patientUid: patientRecord?.external_id || ''
-              })
-            });
-          } catch (emailErr) { console.warn('Email failed:', emailErr.message); }
-
-          // Re-fetch to confirm from DB
+          setShowMedPaymentSuccessPopup(true);
           fetchPurchasedPacks();
-        } catch (err) { console.error('Error saving meditation payment:', err); }
+        } catch (err) {
+          console.error('Error verifying meditation payment:', err);
+          toast.error('We could not verify your payment. If you were charged, please contact support.');
+        }
       };
 
-      saveMedPayment();
+      verifyAndUnlock();
     }, [user?.id, user?.email]);
 
     const meditationPacks = [

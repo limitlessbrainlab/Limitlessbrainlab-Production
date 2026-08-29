@@ -2132,7 +2132,7 @@ app.post('/api/create-frequency-checkout', async (req, res) => {
       });
     }
 
-    const { packId, packName, customerEmail, customerName, currency, amount, isBundle } = req.body;
+    const { packId, packName, customerEmail, customerName, currency, amount, isBundle, patientId, clinicId } = req.body;
 
     if (!customerEmail || !amount || !currency) {
       return res.status(400).json({
@@ -2191,7 +2191,9 @@ app.post('/api/create-frequency-checkout', async (req, res) => {
         pack_id: packId,
         customer_email: customerEmail,
         customer_name: customerName,
-        is_bundle: isBundle ? 'true' : 'false'
+        is_bundle: isBundle ? 'true' : 'false',
+        patient_id: patientId || '',
+        clinic_id: clinicId || ''
       }
     });
 
@@ -2226,7 +2228,7 @@ app.post('/api/create-meditation-checkout', async (req, res) => {
       });
     }
 
-    const { packId, packName, customerEmail, customerName, currency, amount, isBundle } = req.body;
+    const { packId, packName, customerEmail, customerName, currency, amount, isBundle, patientId, clinicId } = req.body;
 
     if (!customerEmail || !amount || !currency) {
       return res.status(400).json({
@@ -2283,7 +2285,9 @@ app.post('/api/create-meditation-checkout', async (req, res) => {
         customer_email: customerEmail,
         customer_name: customerName,
         is_bundle: isBundle ? 'true' : 'false',
-        type: 'meditation'
+        type: 'meditation',
+        patient_id: patientId || '',
+        clinic_id: clinicId || ''
       }
     });
 
@@ -2446,6 +2450,66 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
               if (error) console.error('DB save error (assessment):', error.message);
             }
 
+            // Bundle purchases unlock every included assessment, not just the
+            // primary line item — metadata.bundle_ids is a comma-joined list
+            // set by /api/create-assessment-checkout.
+            const bundleIds = (session.metadata?.bundle_ids || '')
+              .split(',')
+              .map(id => id.trim())
+              .filter(Boolean);
+            if (bundleIds.length) {
+              await Promise.all(bundleIds.map(async (bId) => {
+                const bundleSessionId = `${sessionId}_${bId}`;
+                const { data: existingBundleItem } = await supabase
+                  .from('assessment_purchases')
+                  .select('id')
+                  .eq('stripe_session_id', bundleSessionId)
+                  .limit(1);
+                if (existingBundleItem?.length) return;
+                const { error: bundleErr } = await supabase
+                  .from('assessment_purchases')
+                  .insert({
+                    patient_email: customerEmail?.toLowerCase(),
+                    assessment_id: bId,
+                    stripe_session_id: bundleSessionId,
+                    amount_paid: 0,
+                    currency: session.currency?.toUpperCase(),
+                    status: 'completed',
+                    purchased_at: new Date().toISOString()
+                  });
+                if (bundleErr) console.error(`DB save error (bundle item ${bId}):`, bundleErr.message);
+              }));
+            }
+
+            // patient_payments (per-clinic tracking) — mirrors the webhook's
+            // patient_dashboard branch so this verified path grants the same
+            // records the insecure client-side insert used to write.
+            const { data: existingAssessPatientPayment } = await supabase
+              .from('patient_payments')
+              .select('id')
+              .eq('stripe_session_id', sessionId)
+              .limit(1);
+            if (!existingAssessPatientPayment?.length) {
+              const { error: ppErr } = await supabase.from('patient_payments').insert({
+                clinic_id: session.metadata?.clinic_id || null,
+                patient_id: session.metadata?.patient_id || null,
+                patient_email: customerEmail?.toLowerCase(),
+                patient_name: customerName,
+                amount: session.amount_total / 100,
+                currency: session.currency?.toUpperCase() || 'USD',
+                status: 'completed',
+                type: 'assessment',
+                item_name: session.metadata?.assessment_name || 'Brain Assessment',
+                assessment_id: session.metadata?.assessment_id,
+                assessment_link: session.metadata?.assessment_link || '',
+                stripe_session_id: sessionId,
+                stripe_payment_intent: session.payment_intent,
+                source: session.metadata?.source || 'website',
+                created_at: new Date().toISOString()
+              });
+              if (ppErr) console.error('DB save error (patient_payments/assessment):', ppErr.message);
+            }
+
             // payments row for the SuperAdmin dashboard (unique stripe_session_id)
             const { error: assessPayErr } = await supabase.from('payments').upsert({
               clinic_id: session.metadata?.clinic_id || null,
@@ -2530,6 +2594,33 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
               }
             }
 
+            // patient_payments (per-clinic tracking) — mirrors the webhook's
+            // frequency/meditation branch so this verified path grants the
+            // same records the insecure client-side insert used to write.
+            const { data: existingPackPatientPayment } = await supabase
+              .from('patient_payments')
+              .select('id')
+              .eq('stripe_session_id', sessionId)
+              .limit(1);
+            if (!existingPackPatientPayment?.length) {
+              const { error: packPpErr } = await supabase.from('patient_payments').insert({
+                clinic_id: session.metadata?.clinic_id || null,
+                patient_id: session.metadata?.patient_id || null,
+                patient_email: packEmail,
+                patient_name: customerName,
+                amount: session.amount_total / 100,
+                currency: session.currency?.toUpperCase() || 'USD',
+                status: 'completed',
+                type: isMeditation ? 'meditation' : 'frequency',
+                item_name: session.metadata?.pack_id?.replace(/_/g, ' ') || 'Pack',
+                assessment_id: session.metadata?.pack_id,
+                stripe_session_id: sessionId,
+                source: isMeditation ? 'Meditations' : 'Frequencies',
+                created_at: new Date().toISOString()
+              });
+              if (packPpErr) console.error('DB save error (patient_payments/pack):', packPpErr.message);
+            }
+
             const { error: packPayErr } = await supabase.from('payments').upsert({
               clinic_id: null,
               patient_email: packEmail,
@@ -2575,6 +2666,11 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
         currency: session.currency?.toUpperCase(),
         assessmentName: session.metadata?.assessment_name || null,
         assessmentLink: session.metadata?.assessment_link || null,
+        // packId/isBundle let the frequency/meditation success handlers unlock
+        // exactly what the server actually granted, instead of trusting the
+        // pack id from the (attacker-controlled) redirect URL.
+        packId: session.metadata?.pack_id || null,
+        isBundle: session.metadata?.is_bundle === 'true',
         takeUrl
       });
 
@@ -3660,7 +3756,7 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
       });
     }
 
-    const { assessmentId, assessmentName, customerEmail, customerName, currency = 'USD', amount, assessmentLink, patientId, clinicId, source, successUrl, cancelUrl } = req.body;
+    const { assessmentId, assessmentName, customerEmail, customerName, currency = 'USD', amount, assessmentLink, patientId, clinicId, source, successUrl, cancelUrl, bundleIds } = req.body;
 
     if (!customerEmail || !amount || !currency) {
       return res.status(400).json({
@@ -3733,7 +3829,8 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
         patient_id: patientId || '',
         clinic_id: clinicId || '',
         source: source || 'website',
-        type: 'assessment'
+        type: 'assessment',
+        bundle_ids: Array.isArray(bundleIds) ? bundleIds.join(',') : ''
       }
     });
 

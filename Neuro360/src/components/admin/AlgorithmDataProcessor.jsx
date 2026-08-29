@@ -2590,12 +2590,6 @@ const AlgorithmDataProcessor = () => {
   if (!showProcessingUI) {
     return (
       <div className="space-y-6">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-primary to-navy-700 rounded-lg p-6 text-white shadow-lg">
-          <h1 className="text-2xl font-bold">Limitless Brain Lab - Algorithm Data Processor</h1>
-          <p className="text-primary-light mt-2">Select a patient to generate Algorithm 1 report</p>
-        </div>
-
         {/* Filter Bar */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
           <div className="flex flex-col lg:flex-row gap-4">
@@ -2713,7 +2707,7 @@ const AlgorithmDataProcessor = () => {
 
               {/* Patient Table */}
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px] table-fixed">
+                <table className="w-full">
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
                       <th className="w-[24%] px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -2764,7 +2758,7 @@ const AlgorithmDataProcessor = () => {
                         <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => handleGenerateReport(patient)}
-                            className="ml-auto flex w-[150px] items-center justify-center bg-primary hover:bg-navy-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-md"
+                            className="ml-auto flex items-center justify-center bg-primary hover:bg-navy-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-md"
                           >
                             <FileText className="h-4 w-4 mr-2" />
                             {patient.algorithmStatus === 'completed' ? 'View/Generate' : 'Generate Report'}

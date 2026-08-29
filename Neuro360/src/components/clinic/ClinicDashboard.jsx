@@ -59,7 +59,7 @@ const PendingSubscriptionGate = ({ user, clinic, onPaymentSuccess }) => {
           priceUSD: Number(pkg.price_usd),
           label: pkg.label,
           popular: pkg.popular
-        })).filter(pkg => pkg.reports === 5);
+        }));
         setPackages(mapped);
         setSelectedPkg(mapped[0]);
       }
@@ -319,7 +319,7 @@ const CreditsExhaustedPopup = ({ user, clinic, onDismiss, onPaymentSuccess }) =>
           id: pkg.package_id, reports: pkg.reports,
           priceINR: Number(pkg.price_inr), priceUSD: Number(pkg.price_usd),
           label: pkg.label, popular: pkg.popular
-        })).filter(pkg => pkg.reports === 5);
+        }));
         setPackages(mapped);
       }
     } catch (err) { console.warn('Failed to load packages:', err); }

@@ -223,8 +223,7 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
 
   const getPackages = () => {
     const source = dbPackages || FALLBACK_PACKAGES;
-    const all = source[clinicType] || source.lbl_partner || FALLBACK_PACKAGES.lbl_partner;
-    return all.filter(pkg => pkg.reports === 5);
+    return source[clinicType] || source.lbl_partner || FALLBACK_PACKAGES.lbl_partner;
   };
 
   const getPackagePrice = (pkg) => {

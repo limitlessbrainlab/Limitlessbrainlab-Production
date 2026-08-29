@@ -222,16 +222,9 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
     }
   };
 
-  const handleRefreshUsage = async () => {
+  const handleRefreshUsage = () => {
     setRefreshingUsage(true);
-    try {
-      await Promise.all([loadUsageStats(), loadPricingFromDB()]);
-      toast.success('Usage refreshed');
-    } catch (error) {
-      toast.error(getFriendlyErrorMessage(error, 'Failed to refresh usage'));
-    } finally {
-      setRefreshingUsage(false);
-    }
+    window.location.reload();
   };
 
   const getPackages = () => {

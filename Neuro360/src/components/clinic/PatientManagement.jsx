@@ -972,7 +972,7 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
                               <button
                                 key={latest.id}
                                 onClick={() => handleDownloadReport(latest)}
-                                className="block w-full truncate text-left text-sm text-primary-600 dark:text-blue-400 hover:underline cursor-pointer"
+                                className="block w-full whitespace-normal break-words text-left text-sm text-primary-600 dark:text-blue-400 hover:underline cursor-pointer"
                                 title={`Download ${latest.title || latest.fileName || latest.file_name || 'Report'}`}
                               >
                                 {latest.fileName || latest.file_name || 'Report'}

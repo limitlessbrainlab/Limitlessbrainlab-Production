@@ -48,6 +48,7 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
   const [dbPackages, setDbPackages] = useState(null);
   const [usageStats, setUsageStats] = useState({});
   const [loading, setLoading] = useState(true);
+  const [refreshingUsage, setRefreshingUsage] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [userCurrency, setUserCurrency] = useState({ currency: 'INR', symbol: '\u20b9' });
 
@@ -221,6 +222,18 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
     }
   };
 
+  const handleRefreshUsage = async () => {
+    setRefreshingUsage(true);
+    try {
+      await Promise.all([loadUsageStats(), loadPricingFromDB()]);
+      toast.success('Usage refreshed');
+    } catch (error) {
+      toast.error(getFriendlyErrorMessage(error, 'Failed to refresh usage'));
+    } finally {
+      setRefreshingUsage(false);
+    }
+  };
+
   const getPackages = () => {
     const source = dbPackages || FALLBACK_PACKAGES;
     return source[clinicType] || source.lbl_partner || FALLBACK_PACKAGES.lbl_partner;
@@ -303,11 +316,12 @@ const SubscriptionTab = ({ onPaymentSuccess } = {}) => {
             <p className="text-gray-600 mt-1">Manage your subscription and usage</p>
           </div>
           <button
-            onClick={loadUsageStats}
-            className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100"
+            onClick={handleRefreshUsage}
+            disabled={refreshingUsage}
+            className="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
             title="Refresh"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className={`h-4 w-4 ${refreshingUsage ? 'animate-spin' : ''}`} />
           </button>
         </div>
 

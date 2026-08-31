@@ -22,6 +22,20 @@ import { supabase } from '../../lib/supabaseClient';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import AssessmentResults from './AssessmentResults';
 
+// Catalog prices are maintained from one value and mirrored into the other
+// supported currencies. These are the fixed commercial rates currently used
+// by the assessment catalog (payment providers still receive the selected
+// currency's stored amount).
+const PRICE_RATES = {
+  USD_TO_AED: 3.67,
+  USD_TO_INR: 83
+};
+
+const roundPrice = (value, currency) => {
+  const decimals = currency === 'INR' ? 0 : 2;
+  return Number(value.toFixed(decimals));
+};
+
 // Catalog / Results view toggle shared by both views
 const ViewSwitcher = ({ view, setView }) => (
   <div className="flex gap-2">
@@ -52,6 +66,41 @@ const AssessmentManagement = () => {
   const [categoryFilter, setCategoryFilter] = useState('all');
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm();
+
+  const syncPriceGroup = (changedField, rawValue) => {
+    const match = changedField.match(/^(original|sale)_price_(usd|aed|inr)$/);
+    if (!match) return;
+
+    const [, priceType, sourceCurrency] = match;
+    const value = String(rawValue ?? '').trim();
+    const fields = {
+      usd: `${priceType}_price_usd`,
+      aed: `${priceType}_price_aed`,
+      inr: `${priceType}_price_inr`
+    };
+
+    // Keep all fields empty while the user is clearing an input. This avoids
+    // briefly replacing an empty field with zero while they edit it.
+    if (value === '') {
+      Object.values(fields).forEach(field => setValue(field, '', { shouldDirty: true, shouldValidate: true }));
+      return;
+    }
+
+    const amount = Number(value);
+    if (!Number.isFinite(amount) || amount < 0) return;
+
+    const usd = sourceCurrency === 'usd'
+      ? amount
+      : sourceCurrency === 'aed'
+        ? amount / PRICE_RATES.USD_TO_AED
+        : amount / PRICE_RATES.USD_TO_INR;
+
+    // Preserve the field currently being edited (including a trailing decimal
+    // such as "19.") and only replace the two dependent fields.
+    setValue(fields.usd, sourceCurrency === 'usd' ? rawValue : roundPrice(usd, 'USD'), { shouldDirty: true, shouldValidate: true });
+    setValue(fields.aed, sourceCurrency === 'aed' ? rawValue : roundPrice(usd * PRICE_RATES.USD_TO_AED, 'AED'), { shouldDirty: true, shouldValidate: true });
+    setValue(fields.inr, sourceCurrency === 'inr' ? rawValue : roundPrice(usd * PRICE_RATES.USD_TO_INR, 'INR'), { shouldDirty: true, shouldValidate: true });
+  };
 
   // Watch the category field to conditionally show bundle_includes
   const watchCategory = watch('category', 'individual');
@@ -624,7 +673,7 @@ const AssessmentManagement = () => {
                     <input
                       type="number"
                       step="0.01"
-                      {...register('original_price_usd', { required: 'Original price USD is required' })}
+                      {...register('original_price_usd', { required: 'Original price USD is required', onChange: (event) => syncPriceGroup('original_price_usd', event.target.value) })}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#323956]"
                       placeholder="19.99"
                     />
@@ -637,7 +686,7 @@ const AssessmentManagement = () => {
                     <input
                       type="number"
                       step="0.01"
-                      {...register('sale_price_usd', { required: 'Sale price USD is required' })}
+                      {...register('sale_price_usd', { required: 'Sale price USD is required', onChange: (event) => syncPriceGroup('sale_price_usd', event.target.value) })}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#323956]"
                       placeholder="9.99"
                     />
@@ -654,7 +703,7 @@ const AssessmentManagement = () => {
                     <input
                       type="number"
                       step="0.01"
-                      {...register('original_price_aed')}
+                      {...register('original_price_aed', { onChange: (event) => syncPriceGroup('original_price_aed', event.target.value) })}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#323956]"
                       placeholder="73.00"
                     />
@@ -666,7 +715,7 @@ const AssessmentManagement = () => {
                     <input
                       type="number"
                       step="0.01"
-                      {...register('sale_price_aed')}
+                      {...register('sale_price_aed', { onChange: (event) => syncPriceGroup('sale_price_aed', event.target.value) })}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#323956]"
                       placeholder="36.50"
                     />
@@ -682,7 +731,7 @@ const AssessmentManagement = () => {
                     <input
                       type="number"
                       step="0.01"
-                      {...register('original_price_inr')}
+                      {...register('original_price_inr', { onChange: (event) => syncPriceGroup('original_price_inr', event.target.value) })}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#323956]"
                       placeholder="1699.00"
                     />
@@ -694,7 +743,7 @@ const AssessmentManagement = () => {
                     <input
                       type="number"
                       step="0.01"
-                      {...register('sale_price_inr')}
+                      {...register('sale_price_inr', { onChange: (event) => syncPriceGroup('sale_price_inr', event.target.value) })}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#323956]"
                       placeholder="849.00"
                     />

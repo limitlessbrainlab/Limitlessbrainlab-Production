@@ -3747,6 +3747,24 @@ app.post('/api/create-coaching-checkout', async (req, res) => {
 // =====================================================
 
 // Create Stripe Checkout Session for Assessment Purchases
+async function isAssessmentCurrencyEnabled(assessmentId, currency) {
+  if (currency === 'USD') return true;
+  if (!assessmentId || !supabase) return false;
+
+  const { data, error } = await supabase
+    .from('neurosense_assessments')
+    .select('show_price_aed, show_price_inr')
+    .eq('id', assessmentId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Unable to validate assessment currency visibility:', error.message);
+    return false;
+  }
+
+  return currency === 'AED' ? data?.show_price_aed !== false : data?.show_price_inr !== false;
+}
+
 app.post('/api/create-assessment-checkout', async (req, res) => {
   try {
     if (!stripe) {
@@ -3757,8 +3775,9 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
     }
 
     const { assessmentId, assessmentName, customerEmail, customerName, currency = 'USD', amount, assessmentLink, patientId, clinicId, source, successUrl, cancelUrl, bundleIds } = req.body;
+    const normalizedCurrency = String(currency).toUpperCase();
 
-    if (!customerEmail || !amount || !currency) {
+    if (!customerEmail || !amount || !normalizedCurrency) {
       return res.status(400).json({
         success: false,
         message: 'Customer email, amount, and currency are required'
@@ -3777,7 +3796,18 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
       'SGD': 100
     };
 
-    const multiplier = currencyMultipliers[currency] || 100;
+    if (!currencyMultipliers[normalizedCurrency]) {
+      return res.status(400).json({ success: false, message: 'Unsupported currency' });
+    }
+
+    if (!await isAssessmentCurrencyEnabled(assessmentId, normalizedCurrency)) {
+      return res.status(400).json({
+        success: false,
+        message: `${normalizedCurrency} pricing is not enabled for this assessment`
+      });
+    }
+
+    const multiplier = currencyMultipliers[normalizedCurrency];
     const amountInSmallestUnit = Math.round(amount * multiplier);
 
     const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
@@ -3797,11 +3827,11 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: getStripePaymentMethodTypes(currency),
+      payment_method_types: getStripePaymentMethodTypes(normalizedCurrency),
       line_items: [
         {
           price_data: {
-            currency: currency.toLowerCase(),
+            currency: normalizedCurrency.toLowerCase(),
             product_data: {
               name: `${assessmentName} - Brain Assessment`,
               description: `Unlock your ${assessmentName} to understand your brain health better.`,

@@ -1374,6 +1374,9 @@ const AlgorithmDataProcessor = () => {
       formData.append('clinicId', selectedPatient?.clinicId || selectedPatient?.clinic_id || selectedPatient?.org_id || '');
       formData.append('assessmentDate', uploadDateIso);
       formData.append('generatedAt', uploadDateIso);
+      // Lets the backend link the generated report to this patient record
+      // itself, so it's not lost if the SSE stream never makes it back here.
+      formData.append('savedResultId', savedResultId || '');
       // Forward the raw algorithm results so the backend uses the same buckets and
       // metric values that generated the NeuroSense report.
       try {
@@ -1465,7 +1468,12 @@ const AlgorithmDataProcessor = () => {
       stopClaudeCreep();
 
       if (streamError) throw new Error(streamError);
-      if (!gotDone || !pdfUrlResult) throw new Error('The report stream ended before a report was produced.');
+      // The connection can drop after rendering completes server-side (e.g. a proxy
+      // cutting a long-lived stream) — the backend already links a finished report
+      // to this patient's record itself, so it's usually already available even
+      // though this request never saw the 'done' event. Reload Processing History
+      // rather than declaring outright failure.
+      if (!gotDone || !pdfUrlResult) throw new Error('Lost connection before the report finished streaming back. It may have completed anyway — reload Processing History below to check before retrying.');
 
       console.log('[Claude Report] report compiled. Public URL:', pdfUrlResult);
       setClaudeProgress(100);

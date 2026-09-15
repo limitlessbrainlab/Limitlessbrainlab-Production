@@ -10,8 +10,17 @@ const { buildReportDataFromSource, buildReportDataFromNeuroSenseMd } = require('
 const { buildNeuroSenseMarkdown } = require('../services/neurosenseMarkdown');
 const { generateBrainReportPdf } = require('../services/claudeReportGenerator');
 const SupabaseStorage = require('../services/supabaseStorage');
+const { createClient } = require('@supabase/supabase-js');
 
 const router = express.Router();
+
+// Same admin client pattern as assessmentRecorder.js — used to persist the
+// generated report's URL server-side (see the 'saving' stage below), so the
+// report is never orphaned if the SSE stream drops before the 'done' event
+// reaches the browser (e.g. a proxy cutting a long-lived connection).
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 // Gateway caps the JSON body ~1MB; keep extracted text well under it.
 const MAX_TEXT_CHARS = 200000;
@@ -217,6 +226,33 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
         throw new Error('Supabase upload returned an invalid result');
       }
       console.log('🔗 Claude Report uploaded to Supabase:', uploadResult.url);
+
+      // Persist the URL to the patient's algorithm_results row NOW, server-side —
+      // the frontend also does this after receiving 'done', but that only runs if
+      // the SSE stream survives all the way back to the browser. Doing it here
+      // means the report is linked to the patient record even if the connection
+      // is cut right after this point. Best-effort: a DB hiccup must never fail
+      // an already-generated, already-uploaded report.
+      const savedResultId = (req.body && req.body.savedResultId) || '';
+      if (savedResultId && supabase) {
+        try {
+          const { error: urlErr } = await supabase
+            .from('algorithm_results')
+            .update({ claude_report_url: uploadResult.url })
+            .eq('id', savedResultId);
+          if (urlErr) throw urlErr;
+          if (reportData.patient.reportId) {
+            const { error: idErr } = await supabase
+              .from('algorithm_results')
+              .update({ claude_report_id: reportData.patient.reportId })
+              .eq('id', savedResultId);
+            if (idErr) console.warn('[Claude Report] claude_report_id column update failed (column may be missing — run the migration):', idErr.message);
+          }
+        } catch (persistErr) {
+          console.warn('[Claude Report] Could not persist claude_report_url server-side (report is still uploaded, just not yet linked to the patient record):', persistErr.message);
+        }
+      }
+
       send('done', { success: true, pdfUrl: uploadResult.url, reportId: reportData.patient.reportId });
     } finally {
       fs.unlink(outPath, () => {});

@@ -376,16 +376,40 @@ async function extractReportSource(pdfText) {
   return null;
 }
 
+// Caps how many Chromium instances render at once — each render is memory-heavy,
+// and simultaneous admin clicks could OOM the backend otherwise. Extra renders
+// queue up FIFO and run as slots free.
+const MAX_CONCURRENT_PDF_RENDERS = parseInt(process.env.MAX_CONCURRENT_PDF_RENDERS || '1', 10);
+let activeRenders = 0;
+const renderQueue = [];
+
+function runQueued(task) {
+  return new Promise((resolve, reject) => {
+    const run = async () => {
+      activeRenders++;
+      try {
+        resolve(await task());
+      } catch (e) {
+        reject(e);
+      } finally {
+        activeRenders--;
+        const next = renderQueue.shift();
+        if (next) next();
+      }
+    };
+    if (activeRenders < MAX_CONCURRENT_PDF_RENDERS) run();
+    else renderQueue.push(run);
+  });
+}
+
 /**
- * Render an HTML string to a PDF Buffer using the Puppeteer Chrome installed on
- * THIS backend at build time (`npx puppeteer browsers install chrome`, cached in
- * PUPPETEER_CACHE_DIR). Used as the fallback when the VPS render endpoint is
- * down. The 12-page report template is authored for A4 portrait, margin 0, with
+ * Launch Puppeteer, render the HTML to a PDF, and close the browser. The
+ * 12-page report template is authored for A4 portrait, margin 0, with
  * printBackground (see templates/brainReport12Page.js).
  * @param {string} html  Complete HTML document string.
  * @returns {Promise<Buffer>}  PDF bytes.
  */
-async function renderHtmlLocally(html) {
+async function launchAndRender(html) {
   const puppeteer = require('puppeteer');
   const browser = await puppeteer.launch({
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
@@ -405,34 +429,37 @@ async function renderHtmlLocally(html) {
 }
 
 /**
- * Render a fully-built HTML string to a PDF, VPS-first with a local fallback.
- * Primary: the VPS gateway's headless Chromium (keeps this free-tier backend
- * light). Fallback: if the VPS render is unavailable (e.g. its Chromium worker
- * is down → nginx 502), render locally with this backend's bundled Puppeteer so
- * a VPS outage doesn't break report generation.
+ * Render using the Puppeteer Chrome installed on this backend at build time
+ * (`npx puppeteer browsers install chrome`, cached in PUPPETEER_CACHE_DIR). If
+ * Chrome is ever missing at runtime (e.g. a deploy skipped the build-time
+ * install step), self-heal by installing it once on the spot, then retry —
+ * a safety net, not the primary install path.
  * @param {string} html  Complete HTML document string.
  * @returns {Promise<Buffer>}  PDF bytes.
  */
-async function renderHtmlOnVps(html) {
-  if (MASTER_KEY) {
-    const opts = {
-      headers: { 'X-Nexaproc-Key': MASTER_KEY, 'Content-Type': 'application/json' },
-      timeout: 60000,
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity,
-      responseType: 'arraybuffer',
-    };
-    try {
-      const response = await axios.post(`${GATEWAY_URL}/api/html-to-pdf`, { html }, opts);
-      return Buffer.from(response.data);
-    } catch (err) {
-      console.warn(`[renderHtmlOnVps] VPS render failed (${err.response?.status || ''} ${err.message}); falling back to local Puppeteer render.`);
-    }
-  }
+async function renderHtmlLocally(html) {
   try {
-    return await renderHtmlLocally(html);
-  } catch (localErr) {
-    throw new Error(`PDF render failed (VPS unavailable and local Puppeteer render failed: ${localErr.message}).`);
+    return await launchAndRender(html);
+  } catch (err) {
+    if (!/Could not find (Chrome|Chromium)/i.test(err.message)) throw err;
+    console.warn('[renderHtmlLocally] Chrome missing at runtime — self-healing with a one-time install…');
+    const { execSync } = require('child_process');
+    execSync('npx puppeteer browsers install chrome', { stdio: 'inherit', timeout: 120000 });
+    return await launchAndRender(html);
+  }
+}
+
+/**
+ * Render a fully-built HTML string to a PDF using this backend's local
+ * Puppeteer Chrome, capped at MAX_CONCURRENT_PDF_RENDERS simultaneous renders.
+ * @param {string} html  Complete HTML document string.
+ * @returns {Promise<Buffer>}  PDF bytes.
+ */
+async function renderReportPdf(html) {
+  try {
+    return await runQueued(() => renderHtmlLocally(html));
+  } catch (err) {
+    throw new Error(`PDF render failed: ${err.message}`);
   }
 }
 
@@ -452,7 +479,7 @@ function postLesson(stage, error, lesson) {
 module.exports = {
   generateReportNarrative,
   extractReportSource,
-  renderHtmlOnVps,
+  renderReportPdf,
   postLesson,
   fetchReportExamples,
   saveReportExample,

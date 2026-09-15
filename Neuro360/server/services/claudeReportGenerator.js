@@ -6,14 +6,13 @@
  *      → AI narrative (Gemini by default, or the VPS Claude gateway when
  *        REPORT_AI_PROVIDER=claude — prose only, via reportAiProvider)
  *      → 12-page HTML template (numbers filled deterministically)
- *      → VPS gateway renders HTML to PDF via headless Chromium (no Puppeteer on Render)
+ *      → local Puppeteer Chrome renders HTML to PDF, queued/concurrency-capped
  *
  * The AI never computes or alters numbers — see reportAiProvider.generateReportNarrative.
- * PDF rendering is offloaded to the VPS (/api/html-to-pdf) to avoid OOM on Render free tier.
  */
 
 const { generateReportNarrative } = require('./reportAiProvider');
-const { renderHtmlOnVps, postLesson } = require('./nexaprocService');
+const { renderReportPdf, postLesson } = require('./nexaprocService');
 const { renderReportHtml } = require('../templates/brainReport12Page');
 const { inlineEmojis } = require('../utils/inlineEmojis');
 
@@ -54,7 +53,7 @@ async function generateBrainReportPdf(reportData, narrative, onProgress) {
   // Inline emojis as SVG images so they render on the fontless headless-Chromium
   // renderer (otherwise they appear as empty "tofu" boxes).
   const html = inlineEmojis(renderReportHtml(reportData, prose));
-  const pdf = await renderHtmlOnVps(html);
+  const pdf = await renderReportPdf(html);
   return { pdf, narrative: prose };
 }
 

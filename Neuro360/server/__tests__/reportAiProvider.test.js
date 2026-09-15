@@ -645,7 +645,7 @@ function section(title) {
     delete require.cache[GEN_ID];
     inject(PROVIDER_ID, { generateReportNarrative: narrativeImpl });
     inject(NEXA_ID, {
-      renderHtmlOnVps: async () => Buffer.from('FAKE-PDF'),
+      renderReportPdf: async () => Buffer.from('FAKE-PDF'),
       postLesson: (...args) => {
         state.lessons = state.lessons || [];
         state.lessons.push(args);

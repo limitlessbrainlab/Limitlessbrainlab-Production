@@ -29,14 +29,13 @@ services:
       # call ~60s. 10/min is well inside 2.5-flash limits.
       - key: GEMINI_REQUESTS_PER_MINUTE
         value: "10"
-      # Performance-report AI provider: gemini (default; pinned gemini-2.5-flash)
-      # or claude (Nexaproc gateway flip-back). Non-secret.
+      # Performance-report AI provider: gemini (default; pinned gemini-2.5-flash).
+      # Non-secret.
       - key: REPORT_AI_PROVIDER
         value: gemini
-      - key: NEXAPROC_GATEWAY_URL
-        value: http://187.127.176.1/neuro-sidecar
-      - key: NEXAPROC_MASTER_KEY
-        sync: false
+      # Caps simultaneous local Puppeteer renders (FIFO queue beyond this).
+      - key: MAX_CONCURRENT_PDF_RENDERS
+        value: "1"
       - key: CLAUDE_REPORT_TOKEN
         sync: false
       # Gates the /api/patient-documents endpoints (private patients_documents

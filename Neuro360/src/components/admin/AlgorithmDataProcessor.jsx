@@ -130,7 +130,6 @@ const AlgorithmDataProcessor = () => {
   // Selected patient's clinic credit status (for the exhausted alert + gating).
   const [creditStatus, setCreditStatus] = useState({ exhausted: false, remaining: Infinity, clinic: null });
   const claudeCreepRef = useRef(null); // interval id for intra-stage bar "creep"
-  const sidecarAbortReasonRef = useRef(null); // 'SIDECAR_DOWN' | null — set before aborting controller
 
   // Debug function to check database contents
   useEffect(() => {
@@ -1341,44 +1340,6 @@ const AlgorithmDataProcessor = () => {
     // Hard block performance-report generation when the clinic has no credits left.
     if (await blockIfNoCredits(selectedPatient?.clinicId || selectedPatient?.clinic_id || selectedPatient?.org_id)) return;
 
-    // Pre-flight: check sidecar is alive before starting the long upload.
-    // A single transient failure (429 from the API rate limiter, brief network blip) must not
-    // hard-block report generation, so we time-box each attempt and retry once before giving up.
-    const preflightApiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
-    setConsoleLog(prev => [...prev, '🔍 Checking sidecar health...']);
-    const checkSidecarHealth = async () => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
-      try {
-        const hRes = await fetch(`${preflightApiUrl}/qeeg/claude-report/health`, { signal: controller.signal });
-        const hData = await hRes.json().catch(() => ({}));
-        if (hRes.status === 429) throw new Error('The report service is busy. Retrying…');
-        if (!hRes.ok || !hData.ok) throw new Error(hData.error || 'Sidecar offline');
-        return hData;
-      } finally {
-        clearTimeout(timer);
-      }
-    };
-    try {
-      let hData;
-      try {
-        hData = await checkSidecarHealth();
-      } catch (firstErr) {
-        setConsoleLog(prev => [...prev, `⏳ Health check failed (${firstErr.message}); retrying once…`]);
-        await new Promise(r => setTimeout(r, 1500));
-        hData = await checkSidecarHealth();
-      }
-      setConsoleLog(prev => [...prev,
-        `✅ Sidecar online | busy: ${hData.busy} | uptime: ${Math.round((hData.uptimeSec || 0) / 3600 * 10) / 10}h`
-      ]);
-      console.log('[Sidecar Pre-flight] ✅ online', hData);
-    } catch (preflightErr) {
-      setConsoleLog(prev => [...prev, `❌ Sidecar offline: ${preflightErr.message}`]);
-      toast.error(getFriendlyErrorMessage(preflightErr, 'The report service is unavailable right now, so the report cannot be generated. Please try again in a few minutes.'), { id: 'claude-report' });
-      setClaudeReportError(getFriendlyErrorMessage(preflightErr, 'The report service is unavailable right now. Please try again in a few minutes.'));
-      return;
-    }
-
     console.log('[Claude Report] ▶ Starting upload & compilation process…');
     const t0 = performance.now();
     const stageStartRef = { current: performance.now() };
@@ -1390,9 +1351,6 @@ const AlgorithmDataProcessor = () => {
     setClaudeStages(CLAUDE_STAGE_ORDER.map((s, i) => ({ ...s, status: i === 0 ? 'active' : 'pending', elapsedMs: null })));
     startClaudeCreep(10);
     toast.loading('Building your 12-page Neurosense Performance Report (≈3–6 min, please keep this tab open)…', { id: 'claude-report' });
-    // Function-scoped so the finally can always clear it (avoids the /health poll leaking if the
-    // stream throws before the inline clearInterval runs).
-    let sidecarMonitor = null;
     try {
       const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
       const token = import.meta.env.VITE_CLAUDE_REPORT_TOKEN;
@@ -1441,9 +1399,6 @@ const AlgorithmDataProcessor = () => {
         });
       } catch (fetchError) {
         if (fetchError.name === 'AbortError') {
-          if (sidecarAbortReasonRef.current === 'SIDECAR_DOWN') {
-            throw new Error('Sidecar went offline during report generation. Please try again when the VPS is back up.');
-          }
           throw new Error('Timed out after 20 min. The report did not finish — the gateway may be stuck or overloaded. Please try again.');
         }
         throw fetchError;
@@ -1456,26 +1411,6 @@ const AlgorithmDataProcessor = () => {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.message || `Server error (${response.status})`);
       }
-
-      // Start 2-minute sidecar health monitor — logs to console panel and aborts fast if VPS goes down.
-      sidecarAbortReasonRef.current = null;
-      const sidecarPollUrl = `${apiUrl}/qeeg/claude-report/health`;
-      sidecarMonitor = setInterval(async () => {
-        try {
-          const hRes = await fetch(sidecarPollUrl);
-          const hData = await hRes.json();
-          if (!hRes.ok || !hData.ok) throw new Error(hData.error || 'offline');
-          const uptimeH = Math.round((hData.uptimeSec || 0) / 3600 * 10) / 10;
-          console.log(`[Sidecar Monitor] ✅ alive | busy:${hData.busy} | uptime:${uptimeH}h`);
-          setConsoleLog(prev => [...prev, `💓 Sidecar alive | busy: ${hData.busy} | uptime: ${uptimeH}h`]);
-        } catch (err) {
-          console.error('[Sidecar Monitor] ❌ sidecar went offline:', err.message);
-          setConsoleLog(prev => [...prev, `❌ Sidecar went offline: ${err.message} — aborting`]);
-          sidecarAbortReasonRef.current = 'SIDECAR_DOWN';
-          controller.abort();
-          clearInterval(sidecarMonitor);
-        }
-      }, 2 * 60 * 1000);
 
       // Read the SSE stream: parse `event:`/`data:` frames as they arrive.
       const reader = response.body.getReader();
@@ -1527,7 +1462,6 @@ const AlgorithmDataProcessor = () => {
         }
       }
       clearTimeout(timeoutId);
-      clearInterval(sidecarMonitor);
       stopClaudeCreep();
 
       if (streamError) throw new Error(streamError);
@@ -1594,7 +1528,6 @@ const AlgorithmDataProcessor = () => {
       setClaudeReportError(getFriendlyErrorMessage(error, 'The report could not be generated. Please try again.'));
       toast.error(getFriendlyErrorMessage(error, 'The Neurosense Performance Report could not be generated. Please try again.'), { id: 'claude-report' });
     } finally {
-      if (sidecarMonitor) clearInterval(sidecarMonitor);
       stopClaudeCreep();
       setIsGeneratingClaudeReport(false);
     }

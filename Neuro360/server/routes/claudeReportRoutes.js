@@ -3,9 +3,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const pdfParse = require('pdf-parse');
-const axios = require('axios');
 const { sidecarAuth } = require('../middleware/sidecarAuth');
-const { postLesson, GATEWAY_URL } = require('../services/nexaprocService');
+const { postLesson } = require('../services/nexaprocService');
 const { extractReportSource, getReportAiProvider, REPORT_GEMINI_MODEL } = require('../services/reportAiProvider');
 const { buildReportDataFromSource, buildReportDataFromNeuroSenseMd } = require('../services/claudeReportData');
 const { buildNeuroSenseMarkdown } = require('../services/neurosenseMarkdown');
@@ -13,21 +12,6 @@ const { generateBrainReportPdf } = require('../services/claudeReportGenerator');
 const SupabaseStorage = require('../services/supabaseStorage');
 
 const router = express.Router();
-
-// GET /api/qeeg/claude-report/health — proxy VPS sidecar health (no auth, read-only).
-// The VPS is still needed in both provider modes (it renders the PDF), so the
-// proxy stays. The provider fields are CONFIG-ONLY — no live Gemini call here
-// (it would burn quota and delay the preflight; see the QEEG production rules).
-router.get('/health', async (req, res) => {
-  const provider = getReportAiProvider();
-  const extra = { provider, geminiConfigured: provider === 'gemini' ? !!process.env.GEMINI_API_KEY : null };
-  try {
-    const response = await axios.get(`${GATEWAY_URL}/health`, { timeout: 6000 });
-    res.json({ ok: true, ...extra, ...response.data });
-  } catch (error) {
-    res.status(503).json({ ok: false, ...extra, error: error.message });
-  }
-});
 
 // Gateway caps the JSON body ~1MB; keep extracted text well under it.
 const MAX_TEXT_CHARS = 200000;

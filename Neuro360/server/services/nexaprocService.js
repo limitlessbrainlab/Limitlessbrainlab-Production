@@ -402,21 +402,55 @@ function runQueued(task) {
   });
 }
 
+// This backend runs on a memory-constrained (512MB) container, and headless
+// Chrome is the single biggest consumer in the process. These flags trade
+// away things this report template never needs (GPU compositing, extensions,
+// background network/sync services, separate renderer/GPU/zygote processes)
+// to keep Chrome's footprint as small as possible.
+const LOW_MEMORY_CHROME_ARGS = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-dev-shm-usage',
+  '--disable-gpu',
+  '--disable-extensions',
+  '--disable-background-networking',
+  '--disable-default-apps',
+  '--disable-sync',
+  '--disable-translate',
+  '--metrics-recording-only',
+  '--mute-audio',
+  '--no-first-run',
+  '--safebrowsing-disable-auto-update',
+  '--single-process',
+  '--no-zygote',
+];
+
 /**
  * Launch Puppeteer, render the HTML to a PDF, and close the browser. The
  * 12-page report template is authored for A4 portrait, margin 0, with
  * printBackground (see templates/brainReport12Page.js).
+ *
+ * The HTML is written to a temp file and loaded via `page.goto('file://…')`
+ * rather than `page.setContent()` — every asset in the template is already a
+ * self-contained `data:` URI (see brainReport12Page.js), so this is a drop-in
+ * swap that avoids holding the full HTML string in memory a second time while
+ * it's transferred to Chrome over the CDP connection.
  * @param {string} html  Complete HTML document string.
  * @returns {Promise<Buffer>}  PDF bytes.
  */
 async function launchAndRender(html) {
   const puppeteer = require('puppeteer');
-  const browser = await puppeteer.launch({
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-  });
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+
+  const tmpFile = path.join(os.tmpdir(), `report-${Date.now()}-${Math.round(Math.random() * 1e9)}.html`);
+  fs.writeFileSync(tmpFile, html);
+
+  const browser = await puppeteer.launch({ args: LOW_MEMORY_CHROME_ARGS });
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'load', timeout: 60000 });
+    await page.goto(`file://${tmpFile}`, { waitUntil: 'load', timeout: 60000 });
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
@@ -425,6 +459,7 @@ async function launchAndRender(html) {
     return Buffer.from(pdf);
   } finally {
     await browser.close();
+    fs.unlink(tmpFile, () => {});
   }
 }
 

@@ -425,6 +425,10 @@ const LOW_MEMORY_CHROME_ARGS = [
   '--no-zygote',
 ];
 
+// A stalled Chrome PDF call must release the report request. Without this
+// guard the SSE heartbeat keeps the browser on "Rendering…" at 94% forever.
+const PDF_RENDER_TIMEOUT_MS = parseInt(process.env.PDF_RENDER_TIMEOUT_MS || '120000', 10);
+
 /**
  * Launch Puppeteer, render the HTML to a PDF, and close the browser. The
  * 12-page report template is authored for A4 portrait, margin 0, with
@@ -451,14 +455,38 @@ async function launchAndRender(html) {
   try {
     const page = await browser.newPage();
     await page.goto(`file://${tmpFile}`, { waitUntil: 'load', timeout: 60000 });
-    const pdf = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: 0, right: 0, bottom: 0, left: 0 },
-    });
-    return Buffer.from(pdf);
+    let timeoutId;
+    try {
+      const pdf = await Promise.race([
+        page.pdf({
+          format: 'A4',
+          printBackground: true,
+          margin: { top: 0, right: 0, bottom: 0, left: 0 },
+        }),
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error(`Chrome PDF rendering timed out after ${PDF_RENDER_TIMEOUT_MS / 1000}s`)),
+            PDF_RENDER_TIMEOUT_MS
+          );
+        }),
+      ]);
+      return Buffer.from(pdf);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   } finally {
-    await browser.close();
+    // Chrome can also hang while closing after a failed PDF operation. Give it
+    // a short grace period, then terminate the child so the next report is not
+    // blocked behind a leaked renderer on the 512MB Render instance.
+    try {
+      await Promise.race([
+        browser.close(),
+        new Promise((resolve) => setTimeout(resolve, 5000)),
+      ]);
+    } finally {
+      const chromeProcess = browser.process?.();
+      if (chromeProcess && !chromeProcess.killed) chromeProcess.kill('SIGKILL');
+    }
     fs.unlink(tmpFile, () => {});
   }
 }

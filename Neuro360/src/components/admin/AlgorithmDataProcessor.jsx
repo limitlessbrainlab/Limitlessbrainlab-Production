@@ -1352,7 +1352,14 @@ const AlgorithmDataProcessor = () => {
     startClaudeCreep(10);
     toast.loading('Building your 12-page Neurosense Performance Report (≈3–6 min, please keep this tab open)…', { id: 'claude-report' });
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
+      // This pipeline can legitimately run for several minutes. In production,
+      // never send it through the Vercel rewrite: that proxy can close long
+      // requests before Render finishes and the UI then reports a timeout.
+      const proxyApiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
+      const directBackendUrl = import.meta.env.VITE_DIRECT_BACKEND_URL || (
+        import.meta.env.PROD ? 'https://limitlessbrainlab-production-backend.onrender.com' : ''
+      );
+      const apiUrl = directBackendUrl ? `${directBackendUrl.replace(/\/$/, '')}/api` : proxyApiUrl;
       const token = import.meta.env.VITE_CLAUDE_REPORT_TOKEN;
       console.log('[Claude Report] Step 1: fetching the generated NeuroSense PDF…', pdfUrl);
       // Fetch the just-generated NeuroSense PDF and forward it to the Claude endpoint.

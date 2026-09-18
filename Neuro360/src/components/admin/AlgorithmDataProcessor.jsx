@@ -607,7 +607,14 @@ const AlgorithmDataProcessor = () => {
     setProcessedDocName('');
     try {
       toast.loading('Replacing logo...', { id: 'doc-process' });
-      const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
+      // Logo replacement can take longer than the Vercel rewrite timeout for
+      // larger PDFs. Use the backend directly in production, just like the
+      // long-running NeuroSense Performance Report request below.
+      const proxyApiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
+      const directBackendUrl = import.meta.env.VITE_DIRECT_BACKEND_URL || (
+        import.meta.env.PROD ? 'https://limitlessbrainlab-production-backend.onrender.com' : ''
+      );
+      const apiUrl = directBackendUrl ? `${directBackendUrl.replace(/\/$/, '')}/api` : proxyApiUrl;
       const formData = new FormData();
       formData.append('document', file);
 
@@ -634,7 +641,7 @@ const AlgorithmDataProcessor = () => {
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         // Surface the real reason instead of a generic message so failures are diagnosable.
-        const reason = err.message || err.error ||
+        const reason = err.details || err.message || err.error ||
           (response.status === 401 ? 'Your session expired — please log out and log back in, then retry.' :
            response.status === 413 ? 'That PDF is too large to process.' :
            `Server error (${response.status}).`);

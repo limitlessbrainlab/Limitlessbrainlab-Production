@@ -1,17 +1,14 @@
 // NeuroSense Cloud Integration Service
 // Handles real-time cloud processing, storage, and advanced analytics
 
-import { createClient } from '@supabase/supabase-js';
 import aiAnalysisService from './aiAnalysisService';
+import supabase from '../lib/supabaseClient';
 
 class NeuroSenseCloudService {
   constructor() {
-    // Initialize Supabase client
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    if (supabaseUrl && supabaseAnonKey) {
-      this.supabase = createClient(supabaseUrl, supabaseAnonKey);
+    // Reuse the app's single browser client; separate clients race on auth storage.
+    if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      this.supabase = supabase;
     } else {
       console.warn('WARNING: NeuroSense Cloud: Offline mode');
       this.supabase = null;

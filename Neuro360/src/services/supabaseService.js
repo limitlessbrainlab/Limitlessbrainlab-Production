@@ -1,38 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
+import supabase from '../lib/supabaseClient';
 
-// Get Supabase environment variables with fallbacks for development
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-anon-key';
-
-// Check if we have valid Supabase configuration
-const hasValidSupabaseConfig = supabaseUrl && supabaseUrl !== 'https://placeholder.supabase.co' &&
-                               supabaseAnonKey && supabaseAnonKey !== 'placeholder-anon-key';
-
-// Initialize Supabase client only if we have valid config
-let supabase = null;
-
-if (hasValidSupabaseConfig) {
-  supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-      storageKey: 'neuro360-auth',
-    },
-    global: {
-      headers: {
-        'x-application-name': 'neuro360-web',
-        // NOTE: do NOT hardcode an Authorization header here. supabase-js sets the
-        // apikey + a default anon Authorization automatically, and swaps Authorization
-        // to the logged-in user's JWT once a session exists. A static Bearer anonKey
-        // pinned every read to the `anon` role (auth.uid() = null), defeating RLS.
-      },
-    },
-    db: {
-      schema: 'public',
-    },
-  });
-}
+// Every browser caller must share one GoTrue client and one session storage key.
+const hasValidSupabaseConfig = Boolean(
+  import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 class SupabaseService {
   constructor() {
@@ -720,3 +691,4 @@ class SupabaseService {
 }
 
 export default new SupabaseService();
+export { supabase };

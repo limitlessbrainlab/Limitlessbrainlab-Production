@@ -15,6 +15,8 @@ const axios = require('axios');
 
 const GATEWAY_URL = process.env.NEXAPROC_GATEWAY_URL || 'http://187.127.176.1/neuro-sidecar';
 const MASTER_KEY = process.env.NEXAPROC_MASTER_KEY || '';
+const PDF_RENDER_URL = process.env.PDF_RENDER_URL || 'https://limitlessbrainlab-eight.vercel.app/api/render-performance-pdf';
+const PDF_RENDER_TOKEN = process.env.PDF_RENDER_TOKEN || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 // Gateway caps the JSON body at 1MB; keep the extracted text well under it.
 const MAX_TEXT_CHARS = 200000;
 
@@ -376,154 +378,25 @@ async function extractReportSource(pdfText) {
   return null;
 }
 
-// Caps how many Chromium instances render at once — each render is memory-heavy,
-// and simultaneous admin clicks could OOM the backend otherwise. Extra renders
-// queue up FIFO and run as slots free.
-const MAX_CONCURRENT_PDF_RENDERS = parseInt(process.env.MAX_CONCURRENT_PDF_RENDERS || '1', 10);
-let activeRenders = 0;
-const renderQueue = [];
-
-function runQueued(task) {
-  return new Promise((resolve, reject) => {
-    const run = async () => {
-      activeRenders++;
-      try {
-        resolve(await task());
-      } catch (e) {
-        reject(e);
-      } finally {
-        activeRenders--;
-        const next = renderQueue.shift();
-        if (next) next();
-      }
-    };
-    if (activeRenders < MAX_CONCURRENT_PDF_RENDERS) run();
-    else renderQueue.push(run);
-  });
-}
-
-// This backend runs on a memory-constrained (512MB) container, and headless
-// Chrome is the single biggest consumer in the process. These flags trade
-// away things this report template never needs (GPU compositing, extensions,
-// background network/sync services, separate renderer/GPU/zygote processes)
-// to keep Chrome's footprint as small as possible.
-const LOW_MEMORY_CHROME_ARGS = [
-  '--no-sandbox',
-  '--disable-setuid-sandbox',
-  '--disable-dev-shm-usage',
-  '--disable-gpu',
-  '--disable-extensions',
-  '--disable-background-networking',
-  '--disable-default-apps',
-  '--disable-sync',
-  '--disable-translate',
-  '--metrics-recording-only',
-  '--mute-audio',
-  '--no-first-run',
-  '--safebrowsing-disable-auto-update',
-  '--single-process',
-  '--no-zygote',
-];
-
-// A stalled Chrome PDF call must release the report request. Without this
-// guard the SSE heartbeat keeps the browser on "Rendering…" at 94% forever.
-const PDF_RENDER_TIMEOUT_MS = parseInt(process.env.PDF_RENDER_TIMEOUT_MS || '120000', 10);
-
 /**
- * Launch Puppeteer, render the HTML to a PDF, and close the browser. The
- * 12-page report template is authored for A4 portrait, margin 0, with
- * printBackground (see templates/brainReport12Page.js).
- *
- * The HTML is written to a temp file and loaded via `page.goto('file://…')`
- * rather than `page.setContent()` — every asset in the template is already a
- * self-contained `data:` URI (see brainReport12Page.js), so this is a drop-in
- * swap that avoids holding the full HTML string in memory a second time while
- * it's transferred to Chrome over the CDP connection.
- * @param {string} html  Complete HTML document string.
- * @returns {Promise<Buffer>}  PDF bytes.
- */
-async function launchAndRender(html) {
-  const puppeteer = require('puppeteer');
-  const fs = require('fs');
-  const os = require('os');
-  const path = require('path');
-
-  const tmpFile = path.join(os.tmpdir(), `report-${Date.now()}-${Math.round(Math.random() * 1e9)}.html`);
-  fs.writeFileSync(tmpFile, html);
-
-  const browser = await puppeteer.launch({ args: LOW_MEMORY_CHROME_ARGS });
-  try {
-    const page = await browser.newPage();
-    await page.goto(`file://${tmpFile}`, { waitUntil: 'load', timeout: 60000 });
-    let timeoutId;
-    try {
-      const pdf = await Promise.race([
-        page.pdf({
-          format: 'A4',
-          printBackground: true,
-          margin: { top: 0, right: 0, bottom: 0, left: 0 },
-        }),
-        new Promise((_, reject) => {
-          timeoutId = setTimeout(
-            () => reject(new Error(`Chrome PDF rendering timed out after ${PDF_RENDER_TIMEOUT_MS / 1000}s`)),
-            PDF_RENDER_TIMEOUT_MS
-          );
-        }),
-      ]);
-      return Buffer.from(pdf);
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  } finally {
-    // Chrome can also hang while closing after a failed PDF operation. Give it
-    // a short grace period, then terminate the child so the next report is not
-    // blocked behind a leaked renderer on the 512MB Render instance.
-    try {
-      await Promise.race([
-        browser.close(),
-        new Promise((resolve) => setTimeout(resolve, 5000)),
-      ]);
-    } finally {
-      const chromeProcess = browser.process?.();
-      if (chromeProcess && !chromeProcess.killed) chromeProcess.kill('SIGKILL');
-    }
-    fs.unlink(tmpFile, () => {});
-  }
-}
-
-/**
- * Render using the Puppeteer Chrome installed on this backend at build time
- * (`npx puppeteer browsers install chrome`, cached in PUPPETEER_CACHE_DIR). If
- * Chrome is ever missing at runtime (e.g. a deploy skipped the build-time
- * install step), self-heal by installing it once on the spot, then retry —
- * a safety net, not the primary install path.
- * @param {string} html  Complete HTML document string.
- * @returns {Promise<Buffer>}  PDF bytes.
- */
-async function renderHtmlLocally(html) {
-  try {
-    return await launchAndRender(html);
-  } catch (err) {
-    if (!/Could not find (Chrome|Chromium)/i.test(err.message)) throw err;
-    console.warn('[renderHtmlLocally] Chrome missing at runtime — self-healing with a one-time install…');
-    const { execSync } = require('child_process');
-    execSync('npx puppeteer browsers install chrome', { stdio: 'inherit', timeout: 120000 });
-    return await launchAndRender(html);
-  }
-}
-
-/**
- * Render a fully-built HTML string to a PDF using this backend's local
- * Puppeteer Chrome, capped at MAX_CONCURRENT_PDF_RENDERS simultaneous renders.
+ * Render a fully-built HTML string on Vercel, keeping Chrome out of Render's
+ * memory-constrained container.
  * @param {string} html  Complete HTML document string.
  * @returns {Promise<Buffer>}  PDF bytes.
  */
 async function renderReportPdf(html) {
-  try {
-    return await runQueued(() => renderHtmlLocally(html));
-  } catch (err) {
-    throw new Error(`PDF render failed: ${err.message}`);
+  if (!PDF_RENDER_TOKEN) throw new Error('PDF renderer is not configured');
+  const response = await axios.post(PDF_RENDER_URL, { html }, {
+    headers: { Authorization: `Bearer ${PDF_RENDER_TOKEN}` },
+    responseType: 'arraybuffer',
+    timeout: 180000,
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+  });
+  if (!String(response.headers['content-type']).includes('application/pdf')) {
+    throw new Error('PDF renderer returned an invalid response');
   }
+  return Buffer.from(response.data);
 }
 
 /**

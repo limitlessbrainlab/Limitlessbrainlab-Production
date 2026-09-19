@@ -5,7 +5,7 @@ services:
     env: node
     region: singapore
     plan: free
-    buildCommand: cd server && npm install && npx puppeteer browsers install chrome
+    buildCommand: cd server && npm install
     startCommand: cd server && npm start
     healthCheckPath: /api/health
     envVars:
@@ -13,11 +13,6 @@ services:
         value: production
       - key: PORT
         value: 3001
-      # Puppeteer cache must live INSIDE the project dir so Chrome installed at
-      # build time persists to runtime (Render wipes ~/.cache between build/run).
-      # Used by both the build `npx puppeteer browsers install chrome` and launch.
-      - key: PUPPETEER_CACHE_DIR
-        value: /opt/render/project/src/.cache/puppeteer
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_REQUEST_DELAY_MS
@@ -33,9 +28,6 @@ services:
       # Non-secret.
       - key: REPORT_AI_PROVIDER
         value: gemini
-      # Caps simultaneous local Puppeteer renders (FIFO queue beyond this).
-      - key: MAX_CONCURRENT_PDF_RENDERS
-        value: "1"
       - key: CLAUDE_REPORT_TOKEN
         sync: false
       # Gates the /api/patient-documents endpoints (private patients_documents

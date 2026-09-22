@@ -60,13 +60,18 @@ api.interceptors.response.use(
 export const authService = {
   // Email/Password Authentication
   async loginWithEmail({ email, password, userType }) {
-
-    // Input validation
-    if (!email) {
-      throw new Error('Email is required');
-    }
-    if (!password) {
-      throw new Error('Password is required');
+    if (!email || !password) throw new Error('Email and password are required');
+    try {
+      const { data } = await axios.post(`${API_BASE_URL}/auth/login`, {
+        email,
+        password,
+        userType,
+        origin: window.location.origin,
+      });
+      if (data.session && supabase) await supabase.auth.setSession(data.session);
+      return data;
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Unable to sign in. Please try again.');
     }
 
     const normalizedEmail = email.trim().toLowerCase();

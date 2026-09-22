@@ -1033,6 +1033,106 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Login belongs on the server: browser clients must not query credential-bearing
+// tables directly, because those reads depend on public RLS policies.
+app.post('/api/auth/login', rateLimiters.loginLimiter, async (req, res) => {
+  const { email, password, userType, origin } = req.body || {};
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  const loginType = userType || null;
+  if (!normalizedEmail || typeof password !== 'string' || !password) {
+    return res.status(400).json({ success: false, error: 'Email and password are required' });
+  }
+  if (loginType && !['admin', 'clinic', 'patient'].includes(loginType)) {
+    return res.status(400).json({ success: false, error: 'Invalid login type' });
+  }
+  if (!supabase) return res.status(503).json({ success: false, error: 'Login service is unavailable' });
+
+  const environment = (value) => {
+    try {
+      const host = new URL(value).hostname;
+      return host === 'limitlessbrainlab-eight.vercel.app' ? 'staging' : 'production';
+    } catch { return 'production'; }
+  };
+  const canonicalUrl = (value) => environment(value) === 'staging'
+    ? 'https://limitlessbrainlab-eight.vercel.app'
+    : 'https://limitlessbrainlab.com';
+  const correctEnvironment = (record) => !record.origin_url || environment(record.origin_url) === environment(origin);
+  const deny = (message = 'Invalid email or password') => res.status(401).json({ success: false, error: message });
+
+  try {
+    if (loginType !== 'admin') {
+      const { data: clinics, error } = await supabase.from('clinics').select('*').eq('email', normalizedEmail).limit(1);
+      if (error) throw error;
+      const clinic = clinics?.[0];
+      if (clinic && loginType !== 'patient') {
+        if (clinic.subscription_status === 'pending_approval') return deny('Your account is pending activation. Please wait for admin approval.');
+        if (!clinic.is_active) return deny('Your account has been deactivated. Please contact support at info@limitlessbrainlab.com.');
+        if (!correctEnvironment(clinic)) return deny(`This account was created on ${canonicalUrl(clinic.origin_url)}. Please log in there.`);
+        if (!await bcrypt.compare(password, clinic.password || '')) return deny();
+        return res.json({
+          success: true,
+          token: `local_token_${Date.now()}`,
+          user: {
+            id: clinic.id, email: clinic.email, name: clinic.contact_person || clinic.name,
+            clinicName: clinic.clinic_name || clinic.name, phone: clinic.phone, address: clinic.address,
+            role: 'clinic_admin', avatar: clinic.logo_url || null, clinicId: clinic.id,
+            isActivated: true, credentialsUpdatedAt: clinic.credentials_updated_at || null,
+          },
+        });
+      }
+    }
+
+    if (loginType !== 'admin') {
+      const { data: patients, error } = await supabase.from('patients').select('*').eq('email', normalizedEmail).order('created_at', { ascending: false });
+      if (error) throw error;
+      let patient = null;
+      for (const entry of patients || []) {
+        const stored = entry.password || '';
+        const matches = /^\$2[aby]\$/.test(stored)
+          ? await bcrypt.compare(password, stored)
+          : String(password).trim() === String(stored).trim();
+        if (matches) { patient = entry; break; }
+      }
+      if (patient) {
+        if (!correctEnvironment(patient)) return deny(`This account was created on ${canonicalUrl(patient.origin_url)}. Please log in there.`);
+        return res.json({
+          success: true,
+          token: `patient_token_${Date.now()}`,
+          user: {
+            id: patient.id, email: patient.email, name: patient.full_name || patient.name,
+            phone: patient.phone, address: patient.address, dateOfBirth: patient.date_of_birth,
+            gender: patient.gender, role: 'patient', avatar: patient.avatar || patient.profile_image || patient.avatar_url || null,
+            clinicId: patient.clinic_id || patient.org_id, patientId: patient.id, externalId: patient.external_id,
+            isActivated: true, credentialsUpdatedAt: patient.credentials_updated_at || null,
+          },
+        });
+      }
+    }
+
+    if (loginType !== 'clinic' && loginType !== 'patient') {
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles').select('id,email,full_name,name,avatar_url,role').eq('email', normalizedEmail).eq('role', 'super_admin').limit(1);
+      if (profileError) throw profileError;
+      const profile = profiles?.[0];
+      if (profile) {
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+        if (!authError && authData?.user?.id === profile.id && authData.session) {
+          return res.json({
+            success: true,
+            token: authData.session.access_token,
+            session: { access_token: authData.session.access_token, refresh_token: authData.session.refresh_token },
+            user: { id: profile.id, email: profile.email, name: profile.full_name || profile.name || 'Super Admin', role: 'super_admin', avatar: profile.avatar_url || null, isActivated: true },
+          });
+        }
+      }
+    }
+    return deny();
+  } catch (error) {
+    console.error('Login failed:', error.message);
+    return res.status(503).json({ success: false, error: 'Unable to sign in. Please try again.' });
+  }
+});
+
 // Protected mail-only endpoint for staging. It does not write to production DB.
 app.post('/api/internal/mail-relay', async (req, res) => {
   if (!productionMailRelaySecret || req.get('x-production-mail-relay-secret') !== productionMailRelaySecret) {

@@ -92,7 +92,7 @@ export const AuthProvider = ({ children }) => {
     const forceIdleLogout = async () => {
       await clearAllAndSignOut();
       localStorage.setItem('app_build_id', APP_BUILD_ID); // keep build id so deploy gate doesn't refire
-      window.location.replace('/');
+      window.location.replace('/login');
     };
 
     const checkIdle = () => {
@@ -472,6 +472,7 @@ export const AuthProvider = ({ children }) => {
         // Fetch the latest user data from database to get updated profile picture
         let latestUserData = response.user;
         try {
+          if (false) {
           // super_admin: authService already returns name + avatar (full_name/avatar_url)
           // from the profiles row it fetched, so no extra findById round-trip is needed here.
           if (response.user.role === 'clinic_admin') {
@@ -528,6 +529,7 @@ export const AuthProvider = ({ children }) => {
               };
             } else {
             }
+          }
           }
         } catch (dbError) {
           // Continue with API response if database fetch fails
@@ -702,7 +704,7 @@ export const AuthProvider = ({ children }) => {
     // and Supabase sign-out — then a hard refresh to a clean state.
     try { await clearAllAndSignOut(); } catch (e) { /* ignore */ }
     localStorage.setItem('app_build_id', APP_BUILD_ID); // keep build id so deploy gate doesn't refire
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 
 

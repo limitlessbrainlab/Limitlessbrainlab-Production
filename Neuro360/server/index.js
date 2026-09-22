@@ -1111,7 +1111,7 @@ app.post('/api/auth/login', rateLimiters.loginLimiter, async (req, res) => {
 
     if (loginType !== 'clinic' && loginType !== 'patient') {
       const { data: profiles, error: profileError } = await supabase
-        .from('profiles').select('id,email,full_name,name,avatar_url,role').eq('email', normalizedEmail).eq('role', 'super_admin').limit(1);
+        .from('profiles').select('id,email,full_name,avatar_url,role').eq('email', normalizedEmail).eq('role', 'super_admin').limit(1);
       if (profileError) throw profileError;
       const profile = profiles?.[0];
       if (profile) {
@@ -1121,7 +1121,7 @@ app.post('/api/auth/login', rateLimiters.loginLimiter, async (req, res) => {
             success: true,
             token: authData.session.access_token,
             session: { access_token: authData.session.access_token, refresh_token: authData.session.refresh_token },
-            user: { id: profile.id, email: profile.email, name: profile.full_name || profile.name || 'Super Admin', role: 'super_admin', avatar: profile.avatar_url || null, isActivated: true },
+            user: { id: profile.id, email: profile.email, name: profile.full_name || 'Super Admin', role: 'super_admin', avatar: profile.avatar_url || null, isActivated: true },
           });
         }
       }

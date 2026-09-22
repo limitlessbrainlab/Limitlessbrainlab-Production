@@ -47,15 +47,17 @@ export default function SystemHealth({ compact = false }) {
   };
 
   const healthy = status?.backend?.healthy;
-  if (compact) return <div className={`rounded-lg border px-4 py-3 ${healthy ? 'border-green-300 bg-green-50 text-green-900' : 'border-amber-300 bg-amber-50 text-amber-950'}`}>
-    <div className="flex items-center gap-2"><Activity className="h-4 w-4" /><span className="text-sm font-semibold">Report service: {healthy ? 'Working' : 'Checking / needs attention'}</span></div>
-    <p className="mt-1 text-xs">{message}</p>
-    <div className="mt-2 flex items-center gap-2">
-      <button onClick={check} disabled={working} className="text-xs font-medium underline disabled:opacity-50"><RefreshCw className="mr-1 inline h-3 w-3" />Check again</button>
-      {!healthy && status?.restartConfigured && <button onClick={restart} disabled={working} className="text-xs font-medium underline disabled:opacity-50"><Wrench className="mr-1 inline h-3 w-3" />Restart service</button>}
-      <details className="text-xs"><summary className="cursor-pointer">Technical details</summary><span>HTTP {status?.backend?.status ?? 'no response'} · {status?.checkedAt || 'not checked'}</span></details>
-    </div>
-  </div>;
+  if (compact) {
+    const color = healthy ? 'bg-green-400' : status ? 'bg-red-500' : 'bg-amber-400';
+    const label = healthy ? 'Report service is working' : status ? 'Report service needs attention' : 'Checking report service';
+    return <div className="flex items-center gap-2">
+      <button onClick={check} disabled={working} title={label} aria-label={label} className="relative flex h-5 w-5 items-center justify-center disabled:opacity-50">
+        <span className={`absolute inline-flex h-4 w-4 rounded-full ${color} opacity-75 animate-ping`} />
+        <span className={`relative inline-flex h-3 w-3 rounded-full ${color} ring-2 ring-white`} />
+      </button>
+      {!healthy && status?.restartConfigured && <button onClick={restart} disabled={working} title="Restart report service" aria-label="Restart report service" className="rounded p-1 text-amber-100 hover:bg-white/10 disabled:opacity-50"><Wrench className="h-4 w-4" /></button>}
+    </div>;
+  }
   return <div className="max-w-3xl space-y-5">
     <div className={`rounded-xl border p-6 ${healthy ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`}>
       <div className="flex gap-4">

@@ -15,7 +15,7 @@ const axios = require('axios');
 
 const GATEWAY_URL = process.env.NEXAPROC_GATEWAY_URL || 'http://187.127.176.1/neuro-sidecar';
 const MASTER_KEY = process.env.NEXAPROC_MASTER_KEY || '';
-const PDF_RENDER_URL = process.env.PDF_RENDER_URL || 'https://limitlessbrainlab-eight.vercel.app/api/render-performance-pdf';
+const PDF_RENDER_URL = process.env.PDF_RENDER_URL || 'https://www.limitlessbrainlab.com/api/render-performance-pdf';
 const PDF_RENDER_TOKEN = process.env.PDF_RENDER_TOKEN || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 // Gateway caps the JSON body at 1MB; keep the extracted text well under it.
 const MAX_TEXT_CHARS = 200000;

@@ -29,7 +29,6 @@ const WebsiteInquiries = lazy(() => import('./WebsiteInquiries'));
 const WebsitePayments = lazy(() => import('./WebsitePayments'));
 const PatientSubscriptions = lazy(() => import('./PatientSubscriptions'));
 const PricingManagement = lazy(() => import('./PricingManagement'));
-const SystemHealth = lazy(() => import('./SystemHealth'));
 
 const SuperAdminPanel = () => {
 
@@ -169,8 +168,6 @@ const SuperAdminPanel = () => {
           return <WebsiteInquiries subTab={pathParts[2] || 'contact'} />;
         case 'settings':
           return <SystemSettings />;
-        case 'system-status':
-          return <SystemHealth />;
         default:
           return <AdminDashboard analytics={analytics} />;
       }
@@ -229,7 +226,6 @@ const SuperAdminPanel = () => {
       case 'static-pages': return 'Static Pages';
       case 'website-payments': return 'Website Payments';
       case 'settings': return 'System Settings';
-      case 'system-status': return 'System Status & Recovery';
       default: return 'Super Admin Dashboard';
     }
   };

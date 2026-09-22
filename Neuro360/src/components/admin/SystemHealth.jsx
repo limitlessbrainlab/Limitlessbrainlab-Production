@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Activity, RefreshCw, RotateCw, Wrench } from 'lucide-react';
+import { Activity, RefreshCw, Wrench } from 'lucide-react';
 import SupabaseService from '../../services/supabaseService';
 
 const getToken = async () => {
@@ -7,7 +7,7 @@ const getToken = async () => {
   return data?.session?.access_token || localStorage.getItem('authToken');
 };
 
-export default function SystemHealth() {
+export default function SystemHealth({ compact = false }) {
   const [status, setStatus] = useState(null);
   const [message, setMessage] = useState('Checking report service…');
   const [working, setWorking] = useState(false);
@@ -47,6 +47,15 @@ export default function SystemHealth() {
   };
 
   const healthy = status?.backend?.healthy;
+  if (compact) return <div className={`rounded-lg border px-4 py-3 ${healthy ? 'border-green-300 bg-green-50 text-green-900' : 'border-amber-300 bg-amber-50 text-amber-950'}`}>
+    <div className="flex items-center gap-2"><Activity className="h-4 w-4" /><span className="text-sm font-semibold">Report service: {healthy ? 'Working' : 'Checking / needs attention'}</span></div>
+    <p className="mt-1 text-xs">{message}</p>
+    <div className="mt-2 flex items-center gap-2">
+      <button onClick={check} disabled={working} className="text-xs font-medium underline disabled:opacity-50"><RefreshCw className="mr-1 inline h-3 w-3" />Check again</button>
+      {!healthy && status?.restartConfigured && <button onClick={restart} disabled={working} className="text-xs font-medium underline disabled:opacity-50"><Wrench className="mr-1 inline h-3 w-3" />Restart service</button>}
+      <details className="text-xs"><summary className="cursor-pointer">Technical details</summary><span>HTTP {status?.backend?.status ?? 'no response'} · {status?.checkedAt || 'not checked'}</span></details>
+    </div>
+  </div>;
   return <div className="max-w-3xl space-y-5">
     <div className={`rounded-xl border p-6 ${healthy ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`}>
       <div className="flex gap-4">
@@ -55,7 +64,6 @@ export default function SystemHealth() {
       </div>
       <div className="mt-5 flex flex-wrap gap-3">
         <button onClick={check} disabled={working} className="rounded-lg bg-white px-4 py-2 text-sm font-medium shadow border disabled:opacity-50"><RefreshCw className="mr-2 inline h-4 w-4" />Check again</button>
-        <button onClick={() => { window.location.href = '/admin/algorithm-processor'; }} className="rounded-lg bg-[#323956] px-4 py-2 text-sm font-medium text-white"><RotateCw className="mr-2 inline h-4 w-4" />Retry a report</button>
         {!healthy && status?.restartConfigured && <button onClick={restart} disabled={working} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"><Wrench className="mr-2 inline h-4 w-4" />Restart report service</button>}
       </div>
     </div>

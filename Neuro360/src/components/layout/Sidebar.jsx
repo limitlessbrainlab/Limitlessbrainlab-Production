@@ -203,7 +203,6 @@ const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
         { id: 'pricing', label: 'Pricing Management', icon: Zap, path: '/admin/pricing' },
         { id: 'analytics', label: 'Analytics', icon: PieChart, path: '/admin/analytics' },
         { id: 'alerts', label: 'Alerts & Monitoring', icon: Monitor, path: '/admin/alerts' },
-        { id: 'system-status', label: 'System Status', icon: Activity, path: '/admin/system-status' },
         { id: 'coaches', label: 'Coach Management', icon: Users, path: '/admin/coaches' },
         { id: 'assessments', label: 'Assessments', icon: Brain, path: '/admin/assessments' },
         { id: 'static-pages', label: 'Static Pages', icon: FileText, path: '/admin/static-pages' },

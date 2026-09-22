@@ -188,6 +188,7 @@ function App() {
                   <Route path="/admin/algorithm-processor" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
                   <Route path="/admin/coaches" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
                   <Route path="/admin/alerts" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
+                  <Route path="/admin/system-status" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
                   <Route path="/admin/assessments" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
                   <Route path="/admin/static-pages" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />
                   <Route path="/admin/website-payments" element={<ProtectedRoute requiredRole="super_admin"><SuperAdminPanel /></ProtectedRoute>} />

@@ -386,17 +386,19 @@ async function extractReportSource(pdfText) {
  */
 async function renderReportPdf(html) {
   if (!PDF_RENDER_TOKEN) throw new Error('PDF renderer is not configured');
-  const response = await axios.post(PDF_RENDER_URL, { html }, {
-    headers: { Authorization: `Bearer ${PDF_RENDER_TOKEN}` },
-    responseType: 'arraybuffer',
-    timeout: 180000,
-    maxBodyLength: Infinity,
-    maxContentLength: Infinity,
-  });
-  if (!String(response.headers['content-type']).includes('application/pdf')) {
-    throw new Error('PDF renderer returned an invalid response');
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await axios.post(PDF_RENDER_URL, { html }, {
+        headers: { Authorization: `Bearer ${PDF_RENDER_TOKEN}` }, responseType: 'arraybuffer', timeout: 180000,
+        maxBodyLength: Infinity, maxContentLength: Infinity,
+      });
+      if (!String(response.headers['content-type']).includes('application/pdf')) throw new Error('PDF renderer returned an invalid response');
+      return Buffer.from(response.data);
+    } catch (error) {
+      if (attempt || (error.response && error.response.status < 500)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
   }
-  return Buffer.from(response.data);
 }
 
 /**

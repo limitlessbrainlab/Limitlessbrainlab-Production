@@ -29,7 +29,11 @@ export default function SystemHealth({ compact = false }) {
     }
   }, []);
 
-  useEffect(() => { check(); }, [check]);
+  useEffect(() => {
+    check();
+    const timer = setInterval(check, 30000);
+    return () => clearInterval(timer);
+  }, [check]);
 
   const restart = useCallback(async (automatic = false) => {
     if (!automatic && !window.confirm('Restore the report service? Reports may be unavailable for about two minutes.')) return;

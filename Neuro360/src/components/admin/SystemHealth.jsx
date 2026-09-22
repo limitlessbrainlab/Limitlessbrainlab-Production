@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Activity, RefreshCw, Wrench } from 'lucide-react';
 import SupabaseService from '../../services/supabaseService';
 
@@ -11,6 +11,7 @@ export default function SystemHealth({ compact = false }) {
   const [status, setStatus] = useState(null);
   const [message, setMessage] = useState('Checking report service…');
   const [working, setWorking] = useState(false);
+  const autoRestarted = useRef(false);
 
   const check = useCallback(async () => {
     setWorking(true);
@@ -30,8 +31,8 @@ export default function SystemHealth({ compact = false }) {
 
   useEffect(() => { check(); }, [check]);
 
-  const restart = async () => {
-    if (!window.confirm('Restart the report service? Reports may be unavailable for about two minutes.')) return;
+  const restart = useCallback(async (automatic = false) => {
+    if (!automatic && !window.confirm('Restore the report service? Reports may be unavailable for about two minutes.')) return;
     setWorking(true);
     try {
       const response = await fetch('/api/ops/backend', {
@@ -40,11 +41,20 @@ export default function SystemHealth({ compact = false }) {
         body: JSON.stringify({ action: 'restart' }),
       });
       const data = await response.json();
-      setMessage(data.message);
+      setMessage(response.ok && automatic ? 'The report service is restarting. Please retry in two minutes.' : data.message);
       if (response.ok) setTimeout(check, 120000);
     } catch { setMessage('Restart could not be requested.'); }
     finally { setWorking(false); }
-  };
+  }, [check]);
+
+  useEffect(() => {
+    if (status?.backend?.healthy) {
+      autoRestarted.current = false;
+    } else if (status?.restartConfigured && !autoRestarted.current) {
+      autoRestarted.current = true;
+      restart(true);
+    }
+  }, [restart, status]);
 
   const healthy = status?.backend?.healthy;
   if (compact) {
@@ -55,7 +65,7 @@ export default function SystemHealth({ compact = false }) {
         <span className={`absolute inline-flex h-4 w-4 rounded-full ${color} opacity-75 animate-ping`} />
         <span className={`relative inline-flex h-3 w-3 rounded-full ${color} ring-2 ring-white`} />
       </button>
-      {!healthy && status?.restartConfigured && <button onClick={restart} disabled={working} title="Restart report service" aria-label="Restart report service" className="rounded p-1 text-amber-100 hover:bg-white/10 disabled:opacity-50"><Wrench className="h-4 w-4" /></button>}
+      {!healthy && status?.restartConfigured && <button onClick={() => restart()} disabled={working} className="rounded bg-white/15 px-2 py-1 text-xs font-medium text-white hover:bg-white/25 disabled:opacity-50"><Wrench className="mr-1 inline h-3 w-3" />Restore service</button>}
     </div>;
   }
   return <div className="max-w-3xl space-y-5">
@@ -66,7 +76,7 @@ export default function SystemHealth({ compact = false }) {
       </div>
       <div className="mt-5 flex flex-wrap gap-3">
         <button onClick={check} disabled={working} className="rounded-lg bg-white px-4 py-2 text-sm font-medium shadow border disabled:opacity-50"><RefreshCw className="mr-2 inline h-4 w-4" />Check again</button>
-        {!healthy && status?.restartConfigured && <button onClick={restart} disabled={working} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"><Wrench className="mr-2 inline h-4 w-4" />Restart report service</button>}
+        {!healthy && status?.restartConfigured && <button onClick={() => restart()} disabled={working} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"><Wrench className="mr-2 inline h-4 w-4" />Restart report service</button>}
       </div>
     </div>
     <details className="rounded-xl border bg-white p-5">

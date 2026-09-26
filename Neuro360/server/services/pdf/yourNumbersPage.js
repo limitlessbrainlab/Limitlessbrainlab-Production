@@ -169,10 +169,11 @@ async function generateYourNumbersPageAsync(doc, inputPdfPaths, parameterNotes) 
     var timestamp = Date.now();
 
     try {
-      var results = await Promise.all([
-        extractPageImage(inputPdfPaths.eyesClosed, tempDir, 'ec_page6_' + timestamp),
-        extractPageImage(inputPdfPaths.eyesOpen, tempDir, 'eo_page6_' + timestamp)
-      ]);
+      // Render sequentially: two scale-2 canvases at once can exhaust a small Render instance.
+      var results = [
+        await extractPageImage(inputPdfPaths.eyesClosed, tempDir, 'ec_page6_' + timestamp),
+        await extractPageImage(inputPdfPaths.eyesOpen, tempDir, 'eo_page6_' + timestamp)
+      ];
 
       eyesClosedImagePath = results[0];
       eyesOpenImagePath = results[1];
@@ -200,10 +201,10 @@ async function generateYourNumbersPageAsync(doc, inputPdfPaths, parameterNotes) 
   if (inputPdfPaths && inputPdfPaths.eyesClosed && inputPdfPaths.eyesOpen) {
     try {
       console.log('   Checking RELIABILITY ASSESSMENT for noisy channels...');
-      var reliabilityResults = await Promise.all([
-        extractReliabilityAssessment(inputPdfPaths.eyesClosed),
-        extractReliabilityAssessment(inputPdfPaths.eyesOpen)
-      ]);
+      var reliabilityResults = [
+        await extractReliabilityAssessment(inputPdfPaths.eyesClosed),
+        await extractReliabilityAssessment(inputPdfPaths.eyesOpen)
+      ];
       var combinedChannels = [...new Set([
         ...reliabilityResults[0].redChannels,
         ...reliabilityResults[1].redChannels

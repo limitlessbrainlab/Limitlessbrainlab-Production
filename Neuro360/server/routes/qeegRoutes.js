@@ -11,6 +11,7 @@ const TemplateBasedPDFGenerator = require('../services/pdfGeneratorTemplate');
 const templateManager = require('../services/pdf/templateManager');
 const AIPdfGenerator = require('../services/aiPdfGenerator');
 const SupabaseStorage = require('../services/supabaseStorage');
+const reportJobLock = require('../services/reportJobLock');
 
 // NEW: Gemini AI Service for report generation
 let GeminiService = null;
@@ -83,7 +84,27 @@ const upload = multer({
  * POST /api/qeeg/process
  * Process QEEG files and calculate 7 brain health parameters
  */
-router.post('/process', upload.fields([
+router.post('/process', (req, res, next) => {
+  // ponytail: one job per instance; use a distributed queue if Render is scaled horizontally.
+  if (!reportJobLock.acquire()) {
+    return res.status(503).json({
+      error: true,
+      code: 'REPORT_PROCESSING_BUSY',
+      message: 'Another NeuroSense report is being generated. Please wait and try again.'
+    });
+  }
+
+  let released = false;
+  const release = () => {
+    if (!released) {
+      released = true;
+      reportJobLock.release();
+    }
+  };
+  res.once('finish', release);
+  res.once('close', release);
+  next();
+}, upload.fields([
   { name: 'eyesOpen', maxCount: 1 },
   { name: 'eyesClosed', maxCount: 1 }
 ]), async (req, res) => {
@@ -1549,4 +1570,3 @@ router.post('/replace-logo-download', upload.single('document'), async (req, res
 });
 
 module.exports = router;
-

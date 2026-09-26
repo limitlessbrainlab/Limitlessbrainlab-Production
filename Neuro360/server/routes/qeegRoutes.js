@@ -726,6 +726,11 @@ router.post('/process', (req, res, next) => {
         processedAt: new Date().toISOString(),
         dataType: 'raw', // Using RAW power calculator (as per specification)
         results: results.parameters,
+        canonicalResults: {
+          parameters: results.parameters,
+          overallScore: results.overallScore
+        },
+        qeegData,
         overallScore: results.overallScore,
         maxScore: 21,
         pdfUrl: pdfUrl,

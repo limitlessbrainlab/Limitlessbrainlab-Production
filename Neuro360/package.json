@@ -24,6 +24,7 @@
     "@sparticuz/chromium": "^153.0.0",
     "@stripe/stripe-js": "^7.8.0",
     "@supabase/supabase-js": "^2.57.4",
+    "@twemoji/svg": "^15.0.0",
     "@tanstack/react-query": "^5.89.0",
     "@tanstack/react-table": "^8.21.3",
     "axios": "^1.6.2",

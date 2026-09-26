@@ -2426,7 +2426,7 @@ const AlgorithmDataProcessor = () => {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      window.URL.revokeObjectURL(objectUrl);
+      setTimeout(() => window.URL.revokeObjectURL(objectUrl), 100);
       toast.success('PDF download started!', { id: toastId });
     } catch (e) {
       console.error('downloadViaBlob failed, falling back to direct open:', e);

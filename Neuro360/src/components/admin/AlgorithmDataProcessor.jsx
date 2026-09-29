@@ -5,7 +5,10 @@ import SupabaseService from '../../services/supabaseService';
 import toast from 'react-hot-toast';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import { grantCareProgramAccess } from '../../utils/careProgramEntitlements';
+import { paginate } from '../../utils/pagination';
 import SystemHealth from './SystemHealth';
+
+const PATIENT_PAGE_SIZE = 20;
 
 // Always return a CURRENT Supabase access token. supabase.auth.getSession() refreshes
 // the token transparently if it's near expiry, so /api/qeeg/* calls no longer 401
@@ -72,6 +75,7 @@ const AlgorithmDataProcessor = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClinicFilter, setSelectedClinicFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [visiblePatientCount, setVisiblePatientCount] = useState(PATIENT_PAGE_SIZE);
 
   const [eyesOpenFile, setEyesOpenFile] = useState(null);
   const [eyesClosedFile, setEyesClosedFile] = useState(null);
@@ -567,10 +571,13 @@ const AlgorithmDataProcessor = () => {
     return matchesSearch && matchesClinic && matchesDate;
   });
 
+  useEffect(() => setVisiblePatientCount(PATIENT_PAGE_SIZE), [searchTerm, selectedClinicFilter, dateFilter]);
+
   // Group filtered patients by clinic
+  const visiblePatients = paginate(filteredPatients, visiblePatientCount);
   const groupedPatients = clinics.map(clinic => ({
     clinic,
-    patients: filteredPatients.filter(p => p.clinicId === clinic.id)
+    patients: visiblePatients.filter(p => p.clinicId === clinic.id)
   })).filter(group => group.patients.length > 0);
 
   const clearFilters = () => {
@@ -2851,6 +2858,21 @@ const AlgorithmDataProcessor = () => {
                   Clear Filters
                 </button>
               )}
+            </div>
+          )}
+
+          {visiblePatients.length < filteredPatients.length && (
+            <div className="flex flex-col items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setVisiblePatientCount(count => count + PATIENT_PAGE_SIZE)}
+                className="rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-white shadow-md transition-colors hover:bg-navy-700"
+              >
+                Load More
+              </button>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                Showing {visiblePatients.length} of {filteredPatients.length} patients
+              </span>
             </div>
           )}
         </div>

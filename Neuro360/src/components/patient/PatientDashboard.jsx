@@ -10365,7 +10365,7 @@ const PatientDashboard = () => {
             <div className="flex items-center space-x-3">
               <div className="h-10 w-10 sm:h-14 sm:w-14 flex items-center justify-center">
                 <img
-                  src="/IBW Logo Header.png"
+                  src="/IBW Logo.png"
                   alt="NeuroSense Logo"
                   className="h-10 w-10 sm:h-14 sm:w-14 object-contain"
                 />

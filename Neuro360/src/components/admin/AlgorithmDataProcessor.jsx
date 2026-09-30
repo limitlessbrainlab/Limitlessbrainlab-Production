@@ -5,7 +5,7 @@ import SupabaseService from '../../services/supabaseService';
 import toast from 'react-hot-toast';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import { grantCareProgramAccess } from '../../utils/careProgramEntitlements';
-import { paginate } from '../../utils/pagination';
+import { groupPatientsByClinic, paginate } from '../../utils/pagination';
 import SystemHealth from './SystemHealth';
 
 const PATIENT_PAGE_SIZE = 20;
@@ -575,10 +575,7 @@ const AlgorithmDataProcessor = () => {
 
   // Group filtered patients by clinic
   const visiblePatients = paginate(filteredPatients, visiblePatientCount);
-  const groupedPatients = clinics.map(clinic => ({
-    clinic,
-    patients: visiblePatients.filter(p => p.clinicId === clinic.id)
-  })).filter(group => group.patients.length > 0);
+  const groupedPatients = groupPatientsByClinic(visiblePatients, clinics);
 
   const clearFilters = () => {
     setSearchTerm('');

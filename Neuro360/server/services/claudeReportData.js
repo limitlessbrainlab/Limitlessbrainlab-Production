@@ -574,9 +574,21 @@ function buildReportDataFromNeuroSenseMd(mdText, patient = {}, algorithmResults 
     icon: p.icon,
   }));
 
-  // Overall = average of the 7 parameter percentages, with Stress & Burnout
-  // inverted (100 - percent) so low stress/burnout counts as high health.
-  const overall = overallFromBars(bars);
+  // Use the NeuroSense/algorithm overall directly. Gauge percentages are visual
+  // bucket positions (20/55/90), so averaging them produces a different score.
+  const incomingParams = toParameters(algorithmResults);
+  const providedOverallScore = Number(algorithmResults?.overallScore);
+  const derivedOverallScore = Number.isFinite(providedOverallScore)
+    ? providedOverallScore
+    : incomingParams.length
+    ? incomingParams.reduce((sum, p) => {
+        const inverted = p.name === 'Stress' || p.name === 'Burnout & Fatigue';
+        return sum + (inverted ? p.maxScore - p.score : p.score);
+      }, 0)
+    : null;
+  const overallScore21 = parsed.overall.score ?? derivedOverallScore;
+  const overall = parsed.overall.percentage
+    ?? (overallScore21 == null ? overallFromBars(bars) : Math.round((overallScore21 / 21) * 100));
   const findBar = (key) => bars.find((b) => b.key === key)
     || { key, label: key, percent: 0, status: 'N/A', icon: '' };
 
@@ -593,7 +605,6 @@ function buildReportDataFromNeuroSenseMd(mdText, patient = {}, algorithmResults 
   // them from the deterministic algorithmResults — the same source the NeuroSense
   // report uses — exactly as buildReportDataFromSource does. Focus Score is a
   // number; Alpha:Theta Balance is a { fz, cz, pz } object.
-  const incomingParams = toParameters(algorithmResults);
   const focusVal = metricValue(incomingParams, 'Focus Score');
   const alphaThetaMetric = metricMatch(incomingParams, 'Alpha:Theta Balance');
   const alphaThetaVal = metricValue(incomingParams, 'Alpha:Theta Balance');
@@ -654,7 +665,7 @@ function buildReportDataFromNeuroSenseMd(mdText, patient = {}, algorithmResults 
     deepDive,
     profile,
     brainType,
-    overallScore21: parsed.overall.score != null ? parsed.overall.score : null,
+    overallScore21,
   };
 }
 

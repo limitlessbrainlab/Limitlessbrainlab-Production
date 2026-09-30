@@ -10363,11 +10363,11 @@ const PatientDashboard = () => {
           <div className="flex items-center justify-between h-14 sm:h-16">
             {/* Left Section - Logo & Branding */}
             <div className="flex items-center space-x-3">
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-1.5 border border-white/10">
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg border border-white/10 overflow-hidden">
                 <img
                   src="/IBW Logo.png"
                   alt="NeuroSense Logo"
-                  className="h-8 w-8 sm:h-10 sm:w-10 object-contain"
+                  className="h-10 w-10 sm:h-12 sm:w-12 object-contain"
                 />
               </div>
               <div className="hidden sm:block">

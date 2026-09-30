@@ -19,6 +19,31 @@ const { generateCognitionPage, generateCognitionPage2 } = require('./pdf/cogniti
 // AI Service: Only Gemini
 const AI_SERVICE = 'gemini';
 
+const buildPillBarDisplay = (value, scale) => {
+  let min = scale.min;
+  let max = scale.max;
+  if (scale.symmetric) {
+    const limit = Math.max(Math.abs(min), Math.abs(max), Math.ceil(Math.abs(value) * 1.1));
+    min = -limit;
+    max = limit;
+  } else if (value > max) {
+    max = Math.ceil(value * 1.1);
+  }
+
+  return {
+    score: Math.max(0, Math.min(100, Math.round(((value - min) / (max - min)) * 100))),
+    scale: {
+      min,
+      max,
+      value,
+      unit: scale.unit || '',
+      steps: scale.steps || 5,
+      normalMin: scale.normalMin,
+      normalMax: scale.normalMax
+    }
+  };
+};
+
 // Parameter Detail Data for all 7 parameters
 const PARAMETER_DETAIL_DATA = {
   cognition: {
@@ -1461,7 +1486,7 @@ class GeminiPdfGenerator {
       'FOCUS AND ATTENTION': 'Focus Score (Theta:Beta)',
       'RELAXATION SCORE': 'Relaxation Score',
       'REGENERATION AND REPAIR SCORE': 'Regeneration (Alpha Modulation)',
-      'ASYMMETRY EYE OPEN': 'Alpha Asymmetry (Frontal)'
+      'ALPHA ASYMMETRY': 'Alpha Asymmetry (Frontal)'
     };
 
     // Clinical scale ranges for each sub-parameter (min-max for pill bar positioning)
@@ -1473,7 +1498,7 @@ class GeminiPdfGenerator {
       'FOCUS AND ATTENTION':           { min: 0,  max: 4,   unit: '',   steps: 4, normalMin: 0, normalMax: 1.5 },  // < 1.5 is normal
       'RELAXATION SCORE':              { min: 0,  max: 25,  unit: '',   steps: 5, normalMin: 8, normalMax: 25 },   // > 8 is healthy
       'REGENERATION AND REPAIR SCORE': { min: 0,  max: 100, unit: '%',  steps: 5, normalMin: 30, normalMax: 100 }, // > 30% is healthy
-      'ASYMMETRY EYE OPEN':            { min: 0,  max: 50,  unit: '',   steps: 5, normalMin: 0, normalMax: 1 },    // < 1 is normal
+      'ALPHA ASYMMETRY':                { min: -10, max: 10, unit: '',   steps: 4, normalMin: -1, normalMax: 1, symmetric: true },
     };
 
     for (const sp of subParams) {
@@ -1501,11 +1526,10 @@ class GeminiPdfGenerator {
 
         const scale = subParamScales[sp.title];
         if (numericValue !== null && scale) {
-          // Dynamically expand scale max if value exceeds it
-          const dynamicMax = numericValue > scale.max ? Math.ceil(numericValue * 1.1) : scale.max;
-          sp.pillBarScore = Math.max(0, Math.min(100, Math.round(((numericValue - scale.min) / (dynamicMax - scale.min)) * 100)));
-          sp.pillBarScale = { min: scale.min, max: dynamicMax, value: numericValue, unit: scale.unit || '', steps: scale.steps || 5, normalMin: scale.normalMin, normalMax: scale.normalMax };
-          console.log(`      Pill bar: value=${numericValue}, scale=[${scale.min}-${dynamicMax}] → ${sp.pillBarScore}%`);
+          const display = buildPillBarDisplay(numericValue, scale);
+          sp.pillBarScore = display.score;
+          sp.pillBarScale = display.scale;
+          console.log(`      Pill bar: value=${numericValue}, scale=[${display.scale.min}-${display.scale.max}] → ${sp.pillBarScore}%`);
         } else if (matchedSub.score !== undefined) {
           // Fallback: use binary score if no numeric value available
           sp.pillBarScore = matchedSub.score === 1 ? 75 : 25;
@@ -4460,3 +4484,4 @@ class GeminiPdfGenerator {
 }
 
 module.exports = GeminiPdfGenerator;
+module.exports.buildPillBarDisplay = buildPillBarDisplay;

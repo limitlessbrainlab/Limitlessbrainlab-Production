@@ -11,6 +11,7 @@ const { FONTS, LAYOUT } = require('./pdfStyles');
 const fs = require('fs');
 const path = require('path');
 const { extractReliabilityAssessment } = require('./brainMapComparisonPage');
+const { getReportUploadDir } = require('../reportRuntime');
 
 // Image paths
 const PAGE6_IMG = path.resolve(__dirname, '../../../public/assets/Imagepage6.png');
@@ -160,7 +161,7 @@ async function generateYourNumbersPageAsync(doc, inputPdfPaths, parameterNotes) 
 
   if (inputPdfPaths && inputPdfPaths.eyesClosed && inputPdfPaths.eyesOpen) {
     console.log('   PDF paths provided, extracting brain map images...');
-    var tempDir = path.join(__dirname, '../../uploads/temp');
+    var tempDir = path.join(getReportUploadDir(), 'temp');
 
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });

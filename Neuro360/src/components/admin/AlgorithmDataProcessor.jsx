@@ -823,9 +823,9 @@ const AlgorithmDataProcessor = () => {
         if (fetchError.name === 'AbortError') {
           throw new Error('Upload timed out after 5 minutes. Please check: 1) File size (<50MB), 2) Backend is running (npm run dev:backend), 3) Internet connection is stable. Try compressing PDF files if too large.');
         }
-        // Check if it's a network error (backend not running)
+        // A production request never depends on a browser-local backend.
         if (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('fetch')) {
-          throw new Error('Cannot connect to backend server. Please ensure the backend is running on port 5000. Run "npm run dev:backend" to start the server.');
+          throw new Error('The connection was interrupted while uploading the report files. Please retry at https://www.limitlessbrainlab.com.');
         }
         throw fetchError;
       }

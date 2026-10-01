@@ -7,6 +7,10 @@ import './index.css'
 import consoleErrorFixer from './utils/consoleErrorFixer.js'
 import './utils/globalErrorHandler.js'
 import { guardedReload } from './utils/guardedReload.js'
+import { canonicalProductionUrl } from './utils/canonicalProductionOrigin.js'
+
+const canonicalUrl = import.meta.env.PROD && canonicalProductionUrl(window.location);
+if (canonicalUrl) window.location.replace(canonicalUrl);
 
 // After a redeploy, a stale open tab lazy-loading an old hashed chunk gets a
 // 404 rewritten to index.html (text/html) → module MIME error. Vite reports

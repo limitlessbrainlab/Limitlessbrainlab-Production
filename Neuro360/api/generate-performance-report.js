@@ -8,6 +8,14 @@ const { generateBrainReportPdf } = claudeReportGenerator;
 
 const json = (res, status, body) => res.status(status).json(body);
 
+export function createSseEmitter(res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+  return (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+}
+
 function serverClient() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -76,15 +84,23 @@ export default async function handler(req, res) {
   }
   const idempotencyKey = String(body.idempotencyKey || `performance:${body.savedResultId}`);
   let job;
+  let emit;
   try {
     const claim = await claimJob(supabase, idempotencyKey, body, user.id);
     job = claim.job;
+    emit = createSseEmitter(res);
     if (!claim.claimed) {
-      if (job.status === 'completed') return json(res, 200, { job, pdfUrl: job.output_url });
-      return json(res, 202, { job });
+      if (job.status === 'completed') {
+        emit('done', { pdfUrl: job.output_url, reportId: job.report_id || null });
+      } else {
+        emit('error', { message: 'This report is already processing. Check Processing History shortly.' });
+      }
+      res.end();
+      return;
     }
 
     await supabase.from('report_jobs').update({ status: 'running', stage: 'narrative', progress: 35, started_at: new Date().toISOString() }).eq('id', job.id);
+    emit('progress', { stage: 'narrative', pct: 35 });
     const patient = {
       ...(body.patient || {}),
       id: body.patientId,
@@ -97,6 +113,7 @@ export default async function handler(req, res) {
     const { pdf: originalPdf } = await generateBrainReportPdf(reportData, undefined, async (stage) => {
       const progress = stage === 'render' ? 75 : 45;
       await supabase.from('report_jobs').update({ stage, progress }).eq('id', job.id);
+      emit('progress', { stage, pct: progress });
     });
 
     let pdf = originalPdf;
@@ -109,6 +126,7 @@ export default async function handler(req, res) {
     } catch (_) { /* Metadata is best-effort. */ }
 
     await supabase.from('report_jobs').update({ stage: 'saving', progress: 92 }).eq('id', job.id);
+    emit('progress', { stage: 'saving', pct: 92 });
     const fileName = `claude-reports/NPR-${String(reportData.patient.reportId || job.id).replace(/\D/g, '')}-${Date.now()}.pdf`;
     const { error: uploadError } = await supabase.storage.from('neurosense-reports')
       .upload(fileName, pdf, { contentType: 'application/pdf', upsert: false });
@@ -117,7 +135,7 @@ export default async function handler(req, res) {
     const pdfUrl = publicData.publicUrl;
 
     const completedAt = new Date().toISOString();
-    const { data: completed, error: completeError } = await supabase.from('report_jobs').update({
+    const { error: completeError } = await supabase.from('report_jobs').update({
       status: 'completed', stage: 'completed', progress: 100, output_url: pdfUrl, completed_at: completedAt, error_message: null,
     }).eq('id', job.id).select().single();
     if (completeError) throw completeError;
@@ -128,7 +146,9 @@ export default async function handler(req, res) {
       qeeg_data: body.qeegData,
     }).eq('id', body.savedResultId);
 
-    return json(res, 200, { job: completed, pdfUrl, reportId: reportData.patient.reportId || null });
+    emit('done', { pdfUrl, reportId: reportData.patient.reportId || null });
+    res.end();
+    return;
   } catch (error) {
     console.error('Performance report job failed:', error);
     if (job?.id) {
@@ -136,7 +156,11 @@ export default async function handler(req, res) {
         status: 'failed', stage: 'failed', error_message: String(error.message || error).slice(0, 1000), completed_at: new Date().toISOString(),
       }).eq('id', job.id);
     }
+    if (emit) {
+      emit('error', { message: error.message || 'Report generation failed' });
+      res.end();
+      return;
+    }
     return json(res, 500, { jobId: job?.id || null, message: error.message || 'Report generation failed' });
   }
 }
-

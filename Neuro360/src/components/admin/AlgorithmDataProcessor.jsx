@@ -1382,6 +1382,9 @@ const AlgorithmDataProcessor = () => {
     const token = await getFreshToken();
     const uploadDateIso = reportAssessmentDate || selectedPatient?.lastProcessed || new Date().toISOString();
     const controller = new AbortController();
+    const stageStartRef = { current: performance.now() };
+    setClaudeStages(CLAUDE_STAGE_ORDER.map((stage, index) => ({ ...stage, status: index === 0 ? 'active' : 'pending', elapsedMs: null })));
+    startClaudeCreep(35);
     const timeoutId = setTimeout(() => controller.abort(), 13 * 60 * 1000);
     try {
       const response = await fetch('/api/generate-performance-report', {
@@ -1411,20 +1414,62 @@ const AlgorithmDataProcessor = () => {
         }),
         signal: controller.signal,
       });
-      const data = await response.json().catch(() => ({}));
-      if (response.status === 202) throw new Error('This report is already processing. Check Processing History shortly.');
-      if (!response.ok || !data.pdfUrl) throw new Error(data.message || `Server error (${response.status})`);
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('text/event-stream')) {
+        const data = await response.json().catch(() => ({}));
+        if (response.status === 202) throw new Error('This report is already processing. Check Processing History shortly.');
+        if (!response.ok || !data.pdfUrl) throw new Error(data.message || `Server error (${response.status})`);
+        setClaudeProgress(100);
+        setClaudeReportUrl(data.pdfUrl);
+        setClaudeReportId(data.reportId || null);
+        return;
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('The report progress stream could not be opened.');
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let pdfUrl = null;
+      let reportId = null;
+      let streamError = null;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let separator;
+        while ((separator = buffer.indexOf('\n\n')) !== -1) {
+          const frame = buffer.slice(0, separator);
+          buffer = buffer.slice(separator + 2);
+          const event = frame.match(/^event:\s*(.+)$/m)?.[1] || 'message';
+          const data = frame.match(/^data:\s*(.+)$/m)?.[1];
+          let payload = {};
+          try { payload = data ? JSON.parse(data) : {}; } catch (_) { /* ignore malformed event */ }
+          if (event === 'progress') {
+            advanceClaudeStage(payload.stage, stageStartRef);
+            setClaudeProgress(payload.pct || 10);
+            startClaudeCreep(Math.min((payload.pct || 10) + 20, 99));
+          } else if (event === 'done') {
+            pdfUrl = payload.pdfUrl;
+            reportId = payload.reportId || null;
+          } else if (event === 'error') {
+            streamError = payload.message || 'Report generation failed.';
+          }
+        }
+      }
+      if (streamError) throw new Error(streamError);
+      if (!pdfUrl) throw new Error('The report stream ended before a report was available.');
       setClaudeProgress(100);
-      setClaudeReportUrl(data.pdfUrl);
-      setClaudeReportId(data.reportId || null);
+      setClaudeReportUrl(pdfUrl);
+      setClaudeReportId(reportId);
       setProcessingHistory((prev) => prev.map((rec) => (
         rec.id === savedResultId
-          ? { ...rec, claude_report_url: data.pdfUrl, claudeReportUrl: data.pdfUrl, claude_report_id: data.reportId, claudeReportId: data.reportId }
+          ? { ...rec, claude_report_url: pdfUrl, claudeReportUrl: pdfUrl, claude_report_id: reportId, claudeReportId: reportId }
           : rec
       )));
       toast.success('Neurosense Performance Report ready!', { id: 'claude-report' });
     } finally {
       clearTimeout(timeoutId);
+      stopClaudeCreep();
     }
   };
 

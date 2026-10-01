@@ -10,6 +10,9 @@ const conditionIn = (text) => {
 
 const fileHash = (filePath) => crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 
+const canonicalQeegFileName = (condition, originalName) =>
+  `${String(condition).replace(/\s+/g, '')}${path.extname(originalName).toLowerCase() || '.pdf'}`;
+
 async function validateQeegInputs(eyesOpenPath, eyesClosedPath) {
   if (fileHash(eyesOpenPath) === fileHash(eyesClosedPath)) {
     throw new Error('Eyes Open and Eyes Closed PDFs are identical. Upload two distinct condition recordings.');
@@ -24,4 +27,4 @@ async function validateQeegInputs(eyesOpenPath, eyesClosedPath) {
   }
 }
 
-module.exports = { validateQeegInputs };
+module.exports = { validateQeegInputs, canonicalQeegFileName };

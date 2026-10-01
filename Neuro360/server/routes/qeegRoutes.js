@@ -15,7 +15,7 @@ const reportJobLock = require('../services/reportJobLock');
 const { getReportUploadDir, needsInstanceReportLock } = require('../services/reportRuntime');
 const qeegExtractionCache = require('../services/qeegExtractionCache');
 const { renderPage6Maps } = require('../services/qeegPageMapRenderer');
-const { validateQeegInputs } = require('../services/qeegInputValidation');
+const { validateQeegInputs, canonicalQeegFileName } = require('../services/qeegInputValidation');
 
 // NEW: Gemini AI Service for report generation
 let GeminiService = null;
@@ -212,7 +212,7 @@ async function processQeegRequest(req, res) {
       const patientIdForUpload = extId ? `${extId}_${pName}` : (req.body.patientId || 'unknown');
 
       // Upload Eyes Open PDF (modified with NeuroSense logo)
-      eyesOpenStoragePath = `${patientIdForUpload}/${timestamp}_EyesOpen_${eyesOpenFile.originalname}`;
+      eyesOpenStoragePath = `${patientIdForUpload}/${timestamp}_${canonicalQeegFileName('Eyes Open', eyesOpenFile.originalname)}`;
       logProgress('SUPABASE_UPLOAD', `Uploading Eyes Open: ${eyesOpenStoragePath}`, '📤');
       const eoUploadResult = await SupabaseStorage.uploadFile(
         modifiedEyesOpenPath,
@@ -223,7 +223,7 @@ async function processQeegRequest(req, res) {
       eyesOpenUrl = eoUploadResult.url;  // Store URL for response
 
       // Upload Eyes Closed PDF (modified with NeuroSense logo)
-      eyesClosedStoragePath = `${patientIdForUpload}/${timestamp}_EyesClosed_${eyesClosedFile.originalname}`;
+      eyesClosedStoragePath = `${patientIdForUpload}/${timestamp}_${canonicalQeegFileName('Eyes Closed', eyesClosedFile.originalname)}`;
       logProgress('SUPABASE_UPLOAD', `Uploading Eyes Closed: ${eyesClosedStoragePath}`, '📤');
       const ecUploadResult = await SupabaseStorage.uploadFile(
         modifiedEyesClosedPath,

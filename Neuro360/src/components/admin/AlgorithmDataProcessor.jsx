@@ -1074,8 +1074,8 @@ const AlgorithmDataProcessor = () => {
         inputData: {
           patientName: getPatientName(selectedPatient),
           clinicName: selectedPatient.clinicName,
-          eyesOpenFile: eyesOpenFile?.name,
-          eyesClosedFile: eyesClosedFile?.name,
+          eyesOpenFile: 'EyesOpen.pdf',
+          eyesClosedFile: 'EyesClosed.pdf',
           eyesOpenUrl: eyesOpenUrl || null,  // Modified Eyes Open PDF URL
           eyesClosedUrl: eyesClosedUrl || null,  // Modified Eyes Closed PDF URL
           processedAt: new Date().toISOString(),
@@ -1086,8 +1086,8 @@ const AlgorithmDataProcessor = () => {
         outputData: resultData,  // Keep for backward compatibility
         canonicalResults,
         qeegData: canonicalQeegData,
-        eyesOpenFile: eyesOpenFile?.name,
-        eyesClosedFile: eyesClosedFile?.name,
+        eyesOpenFile: 'EyesOpen.pdf',
+        eyesClosedFile: 'EyesClosed.pdf',
         pdfUrl: pdfUrl || null,
         processedAt: new Date().toISOString(),
         processedBy: 'super_admin',

@@ -6,6 +6,7 @@ const fs = require('fs');
 const nodemailer = require('nodemailer');
 const compression = require('compression');
 const qeegRoutes = require('./routes/qeegRoutes');
+const { internalQeegMapRenderRoute } = require('./routes/internalQeegMapRenderRoute');
 const claudeReportRoutes = require('./routes/claudeReportRoutes');
 const patientDocumentRoutes = require('./routes/patientDocumentRoutes');
 const ssoRoutes = require('./routes/ssoRoutes');
@@ -1175,6 +1176,9 @@ app.get('/api/app-version', (req, res) => {
 });
 
 // ===== PROTECTED ROUTES (Auth Required) =====
+
+// Internal Vercel-to-Render endpoint for Page 6 map conversion only.
+app.post('/api/internal/qeeg-page-maps', internalQeegMapRenderRoute);
 
 // Claude Report (AIaaS sidecar) - has its own auth (long-lived sidecar token OR
 // Supabase token). Mounted BEFORE /api/qeeg so this specific path wins and is

@@ -246,7 +246,7 @@ const SuperAdminPanel = () => {
   return (
     <DashboardLayout
       title={getPageTitle()}
-      headerAction={<DDOLink label="DDO Admin Panel" className="text-sm" />}
+      headerAction={activeTab === 'algorithm-processor' ? null : <DDOLink label="DDO Admin Panel" className="text-sm" />}
     >
       <div className="space-y-6">
         {/* Clinic Selection for Reports and Payments tabs */}

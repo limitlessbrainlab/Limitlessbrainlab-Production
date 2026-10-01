@@ -8,9 +8,10 @@ assert.strictEqual(needsInstanceReportLock({ VERCEL: '1' }), false);
 assert.strictEqual(needsInstanceReportLock({}), true);
 
 const vercelConfig = require(path.join(__dirname, '../../vercel.json'));
-const reportFiles = vercelConfig.functions['api/process-neurosense-report.js'].includeFiles;
-assert.match(reportFiles, /server\/node_modules\/pdfjs-dist\/cmaps/);
-assert.match(reportFiles, /server\/node_modules\/pdfjs-dist\/standard_fonts/);
-assert.match(reportFiles, /server\/node_modules\/@napi-rs\/canvas/);
+const configuredReportFiles = vercelConfig.functions['api/process-neurosense-report.js'].includeFiles;
+const reportFiles = Array.isArray(configuredReportFiles) ? configuredReportFiles.join(',') : configuredReportFiles;
+assert.match(reportFiles, /server\/node_modules\/\{pdf-to-img,/);
+assert.match(reportFiles, /pdfjs-dist\/\{legacy\/build,cmaps,standard_fonts\}/);
+assert.match(reportFiles, /@napi-rs\/\{canvas,canvas-linux-x64-gnu\}/);
 
 console.log('vercelQeegRuntime: ok');

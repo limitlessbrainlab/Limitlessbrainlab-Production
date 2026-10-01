@@ -14,6 +14,7 @@ const SupabaseStorage = require('../services/supabaseStorage');
 const reportJobLock = require('../services/reportJobLock');
 const { getReportUploadDir, needsInstanceReportLock } = require('../services/reportRuntime');
 const qeegExtractionCache = require('../services/qeegExtractionCache');
+const { renderPage6Maps } = require('../services/qeegPageMapRenderer');
 
 // NEW: Gemini AI Service for report generation
 let GeminiService = null;
@@ -182,6 +183,8 @@ async function processQeegRequest(req, res) {
     // Store URLs of modified QEEG files for download later
     let eyesOpenUrl = null;
     let eyesClosedUrl = null;
+    let eyesOpenStoragePath = null;
+    let eyesClosedStoragePath = null;
 
     try {
       // Modify Eyes Open PDF
@@ -207,23 +210,23 @@ async function processQeegRequest(req, res) {
       const patientIdForUpload = extId ? `${extId}_${pName}` : (req.body.patientId || 'unknown');
 
       // Upload Eyes Open PDF (modified with NeuroSense logo)
-      const eoStoragePath = `${patientIdForUpload}/${timestamp}_EyesOpen_${eyesOpenFile.originalname}`;
-      logProgress('SUPABASE_UPLOAD', `Uploading Eyes Open: ${eoStoragePath}`, '📤');
+      eyesOpenStoragePath = `${patientIdForUpload}/${timestamp}_EyesOpen_${eyesOpenFile.originalname}`;
+      logProgress('SUPABASE_UPLOAD', `Uploading Eyes Open: ${eyesOpenStoragePath}`, '📤');
       const eoUploadResult = await SupabaseStorage.uploadFile(
         modifiedEyesOpenPath,
         'qeeg-uploads',
-        eoStoragePath
+        eyesOpenStoragePath
       );
       logProgress('SUPABASE_UPLOAD', 'Eyes Open uploaded successfully', '✅');
       eyesOpenUrl = eoUploadResult.url;  // Store URL for response
 
       // Upload Eyes Closed PDF (modified with NeuroSense logo)
-      const ecStoragePath = `${patientIdForUpload}/${timestamp}_EyesClosed_${eyesClosedFile.originalname}`;
-      logProgress('SUPABASE_UPLOAD', `Uploading Eyes Closed: ${ecStoragePath}`, '📤');
+      eyesClosedStoragePath = `${patientIdForUpload}/${timestamp}_EyesClosed_${eyesClosedFile.originalname}`;
+      logProgress('SUPABASE_UPLOAD', `Uploading Eyes Closed: ${eyesClosedStoragePath}`, '📤');
       const ecUploadResult = await SupabaseStorage.uploadFile(
         modifiedEyesClosedPath,
         'qeeg-uploads',
-        ecStoragePath
+        eyesClosedStoragePath
       );
       logProgress('SUPABASE_UPLOAD', 'Eyes Closed uploaded successfully', '✅');
       eyesClosedUrl = ecUploadResult.url;  // Store URL for response
@@ -238,6 +241,16 @@ async function processQeegRequest(req, res) {
     } catch (uploadError) {
       console.warn('⚠️  Failed to upload QEEG files to Supabase:', uploadError.message);
       console.warn('   Continuing with processing anyway...');
+    }
+
+    let page6Maps = null;
+    if (process.env.VERCEL) {
+      if (!eyesClosedStoragePath || !eyesOpenStoragePath) {
+        throw new Error('Page 6 map rendering failed: source PDFs could not be uploaded');
+      }
+      logProgress('PAGE6_MAPS', 'Rendering named Eyes Closed and Eyes Open maps on Render', '🖼️');
+      page6Maps = await renderPage6Maps({ eyesClosedPath: eyesClosedStoragePath, eyesOpenPath: eyesOpenStoragePath });
+      logProgress('PAGE6_MAPS', 'Both Page 6 maps rendered successfully', '✅');
     }
 
     // Get patient info from request body
@@ -597,7 +610,7 @@ async function processQeegRequest(req, res) {
         try {
           // Pass notesForPdf as 5th parameter for notes to appear under Alpha:Theta Balance
           console.log('   📝 Passing notes to PDF Generator:', notesForPdf ? `"${notesForPdf}"` : '(empty)');
-          pdfGenerator = new GeminiPdfGenerator(pdfPatientData, pdfAlgorithmResults, qeegData, inputPdfPaths, notesForPdf);
+          pdfGenerator = new GeminiPdfGenerator(pdfPatientData, pdfAlgorithmResults, qeegData, inputPdfPaths, notesForPdf, page6Maps);
           console.log('✅ Gemini PDF Generator instantiated successfully');
           console.log('   📝 With notes:', notesForPdf ? 'YES' : 'NO');
         } catch (instantiateError) {
@@ -679,6 +692,8 @@ async function processQeegRequest(req, res) {
 
       // Set pdfUrl to null so frontend knows PDF failed
       pdfUrl = null;
+
+      if (pdfError.code === 'PAGE6_MAP_RENDER_FAILED') throw pdfError;
 
       // Don't fail the whole request if PDF fails - processing still succeeded
       console.log('⚠️ Continuing without PDF - processing succeeded');

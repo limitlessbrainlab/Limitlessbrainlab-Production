@@ -258,13 +258,14 @@ const PARAMETER_DETAIL_DATA = {
 };
 
 class GeminiPdfGenerator {
-  constructor(patientData, algorithmResults, qeegData, inputPdfPaths = null, parameterNotes = '') {
+  constructor(patientData, algorithmResults, qeegData, inputPdfPaths = null, parameterNotes = '', page6Maps = null) {
     this.patientData = patientData;
     this.algorithmResults = algorithmResults;
     this.qeegData = qeegData;
     this.geminiReportData = null;
     this.inputPdfPaths = inputPdfPaths; // { eyesOpen: path, eyesClosed: path }
     this.parameterNotes = parameterNotes || ''; // Channel noisy notes from user
+    this.page6Maps = page6Maps;
 
     // Clinic's custom logo (temp PNG resolved by qeegRoutes from
     // clinics.logo_url) — replaces the NeuroSense logo everywhere when set.
@@ -886,13 +887,17 @@ class GeminiPdfGenerator {
     try {
       if (this.inputPdfPaths && this.inputPdfPaths.eyesClosed && this.inputPdfPaths.eyesOpen) {
         console.log('   📁 Using async version with PDF image extraction...');
-        await generateYourNumbersPageAsync(doc, this.inputPdfPaths, this.parameterNotes);
+        await generateYourNumbersPageAsync(doc, this.inputPdfPaths, this.parameterNotes, this.page6Maps);
       } else {
         console.log('   ⚠️ No PDF paths, using sync fallback with placeholders...');
         generateYourNumbersPage(doc, null, this.parameterNotes);
       }
     } catch (e) {
       console.error('   ⚠️ Error generating Your Numbers page:', e.message);
+      if (process.env.VERCEL) {
+        e.code = 'PAGE6_MAP_RENDER_FAILED';
+        throw e;
+      }
       doc.rect(0, 0, 595, 842).fill('#FFFFFF');
       doc.fontSize(16).fillColor('#333').text('Your Numbers At a Glance', 50, 100);
     }

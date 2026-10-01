@@ -69,7 +69,7 @@ async function extractPageImage(pdfPath) {
  * @param {object} [inputPdfPaths] - { eyesOpen: path, eyesClosed: path }
  * @param {string} [parameterNotes] - Noisy channel notes from user
  */
-async function generateYourNumbersPageAsync(doc, inputPdfPaths, parameterNotes) {
+async function generateYourNumbersPageAsync(doc, inputPdfPaths, parameterNotes, page6Maps = null) {
   var pw = LAYOUT.pageWidth;
   var ph = LAYOUT.pageHeight;
 
@@ -105,7 +105,11 @@ async function generateYourNumbersPageAsync(doc, inputPdfPaths, parameterNotes) 
   var eyesClosedImagePath = null;
   var eyesOpenImagePath = null;
 
-  if (inputPdfPaths && inputPdfPaths.eyesClosed && inputPdfPaths.eyesOpen) {
+  if (page6Maps?.eyesClosed && page6Maps?.eyesOpen) {
+    eyesClosedImagePath = page6Maps.eyesClosed;
+    eyesOpenImagePath = page6Maps.eyesOpen;
+    console.log('   Using Render-provided Page 6 maps');
+  } else if (inputPdfPaths && inputPdfPaths.eyesClosed && inputPdfPaths.eyesOpen) {
     console.log('   PDF paths provided, extracting brain map images...');
 
     try {
@@ -122,6 +126,10 @@ async function generateYourNumbersPageAsync(doc, inputPdfPaths, parameterNotes) 
     } catch (extractError) {
       console.error('   Error during extraction:', extractError.message);
     }
+  }
+
+  if (process.env.VERCEL && (!eyesClosedImagePath || !eyesOpenImagePath)) {
+    throw new Error('Page 6 map rendering failed: both maps are required');
   }
 
   // Panel 1: Eyes-closed condition

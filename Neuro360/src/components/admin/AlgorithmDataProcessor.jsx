@@ -3503,37 +3503,47 @@ const AlgorithmDataProcessor = () => {
 
                   {/* Live, stage-by-stage progress (fed by the backend SSE stream) */}
                   {isGeneratingClaudeReport && (
-                    <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 rounded-lg p-4 shadow-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-white font-medium text-sm">Building your 12-page report…</p>
-                        <p className="text-indigo-200 text-sm font-mono">{Math.round(claudeProgress)}%</p>
+                    <section data-testid="performance-report-progress" className="rounded-3xl border border-slate-600 bg-slate-950 p-6 text-slate-100 shadow-xl sm:p-8">
+                      <div className="flex items-center justify-between gap-4">
+                        <h3 className="text-2xl font-medium">Report generation</h3>
+                        <p className="text-4xl font-semibold tabular-nums">{Math.round(claudeProgress)}%</p>
                       </div>
-                      <div className="w-full bg-white/20 rounded-full h-3 overflow-hidden">
-                        <div
-                          className="bg-green-400 h-3 rounded-full transition-all duration-700 ease-out"
-                          style={{ width: `${Math.min(claudeProgress, 100)}%` }}
-                        />
+                      <div
+                        aria-label="Report generation progress"
+                        aria-valuemax="100"
+                        aria-valuemin="0"
+                        aria-valuenow={Math.round(claudeProgress)}
+                        className="mt-8 grid grid-cols-[repeat(40,minmax(0,1fr))] gap-2"
+                        role="progressbar"
+                      >
+                        {Array.from({ length: 40 }, (_, index) => (
+                          <span key={index} className={`h-12 rounded bg-slate-700 transition-colors duration-500 ${index < Math.ceil(claudeProgress / 2.5) ? 'bg-emerald-400' : ''}`} />
+                        ))}
                       </div>
-                      <div className="mt-3 space-y-1.5">
+                      <div className="mt-4 flex justify-between text-lg text-slate-400">
+                        <span>Starting report</span>
+                        <span>Final PDF</span>
+                      </div>
+                      <div className="mt-8 space-y-3">
                         {claudeStages.map((s) => (
-                          <div key={s.key} className="flex items-center text-xs">
+                          <div key={s.key} className="flex items-center text-lg">
                             {s.status === 'done' ? (
-                              <CheckCircle className="h-4 w-4 text-green-400 mr-2 flex-shrink-0" />
+                              <CheckCircle className="mr-3 h-6 w-6 flex-shrink-0 text-emerald-400" />
                             ) : s.status === 'active' ? (
-                              <Loader2 className="h-4 w-4 text-white animate-spin mr-2 flex-shrink-0" />
+                              <Loader2 className="mr-3 h-6 w-6 flex-shrink-0 animate-spin text-emerald-300" />
                             ) : (
-                              <span className="h-4 w-4 mr-2 flex-shrink-0 rounded-full border border-white/30" />
+                              <span className="mr-3 h-6 w-6 flex-shrink-0 rounded-full border-2 border-slate-500" />
                             )}
-                            <span className={s.status === 'pending' ? 'text-indigo-200/60' : 'text-white'}>
+                            <span className={s.status === 'pending' ? 'text-slate-500' : 'text-slate-100'}>
                               {s.label}
                             </span>
                             {s.status === 'done' && s.elapsedMs != null && (
-                              <span className="ml-auto text-indigo-200/70 font-mono">{(s.elapsedMs / 1000).toFixed(1)}s</span>
+                              <span className="ml-auto font-mono text-sm text-slate-500">{(s.elapsedMs / 1000).toFixed(1)}s</span>
                             )}
                           </div>
                         ))}
                       </div>
-                    </div>
+                    </section>
                   )}
 
                   {claudeReportError && (

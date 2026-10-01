@@ -29,6 +29,7 @@ import toast from 'react-hot-toast';
 import DatabaseService from '../../services/databaseService';
 import StorageService from '../../services/storageService';
 import { getPatientDocSignedUrl } from '../../services/patientDocuments';
+import { algorithmInputDocuments } from '../../utils/algorithmInputDocuments';
 import ErrorBoundary from '../ErrorBoundary';
 import SubscriptionPopup from './SubscriptionPopup';
 import { useAuth } from '../../contexts/AuthContext';
@@ -340,6 +341,7 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
             reportType: 'QEEG',
             description: r.parameter_notes || '',
             source: 'algorithm_results',
+            inputData: r.input_data || r.inputData || {},
             algorithmName: r.algorithm_name || r.algorithmName || 'Algorithm 1'
           },
           title: `QEEG Report - ${r.patient_name || r.patientName || 'Patient'}`,
@@ -1872,6 +1874,9 @@ const PatientDetailModal = ({ patient, reports, clinics, onClose, onDownloadRepo
           }
         });
       }
+
+      // Input PDFs already belong to this completed scan; show them without copying storage.
+      allDocs.push(...algorithmInputDocuments(reports, patient.id));
 
       setClinicalDocuments(allDocs);
       setDocumentsFetched(true);

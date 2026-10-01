@@ -15,6 +15,7 @@ const reportJobLock = require('../services/reportJobLock');
 const { getReportUploadDir, needsInstanceReportLock } = require('../services/reportRuntime');
 const qeegExtractionCache = require('../services/qeegExtractionCache');
 const { renderPage6Maps } = require('../services/qeegPageMapRenderer');
+const { validateQeegInputs } = require('../services/qeegInputValidation');
 
 // NEW: Gemini AI Service for report generation
 let GeminiService = null;
@@ -149,6 +150,7 @@ async function processQeegRequest(req, res) {
 
     logProgress('FILE_UPLOAD', `Eyes Open received: ${eyesOpenFile.originalname} (${(eyesOpenFile.size / 1024).toFixed(2)} KB)`, '📁');
     logProgress('FILE_UPLOAD', `Eyes Closed received: ${eyesClosedFile.originalname} (${(eyesClosedFile.size / 1024).toFixed(2)} KB)`, '📁');
+    await validateQeegInputs(eyesOpenFile.path, eyesClosedFile.path);
 
     // Credit guard (defense in depth) — block generation when the clinic has no report
     // credits left. Single DB read, no AI calls. Default LBL clinic is unlimited. Fail-open

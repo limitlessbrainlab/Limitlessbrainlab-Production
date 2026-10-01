@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import { grantCareProgramAccess } from '../../utils/careProgramEntitlements';
 import { groupPatientsByClinic, paginate, sortByNewestDate } from '../../utils/pagination';
+import { shareReport } from '../../utils/shareReport';
 import SystemHealth from './SystemHealth';
 
 const PATIENT_PAGE_SIZE = 20;
@@ -1730,18 +1731,9 @@ const AlgorithmDataProcessor = () => {
 
   // Sharing must be server-confirmed before email is sent; patient Downloads reads this row.
   const saveSharedReport = async (reportData) => {
-    const token = await getFreshToken();
-    const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
-    const baseUrl = apiUrl.replace(/\/api\/?$/, '');
-    const response = await fetch(`${baseUrl}/api/share-report`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify(reportData),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.message || `Could not save report (${response.status})`);
+    const report = await shareReport(reportData, { getToken: getFreshToken });
     checkCreditAlert(reportData.clinicId);
-    return payload.report;
+    return report;
   };
 
   // Send Report to Clinic and Patient - they can access it from their dashboards

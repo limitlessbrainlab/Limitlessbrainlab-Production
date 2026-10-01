@@ -11,7 +11,6 @@ const { FONTS, LAYOUT } = require('./pdfStyles');
 const fs = require('fs');
 const path = require('path');
 const { extractReliabilityAssessment } = require('./brainMapComparisonPage');
-const { getReportUploadDir } = require('../reportRuntime');
 
 // Image paths
 const PAGE6_IMG = path.resolve(__dirname, '../../../public/assets/Imagepage6.png');
@@ -27,88 +26,35 @@ const REF_GRAY = '#000000';
  * Extract page 2 image from a PDF file using pdf-to-img
  * Crops the header portion to show only the brain map channels grid
  * @param {string} pdfPath - Path to the PDF file
- * @param {string} outputDir - Directory to save the extracted image
- * @param {string} prefix - Prefix for the output filename
- * @returns {Promise<string|null>} Path to the extracted image or null
+ * @returns {Promise<Buffer|null>} Rendered page image or null
  */
-async function extractPageImage(pdfPath, outputDir, prefix) {
+async function extractPageImage(pdfPath) {
   try {
     console.log('   Extracting page 2 from: ' + path.basename(pdfPath));
 
-    // Dynamic imports
     var pdfToImg;
-    var canvasModule;
     try {
       pdfToImg = await import('pdf-to-img');
-      canvasModule = require('canvas');
-      console.log('   pdf-to-img and canvas loaded successfully');
+      console.log('   pdf-to-img loaded successfully');
     } catch (e) {
-      console.log('   Required packages not available:', e.message);
+      console.error('   pdf-to-img unavailable:', e.message);
       return null;
     }
 
-    // Create output directory if it doesn't exist
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-
-    // Convert PDF pages with scale for good quality
     console.log('   Loading PDF document...');
     var document = await pdfToImg.pdf(pdfPath, { scale: 2.0 });
 
-    // Iterate through pages to get page 2
     var pageNum = 0;
-    var outputPath = null;
-
     for await (var imageBuffer of document) {
       pageNum++;
       if (pageNum === 2) {
         console.log('   Original image size: ' + Math.round(imageBuffer.length / 1024) + ' KB');
-
-        // Load image into canvas for cropping
-        var img = await canvasModule.loadImage(imageBuffer);
-        var originalWidth = img.width;
-        var originalHeight = img.height;
-
-        console.log('   Original dimensions: ' + originalWidth + ' x ' + originalHeight);
-
-        // Crop settings - remove top 18% (header) and bottom 8% (footer)
-        var cropTopPercent = 0.18;
-        var cropBottomPercent = 0.08;
-
-        var cropTop = Math.round(originalHeight * cropTopPercent);
-        var cropBottom = Math.round(originalHeight * cropBottomPercent);
-        var newHeight = originalHeight - cropTop - cropBottom;
-
-        // Create cropped canvas
-        var croppedCanvas = canvasModule.createCanvas(originalWidth, newHeight);
-        var ctx = croppedCanvas.getContext('2d');
-
-        // Draw the cropped portion (skip header, keep brain maps)
-        ctx.drawImage(
-          img,
-          0, cropTop,
-          originalWidth, newHeight,
-          0, 0,
-          originalWidth, newHeight
-        );
-
-        // Save cropped image as PNG
-        outputPath = path.join(outputDir, prefix + '.png');
-        var croppedBuffer = croppedCanvas.toBuffer('image/png');
-        fs.writeFileSync(outputPath, croppedBuffer);
-
-        console.log('   Page 2 cropped and saved to: ' + outputPath);
-        break;
+        return imageBuffer;
       }
     }
 
-    if (!outputPath) {
-      console.log('   PDF has only ' + pageNum + ' page(s), need at least 2');
-      return null;
-    }
-
-    return outputPath;
+    console.error('   PDF has only ' + pageNum + ' page(s), need at least 2');
+    return null;
 
   } catch (error) {
     console.error('   Error extracting image from ' + pdfPath + ':', error.message);
@@ -161,19 +107,11 @@ async function generateYourNumbersPageAsync(doc, inputPdfPaths, parameterNotes) 
 
   if (inputPdfPaths && inputPdfPaths.eyesClosed && inputPdfPaths.eyesOpen) {
     console.log('   PDF paths provided, extracting brain map images...');
-    var tempDir = path.join(getReportUploadDir(), 'temp');
-
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-
-    var timestamp = Date.now();
 
     try {
-      // Render sequentially: two scale-2 canvases at once can exhaust a small Render instance.
       var results = [
-        await extractPageImage(inputPdfPaths.eyesClosed, tempDir, 'ec_page6_' + timestamp),
-        await extractPageImage(inputPdfPaths.eyesOpen, tempDir, 'eo_page6_' + timestamp)
+        await extractPageImage(inputPdfPaths.eyesClosed),
+        await extractPageImage(inputPdfPaths.eyesOpen)
       ];
 
       eyesClosedImagePath = results[0];
@@ -237,13 +175,6 @@ async function generateYourNumbersPageAsync(doc, inputPdfPaths, parameterNotes) 
   // ===== 6. REFERENCES =====
   drawReferences(doc);
 
-  // Cleanup temporary images
-  if (eyesClosedImagePath && fs.existsSync(eyesClosedImagePath)) {
-    try { fs.unlinkSync(eyesClosedImagePath); } catch (e) {}
-  }
-  if (eyesOpenImagePath && fs.existsSync(eyesOpenImagePath)) {
-    try { fs.unlinkSync(eyesOpenImagePath); } catch (e) {}
-  }
 }
 
 /**
@@ -417,18 +348,24 @@ function drawConditionPanel(doc, x, y, w, h, title, imagePath) {
   doc.restore();
 
   // If we have an extracted image, use it
-  if (imagePath && fs.existsSync(imagePath)) {
+  if (imagePath) {
     try {
       var imgY = y + 28;
       var imgH = h - 42;
-      doc.image(imagePath, x + 5, imgY, {
-        width: w - 10,
-        height: imgH,
-        fit: [w - 10, imgH],
-        align: 'center',
-        valign: 'center'
+      var imgW = w - 10;
+      var image = doc.openImage(imagePath);
+      var scale = Math.min(imgW / image.width, imgH / (image.height * 0.74));
+      var renderW = image.width * scale;
+      var renderH = image.height * scale;
+
+      doc.save();
+      doc.rect(x + 5, imgY, imgW, imgH).clip();
+      doc.image(imagePath, x + 5 + (imgW - renderW) / 2, imgY - renderH * 0.18, {
+        width: renderW,
+        height: renderH
       });
-      console.log('   Embedded extracted image: ' + path.basename(imagePath));
+      doc.restore();
+      console.log('   Embedded extracted page image');
       return;
     } catch (imgErr) {
       console.error('   Error embedding image:', imgErr.message);
@@ -504,4 +441,4 @@ function drawReferences(doc) {
   doc.restore();
 }
 
-module.exports = { generateYourNumbersPage, generateYourNumbersPageAsync };
+module.exports = { generateYourNumbersPage, generateYourNumbersPageAsync, extractPageImage };

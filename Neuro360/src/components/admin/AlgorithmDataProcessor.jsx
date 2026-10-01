@@ -1728,6 +1728,22 @@ const AlgorithmDataProcessor = () => {
     };
   };
 
+  // Sharing must be server-confirmed before email is sent; patient Downloads reads this row.
+  const saveSharedReport = async (reportData) => {
+    const token = await getFreshToken();
+    const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
+    const baseUrl = apiUrl.replace(/\/api\/?$/, '');
+    const response = await fetch(`${baseUrl}/api/share-report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(reportData),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || `Could not save report (${response.status})`);
+    checkCreditAlert(reportData.clinicId);
+    return payload.report;
+  };
+
   // Send Report to Clinic and Patient - they can access it from their dashboards
   const handleSendReport = async () => {
     if (!pdfUrl) {
@@ -1842,15 +1858,7 @@ const AlgorithmDataProcessor = () => {
       };
 
 
-      // A DB save failure must NOT suppress the email — the patient/clinic still need
-      // their report link. Save best-effort, then always attempt email delivery below.
-      try {
-        await DatabaseService.addReport(reportData);
-        checkCreditAlert(clinicId); // credit consumed → maybe alert clinic + admin
-      } catch (saveError) {
-        console.error('⚠️ Could not save report row (continuing to email anyway):', saveError);
-        toast.error('Could not save the report to the dashboard, but we will still email it.');
-      }
+      await saveSharedReport(reportData);
 
       // Send report emails to clinic and patient
       try {
@@ -2010,15 +2018,7 @@ const AlgorithmDataProcessor = () => {
       };
 
 
-      // A DB save failure must NOT suppress the email — the patient/clinic still need
-      // their report link. Save best-effort, then always attempt email delivery below.
-      try {
-        await DatabaseService.addReport(reportData);
-        checkCreditAlert(clinicId); // credit consumed → maybe alert clinic + admin
-      } catch (saveError) {
-        console.error('⚠️ Could not save report row (continuing to email anyway):', saveError);
-        toast.error('Could not save the report to the dashboard, but we will still email it.');
-      }
+      await saveSharedReport(reportData);
 
       // Send report emails to clinic and patient
       try {
@@ -2115,8 +2115,7 @@ const AlgorithmDataProcessor = () => {
         status: 'completed'
       };
 
-      await DatabaseService.addReport(reportData);
-      checkCreditAlert(clinicId); // credit consumed → maybe alert clinic + admin
+      await saveSharedReport(reportData);
 
       const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
       const baseUrl = apiUrl.replace(/\/api\/?$/, '');
@@ -2195,8 +2194,7 @@ const AlgorithmDataProcessor = () => {
         status: 'completed'
       };
 
-      await DatabaseService.addReport(reportData);
-      checkCreditAlert(clinicId); // credit consumed → maybe alert clinic + admin
+      await saveSharedReport(reportData);
 
       const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
       const baseUrl = apiUrl.replace(/\/api\/?$/, '');

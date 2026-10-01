@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { groupPatientsByClinic, paginate } from '../../src/utils/pagination.js';
+import { groupPatientsByClinic, paginate, sortByNewestDate } from '../../src/utils/pagination.js';
 
 const patients = Array.from({ length: 25 }, (_, id) => ({ id }));
 
@@ -16,5 +16,14 @@ const groups = groupPatientsByClinic(visiblePatients, clinics);
 
 assert.deepEqual(groups.map(({ clinic }) => clinic.id), ['old', 'new']);
 assert.deepEqual(groups[0].patients.map(({ id }) => id), [1, 2]);
+
+assert.deepEqual(
+  sortByNewestDate([
+    { id: 'old', lastProcessed: '2026-09-01T00:00:00Z' },
+    { id: 'none' },
+    { id: 'new', lastProcessed: '2026-10-01T00:00:00Z' },
+  ], (patient) => patient.lastProcessed).map(({ id }) => id),
+  ['new', 'old', 'none']
+);
 
 console.log('algorithmProcessorPagination.test.mjs: ok');

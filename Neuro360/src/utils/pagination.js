@@ -1,5 +1,11 @@
 export const paginate = (items, limit) => items.slice(0, limit);
 
+export const sortByNewestDate = (items, getDate) => [...items].sort((a, b) => {
+  const aTime = new Date(getDate(a)).getTime();
+  const bTime = new Date(getDate(b)).getTime();
+  return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+});
+
 export const groupPatientsByClinic = (patients, clinics) => {
   const clinicsById = new Map(clinics.map(clinic => [clinic.id, clinic]));
   const groups = new Map();

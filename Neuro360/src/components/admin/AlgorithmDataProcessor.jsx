@@ -5,7 +5,7 @@ import SupabaseService from '../../services/supabaseService';
 import toast from 'react-hot-toast';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import { grantCareProgramAccess } from '../../utils/careProgramEntitlements';
-import { groupPatientsByClinic, paginate } from '../../utils/pagination';
+import { groupPatientsByClinic, paginate, sortByNewestDate } from '../../utils/pagination';
 import SystemHealth from './SystemHealth';
 
 const PATIENT_PAGE_SIZE = 20;
@@ -558,7 +558,7 @@ const AlgorithmDataProcessor = () => {
   };
 
   // Filter patients based on search and filters
-  const filteredPatients = patients.filter(patient => {
+  const filteredPatients = sortByNewestDate(patients.filter(patient => {
     const matchesSearch = searchTerm === '' ||
       getPatientName(patient).toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.email?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -569,7 +569,7 @@ const AlgorithmDataProcessor = () => {
       (patient.lastProcessed && new Date(patient.lastProcessed).toISOString().split('T')[0] === dateFilter);
 
     return matchesSearch && matchesClinic && matchesDate;
-  });
+  }), (patient) => patient.lastProcessed);
 
   useEffect(() => setVisiblePatientCount(PATIENT_PAGE_SIZE), [searchTerm, selectedClinicFilter, dateFilter]);
 
@@ -3619,7 +3619,7 @@ const AlgorithmDataProcessor = () => {
                       )}
                     </div>
                     <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1 mb-3">
-                      <p>📁 Files: {record.inputData?.eyesOpenFile || record.eyesOpenFile || 'N/A'}, {record.inputData?.eyesClosedFile || record.eyesClosedFile || 'N/A'}</p>
+                      <p>📁 Files: Eyes Open PDF, Eyes Closed PDF</p>
                       <p>👤 Processed by: {record.inputData?.processedBy || record.processedBy || 'Unknown'}</p>
                       {(() => {
                         const durationMs = record.inputData?.processingDurationMs || record.processingDurationMs;

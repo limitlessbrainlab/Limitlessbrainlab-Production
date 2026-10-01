@@ -13,6 +13,7 @@ const AIPdfGenerator = require('../services/aiPdfGenerator');
 const SupabaseStorage = require('../services/supabaseStorage');
 const reportJobLock = require('../services/reportJobLock');
 const { getReportUploadDir, needsInstanceReportLock } = require('../services/reportRuntime');
+const qeegExtractionCache = require('../services/qeegExtractionCache');
 
 // NEW: Gemini AI Service for report generation
 let GeminiService = null;
@@ -280,30 +281,36 @@ async function processQeegRequest(req, res) {
       console.log('✅ Gemini API key present');
     }
 
-    // Step 1: Parse QEEG files
+    // Step 1: Parse QEEG files, or reuse the exact previous extraction and calculation.
     logProgress('QEEG_PARSE', 'Starting QEEG file parsing', '📊');
-
-    // Show cache stats before parsing
-    const cacheStatsBefore = QEEGParser.getCacheStats();
-    logProgress('CACHE_STATS', `Before: ${cacheStatsBefore.hits} hits, ${cacheStatsBefore.misses} misses`, 'ℹ️');
-
     let qeegData;
+    let results;
+    let sourceHash;
     try {
-      qeegData = await QEEGParser.parse(eyesOpenFile, eyesClosedFile);
-      logProgress('QEEG_PARSE', 'QEEG files parsed successfully', '✅');
-    } catch (parseError) {
-      logProgress('QEEG_PARSE', `FAILED: ${parseError.message}`, '❌');
-      throw parseError;
+      sourceHash = qeegExtractionCache.hashQeegFiles(eyesOpenFile.path, eyesClosedFile.path);
+      const cached = await qeegExtractionCache.getQeegExtraction(sourceHash);
+      if (cached) {
+        qeegData = cached.qeegData;
+        results = cached.results;
+        logProgress('CACHE', 'Exact Eyes Open/Eyes Closed pair reused; no AI extraction', '⚡');
+      }
+    } catch (cacheError) {
+      console.warn('QEEG durable cache lookup failed:', cacheError.message);
     }
 
-    // Show cache stats after parsing
-    const cacheStatsAfter = QEEGParser.getCacheStats();
-    logProgress('CACHE_STATS', `After: ${cacheStatsAfter.hits} hits, ${cacheStatsAfter.misses} misses`, 'ℹ️');
-
-    if (cacheStatsAfter.hits > cacheStatsBefore.hits) {
-      logProgress('CACHE', 'Cache hit! No API quota used', '⚡');
-    } else {
-      logProgress('CACHE', 'Cache miss - Gemini API called (quota consumed)', '📍');
+    if (!qeegData) {
+      const cacheStatsBefore = QEEGParser.getCacheStats();
+      logProgress('CACHE_STATS', `Before: ${cacheStatsBefore.hits} hits, ${cacheStatsBefore.misses} misses`, 'ℹ️');
+      try {
+        qeegData = await QEEGParser.parse(eyesOpenFile, eyesClosedFile);
+        logProgress('QEEG_PARSE', 'QEEG files parsed successfully', '✅');
+      } catch (parseError) {
+        logProgress('QEEG_PARSE', `FAILED: ${parseError.message}`, '❌');
+        throw parseError;
+      }
+      const cacheStatsAfter = QEEGParser.getCacheStats();
+      logProgress('CACHE_STATS', `After: ${cacheStatsAfter.hits} hits, ${cacheStatsAfter.misses} misses`, 'ℹ️');
+      logProgress('CACHE', cacheStatsAfter.hits > cacheStatsBefore.hits ? 'In-memory cache hit' : 'Cache miss - Gemini API called', cacheStatsAfter.hits > cacheStatsBefore.hits ? '⚡' : '📍');
     }
 
     // Validate that we got real patient data
@@ -402,8 +409,20 @@ async function processQeegRequest(req, res) {
     console.log('\n🧮 Step 2: Calculating 7 brain health parameters...');
     console.log('📊 Using Raw Power Calculator (as per specification)');
 
-    const calculator = new AlgorithmCalculator(qeegData);
-    const results = calculator.calculate();
+    if (!results) {
+      const calculator = new AlgorithmCalculator(qeegData);
+      results = calculator.calculate();
+      if (sourceHash) {
+        try {
+          const saved = await qeegExtractionCache.saveQeegExtraction(sourceHash, qeegData, results);
+          qeegData = saved.qeegData;
+          results = saved.results;
+          logProgress('CACHE', 'Extraction and calculation saved for exact repeat uploads', '💾');
+        } catch (cacheError) {
+          console.warn('QEEG durable cache save failed:', cacheError.message);
+        }
+      }
+    }
 
     console.log('\n✅ Calculation completed successfully!');
     console.log('📈 Results Summary:');

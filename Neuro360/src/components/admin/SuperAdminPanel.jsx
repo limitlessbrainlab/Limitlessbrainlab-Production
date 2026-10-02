@@ -28,6 +28,7 @@ const WebsiteInquiries = lazy(() => import('./WebsiteInquiries'));
 const WebsitePayments = lazy(() => import('./WebsitePayments'));
 const PatientSubscriptions = lazy(() => import('./PatientSubscriptions'));
 const PricingManagement = lazy(() => import('./PricingManagement'));
+const BrainCoursesSetup = lazy(() => import('./BrainCoursesSetup'));
 
 const SuperAdminPanel = () => {
 
@@ -141,6 +142,8 @@ const SuperAdminPanel = () => {
           return <AlertDashboard />;
         case 'pricing':
           return <PricingManagement />;
+        case 'advanced-setup':
+          return <BrainCoursesSetup />;
         case 'analytics':
           return <AnalyticsDashboard analytics={analytics} />;
         case 'advanced-analytics':
@@ -212,6 +215,7 @@ const SuperAdminPanel = () => {
       case 'payments': return selectedClinic ? `Payment History - ${clinics.find(c => c.id === selectedClinic)?.name || 'Selected Clinic'}` : 'Payment History';
       case 'patient-subscriptions': return 'Patient Subscriptions';
       case 'pricing': return 'Pricing Management';
+      case 'advanced-setup': return 'Advanced Setup';
       case 'alerts': return 'Alerts & Monitoring';
       case 'analytics': return 'Analytics & Reports';
       case 'advanced-analytics': return 'Advanced Analytics & Tracking';

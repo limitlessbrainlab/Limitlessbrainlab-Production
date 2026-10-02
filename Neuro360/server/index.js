@@ -11,6 +11,8 @@ const claudeReportRoutes = require('./routes/claudeReportRoutes');
 const patientDocumentRoutes = require('./routes/patientDocumentRoutes');
 const ssoRoutes = require('./routes/ssoRoutes');
 const claudeRoutes = require('./routes/claudeRoutes');
+const createBrainCourseRoutes = require('./routes/brainCourses');
+const { grantBrainCoursePurchase } = require('./services/brainCoursePurchase');
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcryptjs');
 const { getReportEmailHtml, getNeuroSenseReportEmailHtml } = require('../shared/reportEmailTemplate.cjs');
@@ -2222,6 +2224,13 @@ function getStripePaymentMethodTypes(currency) {
   return LINK_SUPPORTED_CURRENCIES.has(code) ? ['card', 'link'] : ['card'];
 }
 
+app.use('/api/brain-courses', createBrainCourseRoutes({
+  supabase,
+  stripe,
+  frontendUrl: process.env.FRONTEND_URL || 'https://limitlessbrainlab.com',
+  getPaymentMethodTypes: getStripePaymentMethodTypes
+}));
+
 // =====================================================
 // STRIPE PAYMENT INTEGRATION - Frequency Music Packs
 // =====================================================
@@ -2526,7 +2535,10 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
       // Save payment record to database
       if (supabase) {
         try {
-          if (paymentType === 'assessment') {
+          if (paymentType === 'brain_course') {
+            const courseResult = await grantBrainCoursePurchase({ session, supabase });
+            if (!courseResult.ok) console.error('verify-session brain course grant failed:', courseResult.message);
+          } else if (paymentType === 'assessment') {
             // assessment_purchases has NO unique constraint on stripe_session_id,
             // so upsert(onConflict) always errored and the row was silently
             // dropped — check-then-insert keeps this webhook-fallback path
@@ -4504,7 +4516,10 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         // the shared idempotent helper (also called by /api/stripe/verify-session,
         // the frontend confirm path, so purchases record even when only one of
         // the two paths fires).
-        if (paymentType === 'subscription') {
+        if (paymentType === 'brain_course') {
+          const courseResult = await grantBrainCoursePurchase({ session, supabase });
+          if (!courseResult.ok) console.error('Webhook brain course grant failed:', courseResult.message);
+        } else if (paymentType === 'subscription') {
           const subResult = await applySubscriptionPurchase(session);
           if (!subResult.ok) {
             console.error('Webhook applySubscriptionPurchase failed:', subResult.message);

@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { validateCourse } = require('../routes/brainCourses');
+const { validateCourse, courseInput } = require('../routes/brainCourses');
 
 assert.deepEqual(validateCourse({
   slug: 'memory-course', title: 'Memory Course', author: 'Dr A', category: 'memory',
@@ -7,4 +7,7 @@ assert.deepEqual(validateCourse({
 }), { valid: true });
 assert.equal(validateCourse({ course_url: 'http://academy.example', sale_price: 1, currency: 'INR' }).valid, false);
 assert.equal(validateCourse({ course_url: 'https://academy.example', sale_price: 0, currency: 'INR', is_free: false }).valid, false);
+assert.deepEqual(courseInput({ title: 'YouTube course', course_url: 'https://youtu.be/example', original_price: '', sale_price: '29', is_free: false }), {
+  title: 'YouTube course', course_url: 'https://youtu.be/example', original_price: null, sale_price: 29, is_free: false,
+});
 console.log('brainCoursesRoute.test.cjs: ok');

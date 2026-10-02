@@ -10,6 +10,16 @@ function validateCourse(course) {
   return { valid: true };
 }
 
+function courseInput(body) {
+  const course = Object.fromEntries(COURSE_FIELDS.filter((key) => key in body).map((key) => [key, body[key]]));
+  for (const field of ['original_price', 'sale_price']) {
+    if (course[field] === '') course[field] = null;
+    else if (course[field] != null) course[field] = Number(course[field]);
+  }
+  if (course.is_free) course.sale_price = null;
+  return course;
+}
+
 module.exports = ({ supabase, stripe, frontendUrl, getPaymentMethodTypes }) => {
   const { authMiddleware } = require('../middleware/authMiddleware');
   const router = express.Router();
@@ -18,8 +28,6 @@ module.exports = ({ supabase, stripe, frontendUrl, getPaymentMethodTypes }) => {
     if (error || data?.role !== 'super_admin') return res.status(403).json({ success: false, message: 'Super Admin access is required.' });
     next();
   };
-  const courseInput = (body) => Object.fromEntries(COURSE_FIELDS.filter((key) => key in body).map((key) => [key, body[key]]));
-
   router.get('/', async (_req, res) => {
     const { data, error } = await supabase.from('brain_courses').select('*').eq('is_visible', true).order('sort_order');
     if (error) return res.status(500).json({ success: false, message: 'Courses could not be loaded.' });
@@ -68,3 +76,4 @@ module.exports = ({ supabase, stripe, frontendUrl, getPaymentMethodTypes }) => {
   return router;
 };
 module.exports.validateCourse = validateCourse;
+module.exports.courseInput = courseInput;

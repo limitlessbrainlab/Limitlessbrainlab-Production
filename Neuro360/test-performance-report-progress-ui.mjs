@@ -7,3 +7,5 @@ assert.match(source, /data-testid="performance-report-progress"/);
 assert.match(source, /Report generation/);
 assert.match(source, /Final PDF/);
 assert.match(source, /claudeStages\.map/);
+assert.match(source, /h-2 rounded-sm/);
+assert.match(source, /bg-emerald-300 animate-pulse/);

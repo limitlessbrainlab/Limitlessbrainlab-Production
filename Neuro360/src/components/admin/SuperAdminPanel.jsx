@@ -50,6 +50,10 @@ const SuperAdminPanel = () => {
   const urlClinic = searchParams.get('clinic') || null;
 
   useEffect(() => {
+    if (activeTab === 'advanced-setup') {
+      setLoading(false);
+      return;
+    }
     try {
       // loadAnalytics also populates the clinic selector list (setClinics), so the
       // previous separate loadClinics() full-table fetch is no longer needed.

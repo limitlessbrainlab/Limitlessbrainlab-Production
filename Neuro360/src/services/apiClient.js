@@ -24,9 +24,10 @@ apiClient.interceptors.request.use(
       // Get current session from Supabase
       const { data: { session } } = await supabase.auth.getSession();
 
-      if (session?.access_token) {
+      const token = session?.access_token || localStorage.getItem('authToken');
+      if (token) {
         // Add token to Authorization header
-        config.headers.Authorization = `Bearer ${session.access_token}`;
+        config.headers.Authorization = `Bearer ${token}`;
       }
     } catch (error) {
       console.warn('[ApiClient] Failed to get session:', error.message);
@@ -45,7 +46,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     // Handle 401 - Token expired or invalid
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !error.config?.skipAuthRedirect) {
       // Clear session and redirect to login
       await supabase.auth.signOut();
       window.location.href = '/login';

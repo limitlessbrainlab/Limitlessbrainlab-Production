@@ -1118,7 +1118,10 @@ app.post('/api/auth/login', rateLimiters.loginLimiter, async (req, res) => {
       if (profileError) throw profileError;
       const profile = profiles?.[0];
       if (profile) {
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+        // Never sign in on the shared service client: doing so replaces its service
+        // role with this user's session and makes later admin writes fail RLS.
+        const loginClient = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+        const { data: authData, error: authError } = await loginClient.auth.signInWithPassword({ email: normalizedEmail, password });
         if (!authError && authData?.user?.id === profile.id && authData.session) {
           return res.json({
             success: true,

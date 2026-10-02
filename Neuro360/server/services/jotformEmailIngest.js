@@ -102,15 +102,16 @@ function parseNotificationEmail({ html, text, date, messageId }) {
 
 // --- IMAP plumbing ----------------------------------------------------------
 
-async function withImap(fn) {
+async function withImap(fn, createClient) {
   const { ImapFlow } = require('imapflow');
-  const client = new ImapFlow({
+  const client = createClient ? createClient() : new ImapFlow({
     host: IMAP_HOST,
     port: 993,
     secure: true,
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
     logger: false
   });
+  client.on('error', (error) => console.error('jotformEmailIngest IMAP error:', error.message));
   await client.connect();
   try {
     return await fn(client);
@@ -192,4 +193,4 @@ function startJotformEmailIngest() {
   console.log(`jotformEmailIngest: polling ${IMAP_HOST} as ${process.env.EMAIL_USER} every ${Math.round(POLL_MS / 1000)}s`);
 }
 
-module.exports = { startJotformEmailIngest, processMailboxOnce, parseNotificationEmail };
+module.exports = { startJotformEmailIngest, processMailboxOnce, parseNotificationEmail, withImap };

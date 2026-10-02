@@ -2268,11 +2268,11 @@ const PatientDashboard = () => {
         </p>
         <div className="space-y-2 sm:space-y-3">
           <a
-            href="mailto:limitlessbrainlab@gmail.com"
+            href="mailto:info@limitlessbrainlab.com"
             className="flex items-center space-x-2 sm:space-x-3 p-2.5 sm:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
           >
             <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-[#323956] dark:text-blue-400 flex-shrink-0" />
-            <span className="text-xs sm:text-base text-gray-700 dark:text-gray-300 truncate">limitlessbrainlab@gmail.com</span>
+            <span className="text-xs sm:text-base text-gray-700 dark:text-gray-300 truncate">info@limitlessbrainlab.com</span>
           </a>
           <a
             href="tel:+971501382897"
@@ -8395,6 +8395,7 @@ const PatientDashboard = () => {
         {/* Video Previews Section */}
         {(() => {
           const driveEmbed = (id) => `https://drive.google.com/file/d/${id}/preview`;
+          const driveThumbnail = (id) => `https://drive.google.com/thumbnail?id=${id}&sz=w1000`;
           const YOGA_NIDRA_URL = 'https://sweta8238.graphy.com/products/Yoga-Nidra---The-Ultimate-Whole-Brain-Synchronization-6788054d6cd6065534a49399';
           const meditationVideos = [
             {
@@ -8404,18 +8405,22 @@ const PatientDashboard = () => {
               embedUrl: driveEmbed('121JXjCmCRQqWUaSBcqdQ2bV1Tst1_skV'),
               thumb: '/meditation-thumbs/thumb-0.webp',
             },
-            { num: 1,  title: 'NEURO KARMA CLEANSING MEDITATION',    embedUrl: driveEmbed('1mforB3qRohL0iMe-_CiwryBbv8vPodsg'), thumb: '/meditation-thumbs/thumb-1.webp' },
-            { num: 2,  title: 'NEURO FOCUS MEDITATION',               embedUrl: driveEmbed('1vo5XhHEUHR-HmGRe4pY-uiyMfmUzeOf2'), thumb: '/meditation-thumbs/thumb-2.webp' },
-            { num: 3,  title: 'NEURO PARKINSON DISEASE MEDITATION',   embedUrl: driveEmbed('1PS4LqFrc4n0S8kUP9_SGuU6xWliKyBIk'), thumb: '/meditation-thumbs/thumb-3.webp' },
-            { num: 4,  title: 'LOVE & RELATIONSHIP MEDITATION',        embedUrl: driveEmbed('1PVopOaJpqFxQjPUsz_dl-ExD1S6u-VGA'), thumb: '/meditation-thumbs/thumb-4.webp' },
-            { num: 5,  title: 'NEURO DEEP REST & MEDITATION',          embedUrl: driveEmbed('1hi-6bI7LPMn_Nlzt-zO4G6pdy3sJrh0J'), thumb: '/meditation-thumbs/thumb-5.webp' },
-            { num: 6,  title: 'NEURO ADOPT RELAX & RESET MEDITATION', embedUrl: driveEmbed('1_AIZlmKKXDYd_fxE4XIklMO9VKHYQ2Ks'), thumb: '/meditation-thumbs/thumb-6.webp' },
-            { num: 7,  title: 'NO ANXIETY - FEEL SAFE MEDITATION',    embedUrl: driveEmbed('1QbfP3bzX4wM1TlxU6qyPF1L7zghbGAsk'), thumb: '/meditation-thumbs/thumb-7.webp' },
-            { num: 8,  title: 'NEURO CANCER HEALING MEDITATION',       embedUrl: driveEmbed('1966GVbRXgDhyZWkzRfXThmmGVisaIdUK'), thumb: '/meditation-thumbs/thumb-8.webp' },
-            { num: 9,  title: 'NEURO MANIFESTATION MEDITATION',        embedUrl: driveEmbed('1cjmrKIC683t42CcJuZvkPug0Ed6GdPCU'), thumb: '/meditation-thumbs/thumb-9.webp' },
-            { num: 10, title: 'NEURO DEPRESSION HEALING MEDITATION',   embedUrl: driveEmbed('1xkTyCTbZ2WMmi3Ose_76xck1bq6Z0GBb'), thumb: '/meditation-thumbs/thumb-10.webp' },
-            { num: 11, title: 'NEURO DEEP SLEEP MEDITATION',           embedUrl: driveEmbed('1AZNpbXzRT_XU9mNIU1pKuZVutUi3fNn9'), thumb: '/meditation-thumbs/thumb-11.webp' },
-            { num: 12, title: 'YOGA NIDRA — THE ULTIMATE WHOLE BRAIN SYNCHRONIZATION', thumb: '/meditation-thumbs/yoga-nidra.webp', buyUrl: YOGA_NIDRA_URL },
+            { num: 1, title: 'NEURO DEEP REST & MEDITATION', embedUrl: driveEmbed('1mforB3qRohL0iMe-_CiwryBbv8vPodsg'), thumb: driveThumbnail('1v0VBU75rhwrmCFlz0uPSeSmWr0fWZj0-') },
+            { num: 2, title: 'NEURO DEPRESSION HEALING MEDITATION', embedUrl: driveEmbed('1mNaSY-9eaTFXmCrVzmicziwP07QMsrbw'), thumb: driveThumbnail('1iPK5x7vysIMnV4KWU2pzapjpB7e22WYt') },
+            { num: 3, title: 'NEURO ADOPT RELAX & RESET MEDITATION', embedUrl: driveEmbed('1xkTyCTbZ2WMmi3Ose_76xck1bq6Z0GBb'), thumb: driveThumbnail('1lEw313nm-egsPoB4-PCavb-ZjiNqBmx0') },
+            { num: 4, title: 'NEURO MANIFESTATION MEDITATION', embedUrl: driveEmbed('1DZtRbvhhJz8dskMwIrSc6WkW4Ik-MJ21'), thumb: driveThumbnail('1z34T9qaOUuTj5lfB4GAYzWw8UcrZU2vc') },
+            { num: 5, title: 'NEURO CANCER HEALING MEDITATION', embedUrl: driveEmbed('1zUDQF-fKTVpFS8v1CwHKiCpO0-MnqAra'), thumb: driveThumbnail('1LUNlw6Q_O1HBUG8_M2LmK17f8tsYp3wl') },
+            { num: 6, title: 'NEURO FOCUS MEDITATION', embedUrl: driveEmbed('1cjmrKIC683t42CcJuZvkPug0Ed6GdPCU'), thumb: driveThumbnail('16ZSsbBRmVajyYDFqC0_hlf5V5JWGPdUn') },
+            { num: 7, title: 'NEURO DEEP SLEEP MEDITATION', embedUrl: driveEmbed('1AZNpbXzRT_XU9mNIU1pKuZVutUi3fNn9'), thumb: driveThumbnail('12FJm_MMVW6YFN8-wpsh_E47UhsiYoz1f') },
+            { num: 8, title: 'NO ANXIETY - FEEL SAFE MEDITATION', embedUrl: driveEmbed('1_AIZlmKKXDYd_fxE4XIklMO9VKHYQ2Ks'), thumb: driveThumbnail('1tDVD60XkkT2VT_9hUeHS30JNbELMSAmr') },
+            { num: 9, title: 'LOVE & RELATIONSHIP MEDITATION', embedUrl: driveEmbed('1Y584iFTo4jc_HdqwfK7oqaBMv6mMOqfm'), thumb: driveThumbnail('1hmE-Eru0CsR59d3fkRE7qzfyLXPiMqgr') },
+            { num: 10, title: 'NEURO PARKINSON DISEASE MEDITATION', embedUrl: driveEmbed('1QbfP3bzX4wM1TlxU6qyPF1L7zghbGAsk'), thumb: driveThumbnail('1_zmODzSAQPAbBq5qYt2cl3BOUjes8_za') },
+            { num: 11, title: 'NEURO KARMA CLEANSING MEDITATION', embedUrl: driveEmbed('1966GVbRXgDhyZWkzRfXThmmGVisaIdUK'), thumb: driveThumbnail('1KPMm0n4ETxZhojIQf-SWQ0p7Z7XZLsrC') },
+            { num: 12, title: 'Alpha Meditation - Relaxation and Calm', embedUrl: driveEmbed('1hi-6bI7LPMn_Nlzt-zO4G6pdy3sJrh0J'), free: true, thumb: driveThumbnail('1HQ81VwcKHHsKpgCJE8fZkNz-L7qg-gjK') },
+            { num: 13, title: 'Beta Meditation - Focus & Attention', embedUrl: driveEmbed('1PVopOaJpqFxQjPUsz_dl-ExD1S6u-VGA'), free: true, thumb: driveThumbnail('1MdqqjcYi4hi4Jq2R2QWG4AyboCCEEsgi') },
+            { num: 14, title: 'Delta Meditation - Sleep and Repair', embedUrl: driveEmbed('1PS4LqFrc4n0S8kUP9_SGuU6xWliKyBIk'), free: true, thumb: driveThumbnail('1pbhPW7nJZOLTXRhxzvEgADbfOTD_4rRu') },
+            { num: 15, title: 'Theta Meditation - Manifestation Magic', embedUrl: driveEmbed('1vo5XhHEUHR-HmGRe4pY-uiyMfmUzeOf2'), free: true, thumb: driveThumbnail('1JQBI68OvyWr-OXNdg8HqKpQfyLTCEmMW') },
+            { num: 16, title: 'YOGA NIDRA — THE ULTIMATE WHOLE BRAIN SYNCHRONIZATION', free: true, thumb: '/meditation-thumbs/yoga-nidra.webp', buyUrl: YOGA_NIDRA_URL },
           ];
           const featured = meditationVideos[0];
           const rest = meditationVideos.slice(1);
@@ -8481,6 +8486,7 @@ const PatientDashboard = () => {
               <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
                 {rest.map((v) => {
                   const videoSlug = slugifyCareProgramTarget(v.title);
+                  const isUnlocked = v.free;
                   return (
                   <div
                     key={v.num}
@@ -8505,18 +8511,33 @@ const PatientDashboard = () => {
                         <span className="text-white/60 text-3xl font-bold">{v.num}</span>
                       </div>
                       <span className="absolute top-2 left-2 bg-black/50 text-white text-[10px] font-semibold rounded px-1.5 py-0.5 leading-none">{v.num}</span>
+                      {!isUnlocked && (
+                        <span className="absolute top-2 right-2 bg-white/90 text-gray-700 rounded-full p-1.5">
+                          <Lock className="h-3.5 w-3.5" />
+                        </span>
+                      )}
                     </div>
                     <div className="p-3 flex flex-col flex-grow">
                       <p className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-white leading-snug line-clamp-2 flex-grow mb-3">{v.title}</p>
-                      <a
-                        href={v.buyUrl || 'https://sweta8238.graphy.com/products#nav_barv'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full bg-[#c9a227] hover:bg-[#b8911f] text-white py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 transition-colors"
-                      >
-                        <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                        <span>Buy Now</span>
-                      </a>
+                      {isUnlocked && v.embedUrl ? (
+                        <button
+                          onClick={() => setSelectedVideo(v)}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 transition-colors"
+                        >
+                          <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                          <span>Watch Now</span>
+                        </button>
+                      ) : (
+                        <a
+                          href={v.buyUrl || 'https://sweta8238.graphy.com/products#nav_barv'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`w-full ${isUnlocked ? 'bg-green-600 hover:bg-green-700' : 'bg-[#c9a227] hover:bg-[#b8911f]'} text-white py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center justify-center space-x-1.5 transition-colors`}
+                        >
+                          <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                          <span>{isUnlocked ? 'Open Yoga Nidra' : 'Buy Now'}</span>
+                        </a>
+                      )}
                     </div>
                   </div>
                   );

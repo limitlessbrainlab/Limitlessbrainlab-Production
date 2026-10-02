@@ -2,4 +2,5 @@
 .env
 .env*.local
 .gstack/
+.worktrees/
 Neuro360.zip

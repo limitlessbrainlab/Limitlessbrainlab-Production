@@ -219,7 +219,7 @@ const SuperAdminPanel = () => {
       case 'payments': return selectedClinic ? `Payment History - ${clinics.find(c => c.id === selectedClinic)?.name || 'Selected Clinic'}` : 'Payment History';
       case 'patient-subscriptions': return 'Patient Subscriptions';
       case 'pricing': return 'Pricing Management';
-      case 'advanced-setup': return 'Advanced Setup';
+      case 'advanced-setup': return 'Patient Brain Courses';
       case 'alerts': return 'Alerts & Monitoring';
       case 'analytics': return 'Analytics & Reports';
       case 'advanced-analytics': return 'Advanced Analytics & Tracking';

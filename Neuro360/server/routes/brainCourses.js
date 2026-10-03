@@ -1,6 +1,16 @@
 const express = require('express');
 
 const COURSE_FIELDS = ['slug', 'title', 'author', 'category', 'thumbnail_url', 'course_url', 'original_price', 'sale_price', 'currency', 'is_free', 'is_visible', 'sort_order'];
+const CHECKOUT_ORIGINS = new Set([
+  'https://limitlessbrainlab.com',
+  'https://www.limitlessbrainlab.com',
+  'https://limitlessbrainlab-production.vercel.app',
+  'https://limitlessbrainlab-eight.vercel.app',
+]);
+
+function checkoutReturnOrigin(origin, fallback) {
+  return CHECKOUT_ORIGINS.has(origin) ? origin : fallback;
+}
 
 function validateCourse(course) {
   if (!course?.slug || !course?.title || !course?.course_url || !course?.currency) return { valid: false, message: 'Title, slug, course link, and currency are required.' };
@@ -44,11 +54,12 @@ module.exports = ({ supabase, stripe, frontendUrl, getPaymentMethodTypes }) => {
     if (error || !course || course.is_free) return res.status(400).json({ success: false, message: 'This course is not available for purchase.' });
     const { data: owned } = await supabase.from('brain_course_purchases').select('id').eq('course_id', course.id).eq('patient_id', req.user.id).maybeSingle();
     if (owned) return res.status(409).json({ success: false, message: 'You already own this course.' });
+    const returnOrigin = checkoutReturnOrigin(req.headers.origin, frontendUrl);
     const session = await stripe.checkout.sessions.create({
       payment_method_types: getPaymentMethodTypes(course.currency), mode: 'payment', customer_email: req.user.email,
       line_items: [{ price_data: { currency: course.currency.toLowerCase(), product_data: { name: course.title, images: course.thumbnail_url ? [course.thumbnail_url] : [] }, unit_amount: Math.round(Number(course.sale_price) * 100) }, quantity: 1 }],
-      success_url: `${frontendUrl}/dashboard/brain-courses?course_payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${frontendUrl}/dashboard/brain-courses?course_payment=cancelled`,
+      success_url: `${returnOrigin}/dashboard/brain-courses?course_payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${returnOrigin}/dashboard/brain-courses?course_payment=cancelled`,
       metadata: { type: 'brain_course', course_id: course.id, patient_id: req.user.id, customer_email: req.user.email || '' },
     });
     res.json({ success: true, checkoutUrl: session.url, sessionId: session.id });
@@ -77,3 +88,4 @@ module.exports = ({ supabase, stripe, frontendUrl, getPaymentMethodTypes }) => {
 };
 module.exports.validateCourse = validateCourse;
 module.exports.courseInput = courseInput;
+module.exports.checkoutReturnOrigin = checkoutReturnOrigin;

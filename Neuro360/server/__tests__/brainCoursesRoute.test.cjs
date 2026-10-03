@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { validateCourse, courseInput } = require('../routes/brainCourses');
+const { validateCourse, courseInput, checkoutReturnOrigin } = require('../routes/brainCourses');
 
 assert.deepEqual(validateCourse({
   slug: 'memory-course', title: 'Memory Course', author: 'Dr A', category: 'memory',
@@ -10,4 +10,6 @@ assert.equal(validateCourse({ course_url: 'https://academy.example', sale_price:
 assert.deepEqual(courseInput({ title: 'YouTube course', course_url: 'https://youtu.be/example', original_price: '', sale_price: '29', is_free: false }), {
   title: 'YouTube course', course_url: 'https://youtu.be/example', original_price: null, sale_price: 29, is_free: false,
 });
+assert.equal(checkoutReturnOrigin('https://limitlessbrainlab.com', 'https://limitlessbrainlab-production.vercel.app'), 'https://limitlessbrainlab.com');
+assert.equal(checkoutReturnOrigin('https://unexpected.example', 'https://limitlessbrainlab-production.vercel.app'), 'https://limitlessbrainlab-production.vercel.app');
 console.log('brainCoursesRoute.test.cjs: ok');

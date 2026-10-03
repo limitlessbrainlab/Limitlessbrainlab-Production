@@ -118,7 +118,7 @@ import MyBookings from './MyBookings';
 import ProfileGate from './ProfileGate';
 import { getCareProtocol } from '../../utils/careProtocolLookup';
 
-const CARE_PROGRAM_YOGA_NIDRA_URL = 'https://sweta8238.graphy.com/products/Yoga-Nidra---The-Ultimate-Whole-Brain-Synchronization-6788054d6cd6065534a49399';
+const CARE_PROGRAM_YOGA_NIDRA_URL = 'https://drive.google.com/file/d/1G7M7EiWU7tHzFkb0Gy6KIPNwUt1p3pn8/view';
 const getGuideThumbnailUrl = (url) => {
   if (!url || typeof url !== 'string') return null;
   const youtubeMatch = url.match(/(?:youtube\.com\/embed\/|youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
@@ -8396,7 +8396,7 @@ const PatientDashboard = () => {
         {(() => {
           const driveEmbed = (id) => `https://drive.google.com/file/d/${id}/preview`;
           const driveThumbnail = (id) => `https://drive.google.com/thumbnail?id=${id}&sz=w1000`;
-          const YOGA_NIDRA_URL = 'https://sweta8238.graphy.com/products/Yoga-Nidra---The-Ultimate-Whole-Brain-Synchronization-6788054d6cd6065534a49399';
+          const YOGA_NIDRA_URL = CARE_PROGRAM_YOGA_NIDRA_URL;
           const meditationVideos = [
             {
               num: 0, featured: true,

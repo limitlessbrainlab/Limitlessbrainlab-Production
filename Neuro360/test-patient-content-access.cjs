@@ -14,3 +14,5 @@ for (const id of ['1hi-6bI7LPMn_Nlzt-zO4G6pdy3sJrh0J', '1PVopOaJpqFxQjPUsz_dl-Ex
   assert.match(dashboard, new RegExp(`embedUrl: driveEmbed\\('${id}'\\).*free: true`));
 }
 assert.match(dashboard, /title: 'YOGA NIDRA[^\n]*free: true/);
+assert.match(dashboard, /const CARE_PROGRAM_YOGA_NIDRA_URL = 'https:\/\/drive\.google\.com\/file\/d\/1G7M7EiWU7tHzFkb0Gy6KIPNwUt1p3pn8\/view';/);
+assert.doesNotMatch(dashboard, /sweta8238\.graphy\.com\/products\/Yoga-Nidra/);

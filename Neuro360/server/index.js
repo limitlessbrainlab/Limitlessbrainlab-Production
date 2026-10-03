@@ -19,7 +19,7 @@ const { getReportEmailHtml, getNeuroSenseReportEmailHtml } = require('../shared/
 
 // Import middleware
 const { setupMiddleware, setupRateLimiters, protectedRoutes, setupErrorHandling, asyncHandler } = require('./middleware/setupMiddleware');
-const { authMiddleware, optionalAuth } = require('./middleware/authMiddleware');
+const { authMiddleware, optionalAuth, createLegacyPatientToken } = require('./middleware/authMiddleware');
 const { requireRole, requireOwnership } = require('./middleware/rbac');
 const logger = require('./services/logger');
 
@@ -1100,7 +1100,7 @@ app.post('/api/auth/login', rateLimiters.loginLimiter, async (req, res) => {
         if (!correctEnvironment(patient)) return deny(`This account was created on ${canonicalUrl(patient.origin_url)}. Please log in there.`);
         return res.json({
           success: true,
-          token: `patient_token_${Date.now()}`,
+          token: createLegacyPatientToken(patient),
           user: {
             id: patient.id, email: patient.email, name: patient.full_name || patient.name,
             phone: patient.phone, address: patient.address, dateOfBirth: patient.date_of_birth,

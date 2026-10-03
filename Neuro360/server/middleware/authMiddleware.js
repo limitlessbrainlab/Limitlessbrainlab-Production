@@ -7,6 +7,53 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+const LEGACY_PATIENT_ISSUER = 'limitlessbrainlab';
+const LEGACY_PATIENT_AUDIENCE = 'legacy-patient-api';
+
+function legacyPatientSecret() {
+  // ponytail: reuse the server-only service key until LEGACY_AUTH_JWT_SECRET is configured; set the dedicated secret to decouple key rotation.
+  return process.env.LEGACY_AUTH_JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+}
+
+function createLegacyPatientToken(patient) {
+  return jwt.sign({
+    type: 'legacy_patient',
+    email: patient.email,
+    credentialsUpdatedAt: patient.credentials_updated_at || null,
+  }, legacyPatientSecret(), {
+    subject: patient.id,
+    issuer: LEGACY_PATIENT_ISSUER,
+    audience: LEGACY_PATIENT_AUDIENCE,
+    expiresIn: '7d',
+  });
+}
+
+function legacyPatientFromToken(token) {
+  try {
+    const payload = jwt.verify(token, legacyPatientSecret(), {
+      issuer: LEGACY_PATIENT_ISSUER,
+      audience: LEGACY_PATIENT_AUDIENCE,
+    });
+    if (payload.type !== 'legacy_patient' || !payload.sub || !payload.email) return null;
+    return { id: payload.sub, email: payload.email, role: 'patient', credentialsUpdatedAt: payload.credentialsUpdatedAt || null };
+  } catch {
+    return null;
+  }
+}
+
+async function verifiedLegacyPatient(token) {
+  const tokenUser = legacyPatientFromToken(token);
+  if (!tokenUser) return null;
+  const { data: patient, error } = await supabase
+    .from('patients')
+    .select('id, email, credentials_updated_at')
+    .eq('id', tokenUser.id)
+    .eq('email', tokenUser.email)
+    .maybeSingle();
+  if (error || !patient || (patient.credentials_updated_at || null) !== tokenUser.credentialsUpdatedAt) return null;
+  return { id: patient.id, email: patient.email, role: 'patient' };
+}
+
 /**
  * Middleware to verify JWT token and attach user to request
  * Checks Authorization header for Bearer token or Supabase session
@@ -25,7 +72,13 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
-    // Verify token with Supabase
+    const legacyPatient = await verifiedLegacyPatient(token);
+    if (legacyPatient) {
+      req.user = legacyPatient;
+      return next();
+    }
+
+    // Verify Supabase token with Supabase
     const { data: { user }, error } = await supabase.auth.getUser(token);
 
     if (error || !user) {
@@ -65,6 +118,11 @@ const optionalAuth = async (req, res, next) => {
     const token = authHeader?.split(' ')[1];
 
     if (token) {
+      const legacyPatient = await verifiedLegacyPatient(token);
+      if (legacyPatient) {
+        req.user = legacyPatient;
+        return next();
+      }
       const { data: { user }, error } = await supabase.auth.getUser(token);
       if (!error && user) {
         req.user = {
@@ -84,5 +142,7 @@ const optionalAuth = async (req, res, next) => {
 
 module.exports = {
   authMiddleware,
-  optionalAuth
+  optionalAuth,
+  createLegacyPatientToken,
+  legacyPatientFromToken,
 };

@@ -1783,7 +1783,7 @@ const PatientDashboard = () => {
         icon: iconMap[param.icon] || Lightbulb
       }))
     },
-    { id: 'neurosense-reports', label: 'Neurosense Performance Reports', icon: Download },
+    { id: 'neurosense-reports', label: 'Download Reports', icon: Download },
     { id: 'care-program', label: 'Customized Care Program', icon: ClipboardList },
     { id: 'ans-reset', label: 'Breath Reset Protocol', icon: RefreshCw },
     // { id: 'movers', label: 'MOVERS', icon: Activity },
@@ -10081,7 +10081,7 @@ const PatientDashboard = () => {
             <div className="space-y-3">
               {displayedReports.map((report) => {
                 const reportData = report.reportData || report.report_data || {};
-                const title = reportData.title || report.fileName || report.file_name || 'Neurosense Performance Report';
+                const title = (reportData.title || report.fileName || report.file_name || 'Neurosense Performance Report').replace(/^Limitless Brain Lab QEEG Report\b/, 'Neurosense Report');
                 const reportType = reportData.reportType || 'Report';
                 const createdAt = report.createdAt || report.created_at;
                 const isResponse = reportData.isResponseReport;

@@ -1829,7 +1829,7 @@ const AlgorithmDataProcessor = () => {
         filePath: filePath, // Storage path for signed URL
         reportType: 'NeuroSense Report',
         reportData: {
-          title: `Limitless Brain Lab QEEG Report - ${patientName}`,
+          title: `Neurosense Report - ${patientName}`,
           reportType: 'NeuroSense Report',
           description: `Algorithm processing results for ${patientName}`,
           fileUrl: fullUrl, // Full URL for direct download

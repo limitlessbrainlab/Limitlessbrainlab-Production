@@ -3,7 +3,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const pdfParse = require('pdf-parse');
-const { sidecarAuth } = require('../middleware/sidecarAuth');
+const { authMiddleware } = require('../middleware/authMiddleware');
+const { requirePatientAccess } = require('../utils/patientAccess');
 const { postLesson } = require('../services/nexaprocService');
 const { extractReportSource, getReportAiProvider, REPORT_GEMINI_MODEL } = require('../services/reportAiProvider');
 const { buildReportDataFromSource, buildReportDataFromNeuroSenseMd } = require('../services/claudeReportData');
@@ -66,12 +67,30 @@ const STAGE_LABELS = {
 };
 const STAGE_PCT = { reading: 10, extract: 25, build: 55, narrative: 60, render: 88, saving: 95 };
 
-router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
+router.post('/', authMiddleware, upload.single('pdf'), async (req, res) => {
   const tempPath = req.file?.path;
 
   // The "no file" guard stays plain JSON — emitted BEFORE we switch to SSE.
   if (!req.file) {
     return res.status(400).json({ success: false, message: 'A PDF file (field "pdf") is required.' });
+  }
+
+  let authorizedPatient;
+  const patientId = req.body?.patientId;
+  try {
+    authorizedPatient = await requirePatientAccess(req.user, patientId, req.body?.clinicId || null, supabase);
+    const savedResultId = req.body?.savedResultId;
+    if (savedResultId) {
+      if (typeof savedResultId !== 'string' || savedResultId.length > 128) throw Object.assign(new Error('Invalid report record'), { status: 400 });
+      const { data: savedResult, error } = await supabase.from('algorithm_results').select('id,patient_id,clinic_id').eq('id', savedResultId).maybeSingle();
+      if (error) throw error;
+      if (!savedResult || savedResult.patient_id !== authorizedPatient.id || (savedResult.clinic_id && savedResult.clinic_id !== authorizedPatient.clinic_id)) {
+        throw Object.assign(new Error('Report access denied'), { status: 403 });
+      }
+    }
+  } catch (error) {
+    if (tempPath) fs.unlink(tempPath, () => {});
+    return res.status(error.status || 500).json({ success: false, message: error.status ? error.message : 'Unable to verify report access.' });
   }
 
   // Switch the response to Server-Sent Events so the frontend can show live,
@@ -221,7 +240,7 @@ router.post('/', sidecarAuth, upload.single('pdf'), async (req, res) => {
     const outPath = path.join(__dirname, '../uploads', `claude-report-out-${Date.now()}-${Math.round(Math.random() * 1e9)}.pdf`);
     try {
       fs.writeFileSync(outPath, pdf);
-      const uploadResult = await SupabaseStorage.uploadFile(outPath, 'neurosense-reports', `claude-reports/${base}-${Date.now()}.pdf`);
+      const uploadResult = await SupabaseStorage.uploadFile(outPath, 'neurosense-reports', `claude-reports/${base}-${Date.now()}.pdf`, 'application/pdf', supabase, authorizedPatient.id);
       if (!uploadResult || !uploadResult.url) {
         throw new Error('Supabase upload returned an invalid result');
       }

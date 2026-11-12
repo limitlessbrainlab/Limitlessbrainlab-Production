@@ -33,9 +33,12 @@ function courseInput(body) {
 module.exports = ({ supabase, stripe, frontendUrl, getPaymentMethodTypes }) => {
   const { authMiddleware } = require('../middleware/authMiddleware');
   const router = express.Router();
-  const requireSuperAdmin = async (req, res, next) => {
-    const { data, error } = await supabase.from('profiles').select('role').eq('id', req.user.id).maybeSingle();
-    if (error || data?.role !== 'super_admin') return res.status(403).json({ success: false, message: 'Super Admin access is required.' });
+  const requireSuperAdmin = (req, res, next) => {
+    if (req.user?.role !== 'super_admin') return res.status(403).json({ success: false, message: 'Super Admin access is required.' });
+    next();
+  };
+  const requirePatient = (req, res, next) => {
+    if (req.user?.role !== 'patient' || !req.user.patient_id) return res.status(403).json({ success: false, message: 'Patient access is required.' });
     next();
   };
   router.get('/', async (_req, res) => {
@@ -43,16 +46,16 @@ module.exports = ({ supabase, stripe, frontendUrl, getPaymentMethodTypes }) => {
     if (error) return res.status(500).json({ success: false, message: 'Courses could not be loaded.' });
     res.json({ success: true, courses: data });
   });
-  router.get('/access', authMiddleware, async (req, res) => {
-    const { data, error } = await supabase.from('brain_course_purchases').select('course_id').eq('patient_id', req.user.id);
+  router.get('/access', authMiddleware, requirePatient, async (req, res) => {
+    const { data, error } = await supabase.from('brain_course_purchases').select('course_id').eq('patient_id', req.user.patient_id);
     if (error) return res.status(500).json({ success: false, message: 'Course access could not be loaded.' });
     res.json({ success: true, courseIds: data.map(({ course_id }) => course_id) });
   });
-  router.post('/:id/checkout', authMiddleware, async (req, res) => {
+  router.post('/:id/checkout', authMiddleware, requirePatient, async (req, res) => {
     if (!stripe) return res.status(500).json({ success: false, message: 'Stripe is not configured.' });
     const { data: course, error } = await supabase.from('brain_courses').select('*').eq('id', req.params.id).eq('is_visible', true).maybeSingle();
     if (error || !course || course.is_free) return res.status(400).json({ success: false, message: 'This course is not available for purchase.' });
-    const { data: owned } = await supabase.from('brain_course_purchases').select('id').eq('course_id', course.id).eq('patient_id', req.user.id).maybeSingle();
+    const { data: owned } = await supabase.from('brain_course_purchases').select('id').eq('course_id', course.id).eq('patient_id', req.user.patient_id).maybeSingle();
     if (owned) return res.status(409).json({ success: false, message: 'You already own this course.' });
     const returnOrigin = checkoutReturnOrigin(req.headers.origin, frontendUrl);
     const session = await stripe.checkout.sessions.create({
@@ -60,7 +63,7 @@ module.exports = ({ supabase, stripe, frontendUrl, getPaymentMethodTypes }) => {
       line_items: [{ price_data: { currency: course.currency.toLowerCase(), product_data: { name: course.title, images: course.thumbnail_url ? [course.thumbnail_url] : [] }, unit_amount: Math.round(Number(course.sale_price) * 100) }, quantity: 1 }],
       success_url: `${returnOrigin}/dashboard/brain-courses?course_payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${returnOrigin}/dashboard/brain-courses?course_payment=cancelled`,
-      metadata: { type: 'brain_course', course_id: course.id, patient_id: req.user.id, customer_email: req.user.email || '' },
+      metadata: { type: 'brain_course', course_id: course.id, patient_id: req.user.patient_id, customer_email: req.user.email || '' },
     });
     res.json({ success: true, checkoutUrl: session.url, sessionId: session.id });
   });

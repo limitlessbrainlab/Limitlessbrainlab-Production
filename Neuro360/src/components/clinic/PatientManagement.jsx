@@ -31,7 +31,7 @@ import ClinicalReportView from './ClinicalReportView';
 import { useAuth } from '../../contexts/AuthContext';
 import { generatePatientUID } from '../../utils/patientUidGenerator';
 import { countryCodes as allCountryCodes } from '../../utils/countryCodes';
-import { hashPassword } from '../../utils/passwordUtils';
+import credentialRpc from '../../services/credentialRpc';
 import { getOriginUrl } from '../../utils/environment';
 
 const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted = false }) => {
@@ -328,37 +328,8 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
         // Continue anyway - maybe org exists but findById failed
       }
 
-      // Run auth creation, UID generation, and password hashing in parallel
-      const [authResult, patientUID, hashedPassword] = await Promise.allSettled([
-        DatabaseService.createPatientAuth(sanitizedEmail, data.password, {
-          full_name: data.name,
-          role: 'patient',
-          org_id: clinicId
-        }),
-        generatePatientUID(clinicId),
-        hashPassword(data.password)
-      ]);
-
-      // Process auth result. The Supabase Auth user is auxiliary — patient login
-      // authenticates against the bcrypt password on the patients row created below —
-      // so a failed or duplicate auth user does NOT prevent login. Just log it.
-      if (authResult.status === 'rejected') {
-        console.warn('WARNING: Supabase Auth user creation failed (patient can still log in via the patients table):', authResult.reason);
-      }
-
-      // Get UID (use fallback if generation failed)
-      const uid = patientUID.status === 'fulfilled' ? patientUID.value : `PAT-${Date.now()}`;
-
-      // Get the bcrypt password hash. If hashing failed, abort — never fall back to
-      // storing plaintext (or any other value), which would make the emailed
-      // credentials silently mismatch what login compares against and produce a
-      // bogus "Invalid email or password" for a freshly created patient.
-      if (hashedPassword.status !== 'fulfilled' || !hashedPassword.value) {
-        console.error('ERROR: Password hashing failed during patient creation:', hashedPassword.reason);
-        toast.error('Could not securely process the password. Please try again.');
-        return;
-      }
-      const pwd = hashedPassword.value;
+      const patientUID = await generatePatientUID(clinicId).catch(() => null);
+      const uid = patientUID || `PAT-${Date.now()}`;
 
       // Map fields to match database schema (without owner_user - it doesn't exist)
       const patientData = {
@@ -373,8 +344,6 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
         occupation: data.occupation?.trim() || '',
         handedness: data.handedness || '',
         referred_by: data.referredBy === 'Others' ? (data.referredByOther?.trim() || 'Others') : (data.referredBy || ''),
-        password: pwd,
-        plain_password: data.password, // Plaintext kept so credential/email-update emails can re-show the current password
         medical_history: {
           ...(data.notes ? { notes: data.notes } : {}),
           ...(!data.dateOfBirth && data.age ? { age: parseInt(data.age) } : {})
@@ -387,11 +356,10 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
       // Insert with retry on external_id collision. The (external_id, org_id)
       // unique constraint can still be hit by concurrent adds or stale UID
       // counters, so regenerate the UID and retry a few times before failing.
-      let inserted = false;
+      let insertedPatient = null;
       for (let attempt = 0; attempt < 5; attempt++) {
         try {
-          await DatabaseService.add('patients', patientData);
-          inserted = true;
+          insertedPatient = await DatabaseService.add('patients', patientData);
           break;
         } catch (insertError) {
           const isUidConflict =
@@ -405,8 +373,16 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
             retryUid && retryUid !== patientData.external_id ? retryUid : `PAT-${Date.now()}`;
         }
       }
-      if (!inserted) {
+      if (!insertedPatient) {
         throw new Error('Could not generate a unique patient ID. Please try again.');
+      }
+
+      try {
+        const claimed = await credentialRpc.claimCredentials('patients', sanitizedEmail, data.password);
+        if (claimed !== true) throw new Error('Secure patient credential service is unavailable.');
+      } catch (credentialError) {
+        await DatabaseService.delete('patients', insertedPatient.id).catch(() => {});
+        throw credentialError;
       }
 
       // Send welcome email in background (don't block the UI). Tied to verified
@@ -478,19 +454,16 @@ const PatientManagement = ({ clinicId: propClinicId, onUpdate, creditsExhausted 
         date_of_birth: data.dateOfBirth || null
       };
 
-      // Only overwrite the bcrypt password column when a new password was entered.
-      // Keep the plaintext copy in sync so future email-update emails can re-show it.
-      if (passwordChanged) {
-        patientData.password = await hashPassword(data.password);
-        patientData.plain_password = data.password;
-      }
-
       // Bump on email OR password change so the patient's open session is force-logged-out
       if (emailChanged || passwordChanged) {
         patientData.credentials_updated_at = new Date().toISOString();
       }
 
       await DatabaseService.update('patients', selectedPatient.id, patientData);
+      if (passwordChanged) {
+        const updated = await credentialRpc.setPatientPasswordByClinic(clinicId, selectedPatient.id, data.password);
+        if (updated !== true) throw new Error('Secure patient credential service is unavailable.');
+      }
 
       // Email the patient their updated credentials whenever email and/or password changed.
       if (emailChanged || passwordChanged) {

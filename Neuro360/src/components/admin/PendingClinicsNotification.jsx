@@ -1,9 +1,10 @@
+import { PUBLIC_COLUMNS } from '../../services/publicColumns.js';
 import React, { useState, useEffect } from 'react';
 import { CheckCircle, XCircle, Bell, ArrowLeft, Clock, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DatabaseService from '../../services/databaseService';
 import NotificationService from '../../services/notificationService';
-import { hashPassword, comparePassword } from '../../utils/passwordUtils';
+import credentialRpc from '../../services/credentialRpc';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -56,7 +57,7 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
       // credentials email is sent here on approval, so both go through this queue.
       const { data: rows, error } = await supabase
         .from('clinics')
-        .select('*')
+        .select(PUBLIC_COLUMNS.clinics)
         .eq('subscription_status', 'pending_approval')
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -85,13 +86,12 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
       setLoading(true);
       setSelectedItem(clinic);
 
-      // Prefer the password the clinic chose at registration (stored in plain_password),
-      // so the approval email shows THEIR password and it keeps working at login.
-      const existingPlain = String(clinic.plain_password || clinic.plainPassword || '').trim();
-
       // Update clinic data
+      const clinicFields = { ...clinic };
+      delete clinicFields.password;
+      delete clinicFields.plain_password;
       const updatedClinic = {
-        ...clinic,
+        ...clinicFields,
         is_active: true,
         isActive: true,
         // 'trial' (not 'active') so the 30-day trial_end_date below is actually
@@ -107,49 +107,29 @@ const PendingClinicsNotification = ({ onUpdate, autoShow = true, variant = 'hidd
         updated_at: new Date().toISOString()
       };
 
-      let emailPassword;
-      if (existingPlain) {
-        // Email the clinic's own plaintext password, and RE-HASH it into the
-        // password column so the stored bcrypt hash is guaranteed to match the
-        // exact plaintext we email — clinics have no self-heal fallback, so any
-        // drift between hash and plaintext is a permanent "invalid password"
-        // lockout. This is the key login-works guarantee.
-        emailPassword = existingPlain;
-        updatedClinic.password = await hashPassword(existingPlain);
-        updatedClinic.plain_password = existingPlain;
-      } else {
-        // Legacy fallback: no stored plaintext (clinic registered before this change) —
-        // issue a fresh password and store both hash + plaintext.
-        const generatePassword = () => {
-          const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$';
-          let password = '';
-          for (let i = 0; i < 12; i++) {
-            password += chars.charAt(Math.floor(Math.random() * chars.length));
-          }
-          return password;
-        };
-        emailPassword = generatePassword();
-        updatedClinic.password = await hashPassword(emailPassword);
-        updatedClinic.plain_password = emailPassword;
-      }
+      const generatePassword = () => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$';
+        const bytes = new Uint8Array(12);
+        crypto.getRandomValues(bytes);
+        return Array.from(bytes, byte => chars[byte % chars.length]).join('');
+      };
+      const emailPassword = generatePassword();
+      const credentialUpdated = await credentialRpc.setClinicPassword(clinic.id, emailPassword);
+      if (credentialUpdated !== true) throw new Error('Secure clinic credential service is unavailable.');
 
       // Save updated clinic
       const savedClinic = await DatabaseService.update('clinics', clinic.id, updatedClinic);
-
-      // Read-back guard: only email a password the persisted hash actually verifies
-      // against — never send credentials that can't log in.
-      const persistedOk = await comparePassword(emailPassword, savedClinic?.password);
-      if (!persistedOk) {
-        throw new Error(`Approval saved, but the stored password for "${clinic.name}" failed verification — credentials email NOT sent. Reset the clinic's password and retry.`);
-      }
 
       // Send approval email with credentials
       let emailSent = false;
       let emailFailReason = '';
       try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (!token) throw new Error('Please sign in again before sending clinic credentials.');
         const emailResponse = await fetch(`${API_BASE_URL}/clinic-credentials`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({
             clinicName: clinic.name || clinic.clinic_name,
             email: (clinic.email || '').trim().toLowerCase(),

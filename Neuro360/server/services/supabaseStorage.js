@@ -4,6 +4,7 @@
  */
 
 const { createClient } = require('@supabase/supabase-js');
+const { createRoutedClient } = require('../dbRouter');
 const fs = require('fs');
 const path = require('path');
 
@@ -17,9 +18,10 @@ if (!supabaseUrl || !supabaseKey) {
   console.error('   SUPABASE_SERVICE_ROLE_KEY:', supabaseKey ? 'Set' : 'Missing');
 }
 
-const supabase = supabaseUrl && supabaseKey
-  ? createClient(supabaseUrl, supabaseKey)
-  : null;
+const supabase = process.env.SUPABASE_URL
+  ? createRoutedClient()
+  : (supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null);
+const OWNED_BUCKETS = new Set(['patients_documents', 'neurosense-reports', 'patient-reports', 'edf-files', 'qeeg-uploads']);
 
 class SupabaseStorage {
   /**
@@ -29,14 +31,14 @@ class SupabaseStorage {
    * @param {string} destinationPath - Path within the bucket (optional)
    * @returns {Promise<{success: boolean, url: string, path: string}>}
    */
-  static async uploadFile(filePath, bucketName = 'neurosense-reports', destinationPath = null, contentType = 'application/pdf') {
+  static async uploadFile(filePath, bucketName = 'neurosense-reports', destinationPath = null, contentType = 'application/pdf', client = supabase, patientId = null) {
     try {
       console.log('📤 Uploading file to Supabase storage...');
       console.log('   Local file:', filePath);
       console.log('   Bucket:', bucketName);
 
       // Check if Supabase client is initialized
-      if (!supabase) {
+      if (!client) {
         throw new Error('Supabase client not initialized - check environment variables');
       }
 
@@ -47,14 +49,16 @@ class SupabaseStorage {
       // Determine the storage path
       const storagePath = destinationPath || `reports/${fileName}`;
 
+      if (OWNED_BUCKETS.has(bucketName) && !patientId) throw new Error('Patient ownership is required for medical uploads');
+
       console.log('   Storage path:', storagePath);
 
       // Upload to Supabase
-      const { data, error } = await supabase.storage
+      const { data, error } = await client.storage
         .from(bucketName)
         .upload(storagePath, fileBuffer, {
           contentType: contentType || 'application/octet-stream',
-          upsert: true // Overwrite if file exists
+          upsert: false
         });
 
       if (error) {
@@ -65,8 +69,16 @@ class SupabaseStorage {
       console.log('✅ File uploaded successfully to Supabase');
       console.log('   Upload data:', data);
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
+      if (patientId) {
+        const { error: ownerError } = await client.rpc('register_document_owner', { p_bucket: bucketName, p_path: storagePath, p_patient_id: patientId });
+        if (ownerError) {
+          await client.storage.from(bucketName).remove([storagePath]);
+          throw ownerError;
+        }
+      }
+
+      // Get the stable storage URL; private buckets require the authorized signed-URL route.
+      const { data: urlData } = client.storage
         .from(bucketName)
         .getPublicUrl(storagePath);
 
@@ -92,12 +104,13 @@ class SupabaseStorage {
    * @param {string} bucketName - Name of the bucket
    * @returns {Promise<{success: boolean}>}
    */
-  static async deleteFile(storagePath, bucketName = 'neurosense-reports') {
+  static async deleteFile(storagePath, bucketName = 'neurosense-reports', client = supabase) {
     try {
       console.log('🗑️  Deleting file from Supabase storage...');
       console.log('   Path:', storagePath);
 
-      const { error } = await supabase.storage
+      if (!client) throw new Error('Supabase client not initialized - check environment variables');
+      const { error } = await client.storage
         .from(bucketName)
         .remove([storagePath]);
 
@@ -125,12 +138,12 @@ class SupabaseStorage {
    * @param {number} expiresIn - Seconds the URL stays valid (default 300)
    * @returns {Promise<{success: boolean, signedUrl: string}>}
    */
-  static async getSignedUrl(bucketName, filePath, expiresIn = 300) {
-    if (!supabase) {
+  static async getSignedUrl(bucketName, filePath, expiresIn = 300, client = supabase) {
+    if (!client) {
       throw new Error('Supabase client not initialized - check environment variables');
     }
 
-    const { data, error } = await supabase.storage
+    const { data, error } = await client.storage
       .from(bucketName)
       .createSignedUrl(filePath, expiresIn);
 

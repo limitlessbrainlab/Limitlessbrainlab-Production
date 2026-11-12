@@ -722,9 +722,11 @@ const PatientReports = ({ onUpdate, selectedClinic: superAdminSelectedClinic }) 
       const patientEmail = selectedPatientObj?.email;
       const clinicEmail = selectedClinicObj?.email;
       if (patientEmail || clinicEmail) {
+        const { data: notificationSession } = await supabase.auth.getSession();
+        const notificationToken = notificationSession?.session?.access_token;
         fetch(`${(import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api'))}/notify-patient-report`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(notificationToken ? { Authorization: `Bearer ${notificationToken}` } : {}) },
           body: JSON.stringify({
             patientEmail,
             patientName: selectedPatientObj?.fullName || selectedPatientObj?.full_name || selectedPatientObj?.name,

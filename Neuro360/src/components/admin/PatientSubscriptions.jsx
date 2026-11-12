@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabaseClient';
+import { PUBLIC_COLUMNS } from '../../services/publicColumns.js';
 
 const TIER_COLORS = {
   free: 'bg-gray-100 text-gray-700 border-gray-200',
@@ -40,7 +41,7 @@ const PatientSubscriptions = () => {
       // Fetch patients with subscription data
       const { data: patientsData, error: patientsErr } = await supabase
         .from('patients')
-        .select('*')
+        .select(PUBLIC_COLUMNS.patients)
         .order('updated_at', { ascending: false });
 
       if (patientsErr) throw patientsErr;

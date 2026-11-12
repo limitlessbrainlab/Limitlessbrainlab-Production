@@ -1,9 +1,10 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-
 const server = fs.readFileSync(path.join(__dirname, '../index.js'), 'utf8');
-
-assert.match(server, /const loginClient = createClient\(supabaseUrl, supabaseServiceKey, \{ auth: \{ persistSession: false, autoRefreshToken: false \} \}\);/);
-assert.match(server, /loginClient\.auth\.signInWithPassword/);
+const login = server.slice(server.indexOf("app.post('/api/auth/login'"), server.indexOf('// Protected mail-only endpoint for staging'));
+assert.match(login, /const auth = createAuthClient\(\)/);
+assert.match(login, /auth\.auth\.signInWithPassword/);
+assert.match(login, /verifiedPortalUser\(db, data\.session\.access_token\)/);
+assert.doesNotMatch(login, /supabase\.auth\.signInWithPassword/);
 console.log('adminLoginClientIsolation.test.cjs: ok');

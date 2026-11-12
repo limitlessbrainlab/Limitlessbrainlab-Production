@@ -143,28 +143,6 @@ const PatientSubscription = () => {
           phone: user.phone || ''
         },
         {
-          onSuccess: async (paymentData) => {
-            // Update subscription in database
-            const updateResult = await AccessControlService.updateSubscription(
-              user.email,
-              tierId,
-              {
-                paymentId: paymentData.paymentId,
-                amount: tierData.price,
-                gateway: paymentData.gateway || tierData.gateway
-              }
-            );
-
-            if (updateResult.success) {
-              toast.success(`Successfully upgraded to ${tierData.name}!`);
-              setCurrentTier(tierId);
-
-              // Redirect to dashboard after 2 seconds
-              setTimeout(() => {
-                navigate('/dashboard');
-              }, 2000);
-            }
-          },
           onError: (error) => {
             toast.error(getFriendlyErrorMessage(error, 'The payment could not be completed. Please try again.'));
           },

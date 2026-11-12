@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { getFriendlyErrorMessage } from '../utils/friendlyError';
+import { supabase } from '../lib/supabaseClient';
 import FeatureGate from '../components/access/FeatureGate';
 import {
   Music,
@@ -30,7 +31,6 @@ import {
   ExternalLink,
   X
 } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
 
 const FrequenciesMusic = () => {
   const navigate = useNavigate();
@@ -175,9 +175,11 @@ const FrequenciesMusic = () => {
       // Save return URL so auth can redirect back after Stripe
       localStorage.setItem('paymentReturnUrl', `/dashboard/frequencies?payment=success&pack=${selectedPack.id}`);
 
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData?.session?.access_token) throw new Error('Please sign in to continue checkout');
       const response = await fetch(`${API_URL}/create-frequency-checkout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionData.session.access_token}` },
         body: JSON.stringify({
           packId: selectedPack.id,
           packName: selectedPack.name,

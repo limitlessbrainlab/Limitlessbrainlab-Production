@@ -184,24 +184,6 @@ const ProfileModal = ({ isOpen, onClose, onProfileUpdate }) => {
         setShowSuccess(true);
         setSelectedFile(null); // Clear selected file after successful save
 
-        // Email the user their updated credentials (email + new plaintext password),
-        // with a CC copy to the internal address, whenever they changed their password.
-        if (formData.password) {
-          try {
-            await fetch(`${API_URL}/send-password-email`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: user?.email,
-                password: formData.password,
-                name: user?.name || user?.clinicName || user?.contactPerson || 'User'
-              })
-            });
-          } catch (emailErr) {
-            console.warn('Password email sending failed:', emailErr.message);
-          }
-        }
-
         // Call the callback to update parent component with new profile data
         if (onProfileUpdate) {
           onProfileUpdate({ ...dataToSave });

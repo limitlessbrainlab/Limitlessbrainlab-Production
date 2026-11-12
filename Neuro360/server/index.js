@@ -10,6 +10,10 @@ const { internalQeegMapRenderRoute } = require('./routes/internalQeegMapRenderRo
 const claudeReportRoutes = require('./routes/claudeReportRoutes');
 const patientDocumentRoutes = require('./routes/patientDocumentRoutes');
 const ssoRoutes = require('./routes/ssoRoutes');
+const { createClinicSessionRouter, establishClinicSession } = require('./routes/clinicSessionRoutes');
+const { createAccountRegistrationRouter } = require('./routes/accountRegistrationRoutes');
+const { createClinicSmtpRouter } = require('./routes/clinicSmtpRoutes');
+const { createPatientAuthRouter, ensurePatientAuth } = require('./routes/patientAuthRoutes');
 const claudeRoutes = require('./routes/claudeRoutes');
 const createBrainCourseRoutes = require('./routes/brainCourses');
 const { grantBrainCoursePurchase } = require('./services/brainCoursePurchase');
@@ -19,18 +23,20 @@ const { getReportEmailHtml, getNeuroSenseReportEmailHtml } = require('../shared/
 
 // Import middleware
 const { setupMiddleware, setupRateLimiters, protectedRoutes, setupErrorHandling, asyncHandler } = require('./middleware/setupMiddleware');
-const { authMiddleware, optionalAuth, createLegacyPatientToken } = require('./middleware/authMiddleware');
+const { authMiddleware, optionalAuth } = require('./middleware/authMiddleware');
+const { createRoutedClient, createAuthClient, stagingOriginMiddleware } = require('./dbRouter');
+const { verifiedPortalUser } = require('./utils/verifiedPortalUser');
+const { createAuthorizedBooking } = require('./services/bookingAuthority');
+const { resolveCheckout } = require('./services/checkoutAuthority');
+const { requirePatientEmailAccess } = require('./utils/patientEmailAccess');
+const { patientNotificationAccess } = require('./middleware/patientNotificationAccess');
+const { requireClinicAccess } = require('./utils/patientAccess');
+const { findAuthUserByEmail } = require('./utils/findAuthUserByEmail');
 const { requireRole, requireOwnership } = require('./middleware/rbac');
 const logger = require('./services/logger');
 
-// Initialize Supabase client for server-side operations
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-let supabase = null;
-if (supabaseUrl && supabaseServiceKey) {
-  supabase = createClient(supabaseUrl, supabaseServiceKey);
-} else {
-}
+// The routed proxy selects the active request's project without mutating shared auth state.
+const supabase = createRoutedClient();
 
 // Notification de-duplication. Claims a key the first time and returns true (send);
 // returns false if the key was already claimed (skip). Backed by the
@@ -947,8 +953,23 @@ const allowedOrigins = [
 ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ];
 
+function resolveCheckoutBase(req) {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) return origin;
+  return process.env.FRONTEND_URL || 'https://limitlessbrainlab.com';
+}
+function checkoutProductImages() {
+  return [STRIPE_PRODUCT_IMAGE_URL];
+}
+const CHECKOUT_UI = Object.freeze({
+  payment_method_types: ['card'],
+  billing_address_collection: 'auto',
+  customer_creation: 'always',
+});
+
 // Setup all security and utility middleware
 setupMiddleware(app, allowedOrigins);
+app.use(stagingOriginMiddleware);
 
 // Setup rate limiters
 const rateLimiters = setupRateLimiters();
@@ -992,28 +1013,7 @@ app.use([
 ], rateLimiters.paymentLimiter);
 
 // Custom route to serve PDFs with download headers
-app.get('/uploads/:filename', (req, res) => {
-  // Prevent path traversal: collapse any directory components and confine to uploads/
-  const filename = path.basename(req.params.filename);
-  const uploadsDir = path.join(__dirname, 'uploads');
-  const filePath = path.join(uploadsDir, filename);
-  if (filePath !== path.join(uploadsDir, path.basename(filePath)) ||
-      !path.resolve(filePath).startsWith(path.resolve(uploadsDir) + path.sep)) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
-
-  // Check if file exists
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: 'File not found' });
-  }
-
-  // Set headers to force download
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-
-  // Send file
-  res.sendFile(filePath);
-});
+app.use('/uploads', require('./routes/localReportRoutes'));
 
 // ===== PUBLIC ROUTES (No Auth Required) =====
 
@@ -1039,97 +1039,56 @@ app.get('/api/health', (req, res) => {
 // Login belongs on the server: browser clients must not query credential-bearing
 // tables directly, because those reads depend on public RLS policies.
 app.post('/api/auth/login', rateLimiters.loginLimiter, async (req, res) => {
-  const { email, password, userType, origin } = req.body || {};
+  res.set('Cache-Control', 'no-store');
+  const { email, password, userType } = req.body || {};
   const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
-  const loginType = userType || null;
-  if (!normalizedEmail || typeof password !== 'string' || !password) {
-    return res.status(400).json({ success: false, error: 'Email and password are required' });
-  }
-  if (loginType && !['admin', 'clinic', 'patient'].includes(loginType)) {
-    return res.status(400).json({ success: false, error: 'Invalid login type' });
-  }
-  if (!supabase) return res.status(503).json({ success: false, error: 'Login service is unavailable' });
-
-  const environment = (value) => {
-    try {
-      const host = new URL(value).hostname;
-      return host === 'limitlessbrainlab-eight.vercel.app' ? 'staging' : 'production';
-    } catch { return 'production'; }
-  };
-  const canonicalUrl = (value) => environment(value) === 'staging'
-    ? 'https://limitlessbrainlab-eight.vercel.app'
-    : 'https://limitlessbrainlab.com';
-  const correctEnvironment = (record) => !record.origin_url || environment(record.origin_url) === environment(origin);
-  const deny = (message = 'Invalid email or password') => res.status(401).json({ success: false, error: message });
-
+  if (!normalizedEmail || normalizedEmail.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) || typeof password !== 'string' || !password || password.length > 1024) return res.status(400).json({ success: false, error: 'Email and password are required' });
+  if (userType && !['admin', 'clinic', 'patient'].includes(userType)) return res.status(400).json({ success: false, error: 'Invalid login type' });
+  const db = createRoutedClient();
+  const auth = createAuthClient();
+  if (!db || !auth) return res.status(503).json({ success: false, error: 'Login service is unavailable' });
+  const deny = () => res.status(401).json({ success: false, error: 'Invalid email or password' });
+  const env = value => { try { return new URL(value).hostname === 'limitlessbrainlab-eight.vercel.app' ? 'staging' : 'production'; } catch { return 'production'; } };
+  const requestOrigin = req.get('origin') || req.get('referer') || '';
+  const matchesOrigin = row => !row.origin_url || env(row.origin_url) === env(requestOrigin);
   try {
-    if (loginType !== 'admin') {
-      const { data: clinics, error } = await supabase.from('clinics').select('*').eq('email', normalizedEmail).limit(1);
+    if (userType !== 'admin' && userType !== 'patient') {
+      const { data, error } = await db.rpc('verify_clinic_login', { p_email: normalizedEmail, p_password: password });
       if (error) throw error;
-      const clinic = clinics?.[0];
-      if (clinic && loginType !== 'patient') {
-        if (clinic.subscription_status === 'pending_approval') return deny('Your account is pending activation. Please wait for admin approval.');
-        if (!clinic.is_active) return deny('Your account has been deactivated. Please contact support at info@limitlessbrainlab.com.');
-        if (!correctEnvironment(clinic)) return deny(`This account was created on ${canonicalUrl(clinic.origin_url)}. Please log in there.`);
-        if (!await bcrypt.compare(password, clinic.password || '')) return deny();
-        return res.json({
-          success: true,
-          token: `local_token_${Date.now()}`,
-          user: {
-            id: clinic.id, email: clinic.email, name: clinic.contact_person || clinic.name,
-            clinicName: clinic.clinic_name || clinic.name, phone: clinic.phone, address: clinic.address,
-            role: 'clinic_admin', avatar: clinic.logo_url || null, clinicId: clinic.id,
-            isActivated: true, credentialsUpdatedAt: clinic.credentials_updated_at || null,
-          },
-        });
+      const clinic = data?.[0];
+      if (clinic && clinic.is_active === true && !clinic.deleted_at && clinic.subscription_status !== 'pending_approval' && matchesOrigin(clinic)) {
+        const established = await establishClinicSession(db, { email: normalizedEmail, password });
+        if (established.status === 200) {
+          const { data: exchange, error: exchangeError } = await auth.auth.verifyOtp({ token_hash: established.token_hash, type: 'magiclink' });
+          const actor = !exchangeError && exchange?.session ? await verifiedPortalUser(db, exchange.session.access_token) : null;
+          if (actor?.id === exchange?.user?.id && actor?.role === 'clinic_admin' && actor?.clinic_id === clinic.id && exchange.user.id === established.auth_user_id) return res.json({ success: true, token: exchange.session.access_token, session: { access_token: exchange.session.access_token, refresh_token: exchange.session.refresh_token }, user: { id: clinic.id, email: clinic.email, name: clinic.contact_person || clinic.name, clinicName: clinic.clinic_name || clinic.name, phone: clinic.phone, address: clinic.address, role: 'clinic_admin', avatar: clinic.logo_url || null, clinicId: clinic.id, isActivated: true, credentialsUpdatedAt: clinic.credentials_updated_at || null } });
+        }
       }
     }
-
-    if (loginType !== 'admin') {
-      const { data: patients, error } = await supabase.from('patients').select('*').eq('email', normalizedEmail).order('created_at', { ascending: false });
+    if (userType !== 'admin' && userType !== 'clinic') {
+      const { data, error } = await db.rpc('verify_patient_login', { p_email: normalizedEmail, p_password: password });
       if (error) throw error;
-      let patient = null;
-      for (const entry of patients || []) {
-        const stored = entry.password || '';
-        const matches = /^\$2[aby]\$/.test(stored)
-          ? await bcrypt.compare(password, stored)
-          : String(password).trim() === String(stored).trim();
-        if (matches) { patient = entry; break; }
-      }
-      if (patient) {
-        if (!correctEnvironment(patient)) return deny(`This account was created on ${canonicalUrl(patient.origin_url)}. Please log in there.`);
-        return res.json({
-          success: true,
-          token: createLegacyPatientToken(patient),
-          user: {
-            id: patient.id, email: patient.email, name: patient.full_name || patient.name,
-            phone: patient.phone, address: patient.address, dateOfBirth: patient.date_of_birth,
-            gender: patient.gender, role: 'patient', avatar: patient.avatar || patient.profile_image || patient.avatar_url || null,
-            clinicId: patient.clinic_id || patient.org_id, patientId: patient.id, externalId: patient.external_id,
-            isActivated: true, credentialsUpdatedAt: patient.credentials_updated_at || null,
-          },
-        });
+      const patient = data?.[0];
+      if (patient?.id && matchesOrigin(patient)) {
+        const prepared = await ensurePatientAuth(db, { email: normalizedEmail, password });
+        if (prepared.status === 200) {
+          const { data: signedIn, error: signInError } = await auth.auth.signInWithPassword({ email: normalizedEmail, password });
+          if (!signInError && signedIn?.session?.access_token) {
+            const bound = await ensurePatientAuth(db, { email: normalizedEmail, password, token: signedIn.session.access_token });
+            const actor = bound.status === 200 ? await verifiedPortalUser(db, signedIn.session.access_token) : null;
+            if (actor?.id === signedIn.user?.id && actor?.role === 'patient' && actor?.patient_id === patient.id && bound.patient?.id === patient.id && bound.authUser?.id === signedIn.user?.id) return res.json({ success: true, token: signedIn.session.access_token, session: { access_token: signedIn.session.access_token, refresh_token: signedIn.session.refresh_token }, user: { id: patient.id, email: patient.email, name: patient.full_name || patient.name, phone: patient.phone, address: patient.address, dateOfBirth: patient.date_of_birth, gender: patient.gender, role: 'patient', avatar: patient.avatar || patient.profile_image || patient.avatar_url || null, clinicId: patient.clinic_id || patient.org_id, patientId: patient.id, externalId: patient.external_id, isActivated: true, credentialsUpdatedAt: patient.credentials_updated_at || null } });
+          }
+        }
       }
     }
-
-    if (loginType !== 'clinic' && loginType !== 'patient') {
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles').select('id,email,full_name,avatar_url,role').eq('email', normalizedEmail).eq('role', 'super_admin').limit(1);
-      if (profileError) throw profileError;
+    if (userType !== 'clinic' && userType !== 'patient') {
+      const { data: profiles, error } = await db.from('profiles').select('id,email,full_name,avatar_url,role').eq('email', normalizedEmail).eq('role', 'super_admin').limit(1);
+      if (error) throw error;
       const profile = profiles?.[0];
       if (profile) {
-        // Never sign in on the shared service client: doing so replaces its service
-        // role with this user's session and makes later admin writes fail RLS.
-        const loginClient = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false, autoRefreshToken: false } });
-        const { data: authData, error: authError } = await loginClient.auth.signInWithPassword({ email: normalizedEmail, password });
-        if (!authError && authData?.user?.id === profile.id && authData.session) {
-          return res.json({
-            success: true,
-            token: authData.session.access_token,
-            session: { access_token: authData.session.access_token, refresh_token: authData.session.refresh_token },
-            user: { id: profile.id, email: profile.email, name: profile.full_name || 'Super Admin', role: 'super_admin', avatar: profile.avatar_url || null, isActivated: true },
-          });
-        }
+        const { data, error: signInError } = await auth.auth.signInWithPassword({ email: normalizedEmail, password });
+        const actor = !signInError && data?.session ? await verifiedPortalUser(db, data.session.access_token) : null;
+        if (actor?.id === data?.user?.id && actor?.role === 'super_admin' && actor?.id === profile.id && data.session) return res.json({ success: true, token: data.session.access_token, session: { access_token: data.session.access_token, refresh_token: data.session.refresh_token }, user: { id: profile.id, email: profile.email, name: profile.full_name || 'Super Admin', role: 'super_admin', avatar: profile.avatar_url || null, isActivated: true } });
       }
     }
     return deny();
@@ -1138,7 +1097,6 @@ app.post('/api/auth/login', rateLimiters.loginLimiter, async (req, res) => {
     return res.status(503).json({ success: false, error: 'Unable to sign in. Please try again.' });
   }
 });
-
 // Protected mail-only endpoint for staging. It does not write to production DB.
 app.post('/api/internal/mail-relay', async (req, res) => {
   if (!productionMailRelaySecret || req.get('x-production-mail-relay-secret') !== productionMailRelaySecret) {
@@ -1199,6 +1157,10 @@ app.use('/api/qeeg', protectedRoutes.authRequired, qeegRoutes);
 
 // SSO routes - Optional auth
 app.use('/api/sso', protectedRoutes.optionalAuth, ssoRoutes);
+app.use('/api/clinic-session', rateLimiters.loginLimiter, createClinicSessionRouter());
+app.use('/api/register-account', rateLimiters.loginLimiter, createAccountRegistrationRouter());
+app.use('/api/clinic-smtp', createClinicSmtpRouter());
+app.use('/api/ensure-patient-auth', rateLimiters.loginLimiter, createPatientAuthRouter());
 
 // (claudeRoutes is mounted once under /api below — the old duplicate
 // /api/test mount exposed the same handlers at a second path for no reason)
@@ -1618,8 +1580,9 @@ app.post('/api/partnership-inquiry', async (req, res) => {
 // ============ Website Inquiries Management API ============
 
 // GET all inquiries from a specific table
-app.get('/api/inquiries/:type', async (req, res) => {
+app.get('/api/inquiries/:type', authMiddleware, async (req, res) => {
   try {
+    if (req.user?.role !== 'super_admin') return res.status(403).json({ success: false, message: 'Super admin access required' });
     if (!supabase) {
       return res.status(500).json({ success: false, message: 'Database not configured' });
     }
@@ -1666,8 +1629,9 @@ app.get('/api/inquiries/:type', async (req, res) => {
 });
 
 // DELETE an inquiry by id
-app.delete('/api/inquiries/:type/:id', async (req, res) => {
+app.delete('/api/inquiries/:type/:id', authMiddleware, async (req, res) => {
   try {
+    if (req.user?.role !== 'super_admin') return res.status(403).json({ success: false, message: 'Super admin access required' });
     if (!supabase) {
       return res.status(500).json({ success: false, message: 'Database not configured' });
     }
@@ -1706,8 +1670,9 @@ app.delete('/api/inquiries/:type/:id', async (req, res) => {
 // ============ Website Payment Records API ============
 
 // GET all payment records from all purchase tables
-app.get('/api/website-payments', async (req, res) => {
+app.get('/api/website-payments', authMiddleware, async (req, res) => {
   try {
+    if (req.user?.role !== 'super_admin') return res.status(403).json({ success: false, message: 'Super admin access required' });
     if (!supabase) {
       return res.status(500).json({ success: false, message: 'Database not configured' });
     }
@@ -2239,7 +2204,7 @@ app.use('/api/brain-courses', createBrainCourseRoutes({
 // =====================================================
 
 // Create Stripe Checkout Session for Frequency Packs
-app.post('/api/create-frequency-checkout', async (req, res) => {
+app.post('/api/create-frequency-checkout', authMiddleware, async (req, res) => {
   try {
     if (!stripe) {
       return res.status(500).json({
@@ -2248,7 +2213,10 @@ app.post('/api/create-frequency-checkout', async (req, res) => {
       });
     }
 
-    const { packId, packName, customerEmail, customerName, currency, amount, isBundle, patientId, clinicId } = req.body;
+    const { resolveCheckout: resolveCheckoutPurchase } = require('./services/checkoutAuthority');
+    const purchase = await resolveCheckoutPurchase('frequency', req.body || {}, req.user, supabase, stripe);
+    const { packId, packName, customerEmail, customerName, currency, amount, patientId, clinicId } = purchase;
+    const isBundle = false;
 
     if (!customerEmail || !amount || !currency) {
       return res.status(400).json({
@@ -2274,7 +2242,7 @@ app.post('/api/create-frequency-checkout', async (req, res) => {
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: getStripePaymentMethodTypes(currency),
+      ...CHECKOUT_UI,
       line_items: [
         {
           price_data: {
@@ -2284,7 +2252,7 @@ app.post('/api/create-frequency-checkout', async (req, res) => {
               description: isBundle
                 ? 'Unlock all 6 brainwave frequency packs: Delta, Theta, Alpha, Beta, Gamma, and Solfeggio frequencies for complete brain optimization.'
                 : `Unlock the full ${packName} frequency pack for enhanced brain performance.`,
-              images: [STRIPE_PRODUCT_IMAGE_URL],
+              images: checkoutProductImages(req),
               metadata: {
                 pack_id: packId,
                 is_bundle: isBundle ? 'true' : 'false'
@@ -2301,10 +2269,11 @@ app.post('/api/create-frequency-checkout', async (req, res) => {
       // /dashboard/frequencies) instead of hardcoding the Vercel production URL.
       success_url: (req.body.successUrl && req.body.successUrl.includes('{CHECKOUT_SESSION_ID}'))
         ? req.body.successUrl
-        : `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard/frequencies?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: req.body.cancelUrl || `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard/frequencies?payment=cancelled`,
+        : `${resolveCheckoutBase(req)}/dashboard/frequencies?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: req.body.cancelUrl || `${resolveCheckoutBase(req)}/dashboard/frequencies?payment=cancelled`,
       metadata: {
         pack_id: packId,
+        type: 'frequency',
         customer_email: customerEmail,
         customer_name: customerName,
         is_bundle: isBundle ? 'true' : 'false',
@@ -2322,7 +2291,7 @@ app.post('/api/create-frequency-checkout', async (req, res) => {
 
   } catch (error) {
     console.error('Stripe checkout error:', error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: 'Failed to create checkout session',
       error: error.message
@@ -2335,7 +2304,7 @@ app.post('/api/create-frequency-checkout', async (req, res) => {
 // =====================================================
 
 // Create Stripe Checkout Session for Meditation Packs
-app.post('/api/create-meditation-checkout', async (req, res) => {
+app.post('/api/create-meditation-checkout', authMiddleware, async (req, res) => {
   try {
     if (!stripe) {
       return res.status(500).json({
@@ -2344,7 +2313,10 @@ app.post('/api/create-meditation-checkout', async (req, res) => {
       });
     }
 
-    const { packId, packName, customerEmail, customerName, currency, amount, isBundle, patientId, clinicId } = req.body;
+    const { resolveCheckout: resolveCheckoutPurchase } = require('./services/checkoutAuthority');
+    const purchase = await resolveCheckoutPurchase('meditation', req.body || {}, req.user, supabase, stripe);
+    const { packId, packName, customerEmail, customerName, currency, amount, patientId, clinicId } = purchase;
+    const isBundle = false;
 
     if (!customerEmail || !amount || !currency) {
       return res.status(400).json({
@@ -2370,7 +2342,7 @@ app.post('/api/create-meditation-checkout', async (req, res) => {
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: getStripePaymentMethodTypes(currency),
+      ...CHECKOUT_UI,
       line_items: [
         {
           price_data: {
@@ -2380,7 +2352,7 @@ app.post('/api/create-meditation-checkout', async (req, res) => {
               description: isBundle
                 ? 'Unlock all 6 guided meditation packs: Morning Awakening, Stress Relief, Focus & Clarity, Deep Sleep, Gratitude & Joy, and Body Healing.'
                 : `Unlock the full ${packName} meditation pack for enhanced mental wellness.`,
-              images: [STRIPE_PRODUCT_IMAGE_URL],
+              images: checkoutProductImages(req),
               metadata: {
                 pack_id: packId,
                 is_bundle: isBundle ? 'true' : 'false',
@@ -2394,8 +2366,8 @@ app.post('/api/create-meditation-checkout', async (req, res) => {
       ],
       mode: 'payment',
       customer_email: customerEmail,
-      success_url: `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard/meditations?meditation_payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app'}/dashboard/meditations?meditation_payment=cancelled`,
+      success_url: `${resolveCheckoutBase(req)}/dashboard/meditations?meditation_payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${resolveCheckoutBase(req)}/dashboard/meditations?meditation_payment=cancelled`,
       metadata: {
         pack_id: packId,
         customer_email: customerEmail,
@@ -2416,7 +2388,7 @@ app.post('/api/create-meditation-checkout', async (req, res) => {
 
   } catch (error) {
     console.error('Stripe meditation checkout error:', error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: 'Failed to create checkout session',
       error: error.message
@@ -2429,7 +2401,7 @@ app.post('/api/create-meditation-checkout', async (req, res) => {
 // ============================================
 
 // Create Stripe Checkout Session for Subscription Upgrades
-app.post('/api/stripe/create-checkout-session', async (req, res) => {
+app.post('/api/stripe/create-checkout-session', authMiddleware, async (req, res) => {
   try {
     if (!stripe) {
       return res.status(500).json({
@@ -2438,38 +2410,29 @@ app.post('/api/stripe/create-checkout-session', async (req, res) => {
       });
     }
 
-    const {
-      tierId,
-      tierName,
-      price,
-      currency = 'USD',
-      customerEmail,
-      customerName,
-      successUrl,
-      cancelUrl,
-      priceId, // Optional: Pre-configured Stripe Price ID
-      metadata = {}
-    } = req.body;
-
-    // Validate required fields
-    if (!customerEmail) {
-      return res.status(400).json({
-        success: false,
-        error: 'Customer email is required'
-      });
-    }
+    const input = req.body || {};
+    const { resolveCheckout: resolveCheckoutPurchase } = require('./services/checkoutAuthority');
+    const checkout = await resolveCheckoutPurchase('subscription', input, req.user, supabase, stripe);
+    const { tierId, tierName, price, currency, customerEmail, customerName, priceId } = {
+      ...checkout,
+      tierName: checkout.tierName || checkout.tierId[0] + checkout.tierId.slice(1).toLowerCase(),
+    };
+    const successUrl = input.successUrl;
+    const cancelUrl = input.cancelUrl;
 
     let sessionConfig = {
-      payment_method_types: getStripePaymentMethodTypes(currency),
+      ...CHECKOUT_UI,
       mode: 'payment',
       customer_email: customerEmail,
-      success_url: successUrl || `${req.headers.origin}/dashboard?payment=success&tier=${tierId}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: cancelUrl || `${req.headers.origin}/dashboard/subscription?payment=cancelled`,
+      success_url: successUrl || `${resolveCheckoutBase(req)}/dashboard?payment=success&tier=${tierId}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: cancelUrl || `${resolveCheckoutBase(req)}/dashboard/subscription?payment=cancelled`,
       metadata: {
         tier: tierId,
         type: 'subscription',
         user_email: customerEmail,
-        ...metadata
+        patient_id: checkout.patientId || '',
+        clinic_id: checkout.clinicId || '',
+        customer_name: customerName || ''
       }
     };
 
@@ -2487,7 +2450,7 @@ app.post('/api/stripe/create-checkout-session', async (req, res) => {
           product_data: {
             name: `Limitless Brain Lab ${tierName} Subscription`,
             description: `Access to ${tierName} features - Monthly subscription`,
-            images: [STRIPE_PRODUCT_IMAGE_URL]
+            images: checkoutProductImages(req)
           },
           unit_amount: Math.round(price * 100) // Convert to cents
         },
@@ -2506,7 +2469,7 @@ app.post('/api/stripe/create-checkout-session', async (req, res) => {
 
   } catch (error) {
     console.error('Stripe subscription checkout error:', error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
       error: error.message
     });
@@ -2525,6 +2488,8 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
 
     const { sessionId } = req.params;
     const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const { applyVerifiedPatientPurchase } = require('./services/verifiedPatientPurchases');
+    const verifiedPurchase = await applyVerifiedPatientPurchase(session, supabase);
 
     if (session.payment_status === 'paid') {
       const paymentType = session.metadata?.type || 'frequency';
@@ -2681,7 +2646,9 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
             // purchased_at) — the old upsert used columns that don't exist and
             // always errored. The payments row (unique stripe_session_id) is
             // the idempotency anchor.
-            const isMeditation = session.metadata?.pack_id?.startsWith('solfeggio_') || session.metadata?.pack_id?.includes('meditation');
+            const isMeditation = session.metadata?.type
+              ? session.metadata.type === 'meditation'
+              : session.metadata?.pack_id?.startsWith('solfeggio_') || session.metadata?.pack_id?.includes('meditation');
             const packEmail = customerEmail?.toLowerCase();
 
             if (isMeditation) {
@@ -2790,6 +2757,12 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
         // pack id from the (attacker-controlled) redirect URL.
         packId: session.metadata?.pack_id || null,
         isBundle: session.metadata?.is_bundle === 'true',
+        purchase: verifiedPurchase ? {
+          email: verifiedPurchase.email,
+          type: verifiedPurchase.type,
+          itemId: verifiedPurchase.itemId,
+          itemName: verifiedPurchase.itemName,
+        } : null,
         takeUrl
       });
 
@@ -2898,7 +2871,7 @@ app.get('/api/stripe/verify-session/:sessionId', async (req, res) => {
 });
 
 // Create Stripe Checkout Session for Clinic Report Purchases
-app.post('/api/create-report-checkout', async (req, res) => {
+app.post('/api/create-report-checkout', authMiddleware, async (req, res) => {
   try {
     if (!stripe) {
       return res.status(500).json({
@@ -2907,13 +2880,15 @@ app.post('/api/create-report-checkout', async (req, res) => {
       });
     }
 
-    const { packageId, packageName, reports, amount, currency, customerEmail, customerName, clinicId, clinicType } = req.body;
+    const { resolveCheckout: resolveCheckoutPurchase } = require('./services/checkoutAuthority');
+    const purchase = await resolveCheckoutPurchase('clinic_report', req.body || {}, req.user, supabase, stripe);
+    const { packageId, packageName, reports, amount, currency, customerEmail, customerName, clinicId, clinicType } = purchase;
 
     // Return the clinic to the SAME origin it came from after payment, so the
     // per-origin auth session survives the round-trip (a cross-origin return drops
     // the session and bounces the clinic to /login). Fall back to the canonical
     // production domain — never the staging vercel.app URL.
-    const baseUrl = req.headers.origin || 'https://limitlessbrainlab.com';
+    const baseUrl = resolveCheckoutBase(req);
 
     if (!customerEmail || !amount || !currency) {
       return res.status(400).json({
@@ -2939,7 +2914,7 @@ app.post('/api/create-report-checkout', async (req, res) => {
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: getStripePaymentMethodTypes(currency),
+      ...CHECKOUT_UI,
       line_items: [
         {
           price_data: {
@@ -2947,7 +2922,7 @@ app.post('/api/create-report-checkout', async (req, res) => {
             product_data: {
               name: `${packageName} - ${reports} EEG Reports`,
               description: `Purchase ${reports} EEG brain reports for your clinic`,
-              images: [STRIPE_PRODUCT_IMAGE_URL],
+              images: checkoutProductImages(req),
               metadata: {
                 package_id: packageId,
                 reports: reports.toString(),
@@ -2983,7 +2958,7 @@ app.post('/api/create-report-checkout', async (req, res) => {
 
   } catch (error) {
     console.error('Error creating clinic report checkout session:', error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: 'Failed to create checkout session',
       error: error.message
@@ -3228,19 +3203,30 @@ async function applySubscriptionPurchase(session) {
   const amount = session.amount_total / 100;
   const currency = session.currency?.toUpperCase() || 'USD';
 
-  // 1. Grant the plan on the patient row (safe to re-run — same values).
-  const { error: updateError } = await supabase
+  // Resolve the session's business patient; email-only sessions use the same newest-row rule as portal identity.
+  let patientQuery = supabase.from('patients').select('id,email');
+  if (session.metadata?.patient_id) {
+    patientQuery = patientQuery.eq('id', session.metadata.patient_id).eq('email', email).limit(1);
+  } else {
+    patientQuery = patientQuery.eq('email', email).order('created_at', { ascending: false, nullsFirst: false }).order('id', { ascending: false }).limit(1);
+  }
+  const { data: patient, error: patientError } = await patientQuery.maybeSingle();
+  if (patientError) throw patientError;
+  if (!patient?.id) throw new Error('Patient could not be resolved for this subscription');
+
+  // 1. Grant the plan to one resolved business patient (never every matching email row).
+  const { data: updatedPatient, error: updateError } = await supabase
     .from('patients')
     .update({
       subscription_tier: tier.toLowerCase(),
       subscription_status: 'active',
       dashboard_access: true,
+      reports_unlocked: true,
       updated_at: new Date().toISOString()
     })
-    .eq('email', email);
-  if (updateError) {
-    console.error('applySubscriptionPurchase patients update error:', updateError.message);
-  }
+    .eq('id', patient.id).eq('email', email).select('id').maybeSingle();
+  if (updateError) throw updateError;
+  if (!updatedPatient?.id) throw new Error('Patient could not be resolved for this subscription');
 
   // 2. Payment rows — idempotent via upsert on the unique stripe_session_id.
   await supabase.from('payment_history').upsert({
@@ -3444,7 +3430,7 @@ const JOTFORM_API_KEY = process.env.JOTFORM_API_KEY || '';
 // so AssessmentResults renders it identically. Returns null when unavailable
 // (no key, no matching submission, or API error).
 async function fetchJotformSubmission(formId, email) {
-  if (!JOTFORM_API_KEY || !formId) return null;
+  if (!JOTFORM_API_KEY || !formId || !String(email || '').trim()) return null;
   try {
     const url = `https://api.jotform.com/form/${encodeURIComponent(formId)}/submissions`
       + `?apiKey=${encodeURIComponent(JOTFORM_API_KEY)}&limit=30&orderby=created_at`;
@@ -3460,9 +3446,9 @@ async function fetchJotformSubmission(formId, email) {
     // Newest first, then prefer the submission carrying this buyer's email.
     subs.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
     const wantEmail = String(email || '').toLowerCase();
-    const sub = (wantEmail
-      && subs.find(s => JSON.stringify(s.answers || {}).toLowerCase().includes(wantEmail)))
-      || subs[0];
+    const sub = wantEmail
+      ? subs.find(s => JSON.stringify(s.answers || {}).toLowerCase().includes(wantEmail))
+      : subs[0];
     if (!sub) return null;
 
     // Build a "Q:A, Q:A" pretty string + { question: answer } map, skipping
@@ -3768,7 +3754,7 @@ app.post('/api/confirm-report-credits', async (req, res) => {
 });
 
 // Create Stripe Checkout for Brain Coaching Session
-app.post('/api/create-coaching-checkout', async (req, res) => {
+app.post('/api/create-coaching-checkout', authMiddleware, async (req, res) => {
   try {
     if (!stripe) {
       return res.status(500).json({
@@ -3778,7 +3764,9 @@ app.post('/api/create-coaching-checkout', async (req, res) => {
     }
 
     const COMMON_CALENDLY = 'https://calendly.com/admin-bettroi/30min';
-    const { coachId, coachName, coachEmail, calendlyUrl = COMMON_CALENDLY, price, patientEmail, patientName, currency = 'inr' } = req.body;
+    const { resolveCheckout: resolveCheckoutPurchase } = require('./services/checkoutAuthority');
+    const purchase = await resolveCheckoutPurchase('coaching', req.body || {}, req.user, supabase, stripe);
+    const { coachId, coachName, coachEmail, calendlyUrl, price, customerEmail: patientEmail, patientName, currency } = purchase;
 
     if (!patientEmail || !price) {
       return res.status(400).json({
@@ -3809,7 +3797,7 @@ app.post('/api/create-coaching-checkout', async (req, res) => {
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: getStripePaymentMethodTypes(currency),
+      ...CHECKOUT_UI,
       line_items: [
         {
           price_data: {
@@ -3817,7 +3805,7 @@ app.post('/api/create-coaching-checkout', async (req, res) => {
             product_data: {
               name: `Brain Coaching Session with ${coachName}`,
               description: '30-minute online brain coaching session',
-              images: [STRIPE_PRODUCT_IMAGE_URL],
+              images: checkoutProductImages(req),
               metadata: {
                 type: 'coaching_session',
                 coach_id: coachId,
@@ -3838,7 +3826,7 @@ app.post('/api/create-coaching-checkout', async (req, res) => {
         coach_id: coachId,
         coach_name: coachName,
         coach_email: coachEmail || '',
-        calendly_url: resolvedCalendlyUrl,
+        calendly_url: calendlyUrl || resolvedCalendlyUrl,
         patient_email: patientEmail,
         patient_name: patientName || ''
       }
@@ -3853,7 +3841,7 @@ app.post('/api/create-coaching-checkout', async (req, res) => {
 
   } catch (error) {
     console.error('Error creating coaching checkout:', error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: 'Failed to create checkout session',
       error: error.message
@@ -3893,8 +3881,24 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
       });
     }
 
-    const { assessmentId, assessmentName, customerEmail, customerName, currency = 'USD', amount, assessmentLink, patientId, clinicId, source, successUrl, cancelUrl, bundleIds } = req.body;
-    const normalizedCurrency = String(currency).toUpperCase();
+    const input = req.body || {};
+    const token = req.headers.authorization?.match(/^Bearer (\S+)$/i)?.[1];
+    const actor = token ? await verifiedPortalUser(supabase, token) : null;
+    if (token && !actor) return res.status(401).json({ success: false, message: 'Authentication required' });
+    const { resolveCheckout: resolveCheckoutPurchase } = require('./services/checkoutAuthority');
+    const purchase = await resolveCheckoutPurchase('assessment', input, actor, supabase, stripe);
+    const { assessmentId, assessmentName, customerEmail, customerName, currency, amount, assessmentLink, patientId, clinicId, source } = {
+      ...purchase,
+      assessmentId: purchase.assessmentId,
+      assessmentName: purchase.assessmentName,
+      assessmentLink: purchase.assessmentLink,
+      patientId: purchase.patientId,
+      clinicId: purchase.clinicId,
+      source: purchase.source,
+    };
+    const normalizedCurrency = currency;
+    const successUrl = input.successUrl;
+    const cancelUrl = input.cancelUrl;
 
     if (!customerEmail || !amount || !normalizedCurrency) {
       return res.status(400).json({
@@ -3919,23 +3923,14 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Unsupported currency' });
     }
 
-    if (!await isAssessmentCurrencyEnabled(assessmentId, normalizedCurrency)) {
-      return res.status(400).json({
-        success: false,
-        message: `${normalizedCurrency} pricing is not enabled for this assessment`
-      });
-    }
-
     const multiplier = currencyMultipliers[normalizedCurrency];
     const amountInSmallestUnit = Math.round(amount * multiplier);
-
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://limitlessbrainlab-eight.vercel.app';
 
     // Redirect back to the EXACT domain the payment was started from (req.headers.origin),
     // so a patient paying on limitlessbrainlab.com is not bounced to the Vercel URL — where
     // they have no session and get redirected to /login. Fall back to FRONTEND_URL only if
     // the Origin header is absent (e.g. server-to-server calls).
-    const redirectBase = req.headers.origin || FRONTEND_URL;
+    const redirectBase = resolveCheckoutBase(req);
 
     // Default return must be a PUBLIC page — /dashboard/* is login-protected,
     // so a guest buyer would be bounced to /login with no confirmation. The
@@ -3946,7 +3941,7 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
 
     // Create Stripe Checkout Session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: getStripePaymentMethodTypes(normalizedCurrency),
+      ...CHECKOUT_UI,
       line_items: [
         {
           price_data: {
@@ -3954,7 +3949,7 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
             product_data: {
               name: `${assessmentName} - Brain Assessment`,
               description: `Unlock your ${assessmentName} to understand your brain health better.`,
-              images: [STRIPE_PRODUCT_IMAGE_URL],
+              images: checkoutProductImages(req),
               metadata: {
                 assessment_id: assessmentId,
                 type: 'assessment'
@@ -3979,7 +3974,7 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
         clinic_id: clinicId || '',
         source: source || 'website',
         type: 'assessment',
-        bundle_ids: Array.isArray(bundleIds) ? bundleIds.join(',') : ''
+        bundle_ids: Array.isArray(purchase.bundleIds) ? purchase.bundleIds.join(',') : ''
       }
     });
 
@@ -3992,7 +3987,7 @@ app.post('/api/create-assessment-checkout', async (req, res) => {
 
   } catch (error) {
     console.error('Assessment checkout error:', error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: 'Failed to create checkout session',
       error: error.message
@@ -4394,7 +4389,7 @@ app.post('/api/send-assessment-email', async (req, res) => {
 
 
 // Create Customer Portal Session (for managing subscriptions)
-app.post('/api/stripe/create-portal-session', async (req, res) => {
+app.post('/api/stripe/create-portal-session', authMiddleware, async (req, res) => {
   try {
     if (!stripe) {
       return res.status(500).json({
@@ -4404,10 +4399,12 @@ app.post('/api/stripe/create-portal-session', async (req, res) => {
     }
 
     const { customerEmail, returnUrl } = req.body;
+    const { requirePatientEmailAccess: requireEmailAccess } = require('./utils/patientEmailAccess');
+    const email = await requireEmailAccess(req.user, customerEmail, supabase);
 
     // Find or create customer
     const customers = await stripe.customers.list({
-      email: customerEmail,
+      email,
       limit: 1
     });
 
@@ -4416,7 +4413,7 @@ app.post('/api/stripe/create-portal-session', async (req, res) => {
       customerId = customers.data[0].id;
     } else {
       const customer = await stripe.customers.create({
-        email: customerEmail
+        email
       });
       customerId = customer.id;
     }
@@ -4434,7 +4431,7 @@ app.post('/api/stripe/create-portal-session', async (req, res) => {
 
   } catch (error) {
     console.error('Portal session error:', error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
       error: error.message
     });
@@ -4754,8 +4751,9 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           // Handle frequency/meditation purchases
 
           // Check if this is a meditation purchase (has type: 'meditation' in product metadata)
-          const isMeditationPurchase = session.metadata?.pack_id?.startsWith('solfeggio_') ||
-                                       session.metadata?.pack_id?.includes('meditation');
+          const isMeditationPurchase = session.metadata?.type
+            ? session.metadata.type === 'meditation'
+            : session.metadata?.pack_id?.startsWith('solfeggio_') || session.metadata?.pack_id?.includes('meditation');
 
           if (isMeditationPurchase) {
             // Save to meditation_purchases table. Columns must match the live
@@ -5318,9 +5316,10 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 // =====================================================
 
 // Get patient coaching credits
-app.get('/api/coaching-credits/:email', async (req, res) => {
+app.get('/api/coaching-credits/:email', authMiddleware, async (req, res) => {
   try {
     const { email } = req.params;
+    await requirePatientEmailAccess(req.user, email, supabase);
 
     if (!email) {
       return res.status(400).json({
@@ -5363,8 +5362,9 @@ app.get('/api/coaching-credits/:email', async (req, res) => {
 });
 
 // Grant coaching credit (called after assessment purchase or manually)
-app.post('/api/coaching-credits/grant', async (req, res) => {
+app.post('/api/coaching-credits/grant', authMiddleware, async (req, res) => {
   try {
+    if (req.user?.role !== 'super_admin') return res.status(403).json({ success: false, message: 'Administrator access required' });
     const { patientEmail, source, sourceReferenceId, creditsAmount } = req.body;
 
     if (!patientEmail) {
@@ -5407,7 +5407,7 @@ app.post('/api/coaching-credits/grant', async (req, res) => {
     });
   } catch (error) {
     console.error('Error in grant coaching credit endpoint:', error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: 'Internal server error',
       error: error.message
@@ -5416,8 +5416,9 @@ app.post('/api/coaching-credits/grant', async (req, res) => {
 });
 
 // Use/redeem coaching credit
-app.post('/api/coaching-credits/use', async (req, res) => {
+app.post('/api/coaching-credits/use', authMiddleware, async (req, res) => {
   try {
+    if (req.user?.role !== 'super_admin') return res.status(403).json({ success: false, message: 'Administrator access required' });
     const { patientEmail, creditId, coachId, coachName } = req.body;
 
     if (!patientEmail || !creditId) {
@@ -5477,7 +5478,7 @@ app.post('/api/coaching-credits/use', async (req, res) => {
     });
   } catch (error) {
     console.error('Error in use coaching credit endpoint:', error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: 'Internal server error',
       error: error.message
@@ -5510,7 +5511,7 @@ app.get('/api/test-gemini', async (req, res) => {
 });
 
 // Clinic Credentials Email API endpoint
-app.post('/api/clinic-credentials', async (req, res) => {
+app.post('/api/clinic-credentials', authMiddleware, requireRole('super_admin'), async (req, res) => {
   try {
     const { clinicName, contactPerson } = req.body;
     const email = String(req.body.email || '').trim().toLowerCase();
@@ -6372,9 +6373,12 @@ app.post('/api/send-24hr-reminder', async (req, res) => {
 });
 
 // Get bookings for a patient
-app.get('/api/bookings/:email', async (req, res) => {
+app.get('/api/bookings/:email', authMiddleware, async (req, res) => {
   try {
     const { email } = req.params;
+    const actor = req.user;
+    if (!actor) return res.status(401).json({ success: false, message: 'Authentication required' });
+    await requirePatientEmailAccess(actor, email, supabase);
     const { status, upcoming } = req.query;
 
     let query = supabase
@@ -6399,13 +6403,15 @@ app.get('/api/bookings/:email', async (req, res) => {
     res.json({ success: true, bookings: data || [] });
   } catch (error) {
     console.error('Error fetching bookings:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch bookings', error: error.message });
+    res.status(error.status || 500).json({ success: false, message: error.status ? error.message : 'Failed to fetch bookings' });
   }
 });
 
 // Get all bookings (for admin/coach dashboard)
-app.get('/api/all-bookings', async (req, res) => {
+app.get('/api/all-bookings', authMiddleware, async (req, res) => {
   try {
+    const actor = req.user;
+    if (actor?.role !== 'super_admin') return res.status(actor ? 403 : 401).json({ success: false, message: 'Administrator access required' });
     const { status, coachId, date } = req.query;
 
     let query = supabase
@@ -6438,13 +6444,15 @@ app.get('/api/all-bookings', async (req, res) => {
     res.json({ success: true, bookings: data || [] });
   } catch (error) {
     console.error('Error fetching all bookings:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch bookings', error: error.message });
+    res.status(error.status || 500).json({ success: false, message: error.status ? error.message : 'Failed to fetch bookings' });
   }
 });
 
 // Update booking status
-app.put('/api/bookings/:id', async (req, res) => {
+app.put('/api/bookings/:id', authMiddleware, async (req, res) => {
   try {
+    const actor = req.user;
+    if (actor?.role !== 'super_admin') return res.status(actor ? 403 : 401).json({ success: false, message: 'Administrator access required' });
     const { id } = req.params;
     const { status, notes } = req.body;
 
@@ -6567,40 +6575,18 @@ app.put('/api/bookings/:id', async (req, res) => {
     res.json({ success: true, booking: data });
   } catch (error) {
     console.error('Error updating booking:', error);
-    res.status(500).json({ success: false, message: 'Failed to update booking', error: error.message });
+    res.status(error.status || 500).json({ success: false, message: error.status ? error.message : 'Failed to update booking' });
   }
 });
 
 // Manual booking creation (for testing or manual entry)
-app.post('/api/bookings', async (req, res) => {
+app.post('/api/bookings', authMiddleware, async (req, res) => {
   try {
-    const bookingData = req.body;
-
-    // Validate required fields
-    if (!bookingData.patient_email || !bookingData.start_time || !bookingData.end_time) {
-      return res.status(400).json({
-        success: false,
-        message: 'patient_email, start_time, and end_time are required'
-      });
-    }
-
-    bookingData.patient_email = bookingData.patient_email.toLowerCase();
-    bookingData.created_at = new Date().toISOString();
-    bookingData.updated_at = new Date().toISOString();
-    bookingData.status = bookingData.status || 'scheduled';
-
-    // Ensure coach_id is valid UUID or null (foreign key constraint)
-    if (bookingData.coach_id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingData.coach_id)) {
-      bookingData.coach_id = null;
-    }
-
-    const { data, error } = await supabase
-      .from('coach_bookings')
-      .insert([bookingData])
-      .select()
-      .single();
-
-    if (error) throw error;
+    const actor = req.user;
+    if (!actor) return res.status(401).json({ success: false, message: 'Authentication required' });
+    const data = await createAuthorizedBooking(actor, req.body || {}, supabase, stripe);
+    const bookingData = data?.booking || data;
+    if (!bookingData) return res.status(403).json({ success: false, message: 'Booking could not be authorized' });
 
     // Notify the super admin portal of the new booking (shows in the notification bell)
     await supabase.from('admin_notifications').insert({
@@ -6617,7 +6603,7 @@ app.post('/api/bookings', async (req, res) => {
     res.json({ success: true, booking: data });
   } catch (error) {
     console.error('Error creating booking:', error);
-    res.status(500).json({ success: false, message: 'Failed to create booking', error: error.message });
+    res.status(error.status || 500).json({ success: false, message: error.status ? error.message : 'Failed to create booking' });
   }
 });
 
@@ -6694,7 +6680,7 @@ const otpStore = new Map();
 
 // Generate 6-digit OTP
 const generateOTP = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return require('crypto').randomInt(100000, 1000000).toString();
 };
 
 // Send OTP to email
@@ -6820,6 +6806,7 @@ app.post('/api/verify-otp', async (req, res) => {
     // Verify OTP
     if (storedData.otp !== otp) {
       storedData.attempts++;
+      if (storedData.attempts >= 3) otpStore.delete(email.toLowerCase());
       return res.status(400).json({
         success: false,
         message: `Invalid OTP. ${3 - storedData.attempts} attempts remaining.`
@@ -6870,13 +6857,20 @@ app.post('/api/reset-password', async (req, res) => {
     if (!storedData) {
       return res.status(400).json({ success: false, message: 'OTP expired or not found. Please request a new OTP.' });
     }
+    if (storedData.claimed) {
+      return res.status(400).json({ success: false, message: 'OTP has already been used. Please request a new OTP.' });
+    }
     if (Date.now() > storedData.expiresAt) {
       otpStore.delete(normalizedEmail);
       return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new OTP.' });
     }
     if (storedData.otp !== otp) {
+      storedData.attempts = (storedData.attempts || 0) + 1;
+      if (storedData.attempts >= 3) otpStore.delete(normalizedEmail);
       return res.status(400).json({ success: false, message: 'Invalid OTP. Please try again.' });
     }
+    // Claim synchronously before any awaits so a code authorizes only one concurrent reset.
+    storedData.claimed = true;
 
     if (!supabase) {
       return res.status(500).json({ success: false, message: 'Server is not configured to reset passwords right now.' });
@@ -6888,8 +6882,7 @@ app.post('/api/reset-password', async (req, res) => {
     // Best-effort Supabase Auth sync (patients + super admins authenticate there or fall back to it).
     const syncSupabaseAuth = async () => {
       try {
-        const { data: existingUsers } = await supabase.auth.admin.listUsers({ filter: normalizedEmail, perPage: 1 });
-        const authUser = existingUsers?.users?.find(u => (u.email || '').toLowerCase() === normalizedEmail) || existingUsers?.users?.[0];
+        const authUser = await findAuthUserByEmail(supabase, normalizedEmail);
         if (authUser?.id) {
           await supabase.auth.admin.updateUserById(authUser.id, { password: newPassword });
         }
@@ -7027,11 +7020,12 @@ app.post('/api/validate-session', async (req, res) => {
   }
 });
 // Send new password to registered email after password change
-app.post('/api/send-password-email', async (req, res) => {
+app.post('/api/send-password-email', authMiddleware, async (req, res) => {
   try {
-    const { email, password, name } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Email and password are required' });
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const name = String(req.body?.name || 'User').slice(0, 120);
+    if (!email || email !== String(req.user?.email || '').trim().toLowerCase()) {
+      return res.status(403).json({ success: false, message: 'Account access denied' });
     }
 
     if (!mailerConfigured) {
@@ -7051,12 +7045,8 @@ app.post('/api/send-password-email', async (req, res) => {
             <h1 style="color: #ffffff; margin: 10px 0 0; font-size: 20px;">Password Changed Successfully</h1>
           </div>
           <div style="padding: 24px; background: #ffffff;">
-            <p style="color: #333;">Hi ${name || 'User'},</p>
-            <p style="color: #555;">Your password has been successfully changed. Here are your updated login credentials:</p>
-            <div style="background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0;">
-              <p style="margin: 4px 0; color: #333;"><strong>Email:</strong> ${email}</p>
-              <p style="margin: 4px 0; color: #333;"><strong>New Password:</strong> ${escapeHtml(password)}</p>
-            </div>
+            <p style="color: #333;">Hi ${escapeHtml(name)},</p>
+            <p style="color: #555;">Your password was changed. If you did not make this change, contact support immediately.</p>
             <p style="color: #999; font-size: 12px;">If you did not make this change, please contact support immediately.</p>
             <div style="text-align: center; margin: 24px 0;">
               <a href="${APP_URL}/login" style="display: inline-block; background: #323956; color: #fff; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-weight: 600;">Login Now</a>
@@ -7076,7 +7066,7 @@ app.post('/api/send-password-email', async (req, res) => {
 });
 
 // Create Patient Auth Account (admin API - no confirmation email)
-app.post('/api/create-patient-auth', async (req, res) => {
+app.post('/api/create-patient-auth', authMiddleware, requireRole('super_admin'), async (req, res) => {
   try {
     const { email, password, metadata } = req.body;
 
@@ -7109,15 +7099,11 @@ app.post('/api/create-patient-auth', async (req, res) => {
     if (error) {
       // If user already exists, fetch the existing user and return success
       if (error.message && error.message.includes('already been registered')) {
-        // Use listUsers with filter instead of loading all users
-        const { data: existingUsers, error: listError } = await supabase.auth.admin.listUsers({
-          filter: email,
-          perPage: 1
-        });
-        if (!listError && existingUsers?.users?.length > 0) {
+        const existingUser = await findAuthUserByEmail(supabase, email);
+        if (existingUser) {
           return res.json({
             success: true,
-            user: existingUsers.users[0],
+            user: existingUser,
             existing: true
           });
         }
@@ -7161,7 +7147,7 @@ app.post('/api/create-patient-auth', async (req, res) => {
 });
 
 // Send Welcome Email with Login Credentials to Patient
-app.post('/api/send-welcome-email', async (req, res) => {
+app.post('/api/send-welcome-email', authMiddleware, patientNotificationAccess('email'), async (req, res) => {
   try {
     const { patientName, email, password, clinicName, clinicSmtpEmail, clinicSmtpPassword, clinicEmail } = req.body;
     console.log('📧 send-welcome-email called:', { patientName, email, clinicName, hasClinicSmtp: !!(clinicSmtpEmail && clinicSmtpPassword), clinicEmail });
@@ -7385,7 +7371,7 @@ app.post('/api/send-welcome-email', async (req, res) => {
 });
 
 // Send Email Updated Notification
-app.post('/api/send-email-update-notification', async (req, res) => {
+app.post('/api/send-email-update-notification', authMiddleware, patientNotificationAccess('newEmail'), async (req, res) => {
   try {
     const { patientName, newEmail, password, emailChanged, passwordChanged, clinicName, clinicUrl, clinicSmtpEmail, clinicSmtpPassword, clinicEmail } = req.body;
     console.log('📧 send-email-update-notification called:', { patientName, newEmail, clinicName, emailChanged: !!emailChanged, passwordChanged: !!passwordChanged, clinicEmail });
@@ -7568,17 +7554,37 @@ app.post('/api/send-email-update-notification', async (req, res) => {
 });
 
 // Send QEEG Report Email to Clinic and Patient
-app.post('/api/send-report-email', async (req, res) => {
+app.post('/api/send-report-email', authMiddleware, patientNotificationAccess('patientEmail'), async (req, res) => {
   try {
-    const {
-      patientName,
-      patientEmail,
-      clinicName,
-      clinicEmail,
-      reportUrl,
-      generatedAt,
-      reportType
-    } = req.body;
+    const { patientId, reportUrl, generatedAt, reportType } = req.body || {};
+    const { requirePatientAccess: requireOwnedPatient } = require('./utils/patientAccess');
+    if (!patientId || !reportUrl || req.authorizedPatient?.id !== patientId) return res.status(403).json({ success: false, message: 'Report access denied' });
+    const patient = await requireOwnedPatient(req.user, patientId, null, supabase);
+    const reference = new URL(reportUrl, APP_URL);
+    let owner;
+    if (req.reportReferenceIsLocal) {
+      owner = patient.id;
+    } else if (reference.pathname.startsWith('/uploads/')) {
+      const trustedOrigins = new Set([...allowedOrigins, APP_URL, process.env.RENDER_EXTERNAL_URL, process.env.BACKEND_PUBLIC_URL].filter(Boolean).map(value => new URL(value).origin));
+      if (!trustedOrigins.has(reference.origin)) return res.status(400).json({ success: false, message: 'Invalid report reference' });
+      const filename = decodeURIComponent(reference.pathname.slice('/uploads/'.length));
+      if (!filename || filename.includes('/') || filename.includes('\\')) return res.status(400).json({ success: false, message: 'Invalid report reference' });
+      const { data, error } = await supabase.rpc('resolve_local_report_owner', { p_filename: filename });
+      if (error) throw error;
+      owner = data;
+    } else {
+      const match = reference.pathname.match(/^\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/]+)\/(.+)$/);
+      if (reference.origin !== new URL(supabase.supabaseUrl).origin || !match || !['patients_documents','neurosense-reports','patient-reports','edf-files','qeeg-uploads'].includes(match[1])) return res.status(400).json({ success: false, message: 'Invalid report reference' });
+      const { data, error } = await supabase.rpc('resolve_document_owner', { p_bucket: match[1], p_path: decodeURIComponent(match[2]) });
+      if (error) throw error;
+      owner = data;
+    }
+    if (owner !== patient.id) return res.status(403).json({ success: false, message: 'Report access denied' });
+    const patientName = patient.full_name || patient.name || 'Patient';
+    const patientEmail = patient.email;
+    const { data: clinic } = patient.clinic_id ? await supabase.from('clinics').select('name,clinic_name,email').eq('id', patient.clinic_id).maybeSingle() : { data: null };
+    const clinicName = clinic?.clinic_name || clinic?.name || '';
+    const clinicEmail = clinic?.email || '';
 
     console.log('📧 send-report-email called:', {
       patientName,
@@ -8064,7 +8070,7 @@ app.post('/api/request-demo-report', async (req, res) => {
 // =====================================================
 // PATIENT REPORT NOTIFICATION
 // =====================================================
-app.post('/api/notify-patient-report', async (req, res) => {
+app.post('/api/notify-patient-report', authMiddleware, patientNotificationAccess('patientEmail'), async (req, res) => {
   try {
     const { patientEmail, patientName, reportType, clinicName, clinicEmail } = req.body;
 
@@ -8263,7 +8269,7 @@ app.post('/api/send-no-credit-email', async (req, res) => {
     res.json({ success: true, message: 'No credit notification email sent' });
   } catch (error) {
     console.error('❌ Error sending no-credit email:', error);
-    res.status(500).json({ success: false, message: 'Failed to send email' });
+    res.status(error.status || 500).json({ success: false, message: 'Failed to send email' });
   }
 });
 
@@ -8456,9 +8462,10 @@ app.post('/api/check-email-exists', async (req, res) => {
 // ADD PATIENT - CLINIC
 // ════════════════════════════════════════════════════════════════════════════════
 
-app.post('/api/clinic/add-patient', async (req, res) => {
+app.post('/api/clinic/add-patient', authMiddleware, async (req, res) => {
   try {
     const { clinicId, fullName, email, password, phone, dateOfBirth, gender, address } = req.body;
+    requireClinicAccess(req.user, clinicId);
 
     if (!clinicId || !fullName || !email || !password) {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
@@ -8516,7 +8523,7 @@ app.post('/api/clinic/add-patient', async (req, res) => {
       .insert({
         patient_name: fullName,
         email: normalizedEmail,
-        password: password, // Hash this in production!
+        password: await bcrypt.hash(password, 10),
         phone,
         date_of_birth: dateOfBirth,
         gender,
@@ -8533,7 +8540,7 @@ app.post('/api/clinic/add-patient', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error adding patient:', error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(error.status || 500).json({ success: false, message: error.message });
   }
 });
 
@@ -8541,9 +8548,10 @@ app.post('/api/clinic/add-patient', async (req, res) => {
 // ADD PATIENT - PARTNER
 // ════════════════════════════════════════════════════════════════════════════════
 
-app.post('/api/partner/add-patient', async (req, res) => {
+app.post('/api/partner/add-patient', authMiddleware, async (req, res) => {
   try {
     const { clinicId, fullName, email, password, phone, dateOfBirth, gender, address } = req.body;
+    requireClinicAccess(req.user, clinicId);
 
     if (!clinicId || !fullName || !email || !password) {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
@@ -8601,7 +8609,7 @@ app.post('/api/partner/add-patient', async (req, res) => {
       .insert({
         patient_name: fullName,
         email: normalizedEmail,
-        password: password, // Hash this in production!
+        password: await bcrypt.hash(password, 10),
         phone,
         date_of_birth: dateOfBirth,
         gender,
@@ -8618,7 +8626,7 @@ app.post('/api/partner/add-patient', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error adding patient:', error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(error.status || 500).json({ success: false, message: error.message });
   }
 });
 
@@ -8910,9 +8918,18 @@ app.post('/api/send-partner-patient-welcome', async (req, res) => {
   }
 });
 
+const callerIsSuperAdmin = async (req) => {
+  const email = String(req.user?.email || '').trim().toLowerCase();
+  if (!email || !supabase) return false;
+  const { data } = await supabase.from('profiles').select('id').eq('email', email).eq('role', 'super_admin').limit(1);
+  return Boolean(data?.length);
+};
+
+// Resolve a clinic or partner credential email only after the admin check.
 // 6. PARTNER EMAIL UPDATE
-app.post('/api/send-partner-email-update', async (req, res) => {
+app.post('/api/send-partner-email-update', authMiddleware, async (req, res) => {
   try {
+    if (!(await callerIsSuperAdmin(req))) return res.status(403).json({ success: false, message: 'Super admin access required' });
     const { partnerName, oldEmail, newEmail, password } = req.body;
 
     if (!newEmail || !partnerName) {

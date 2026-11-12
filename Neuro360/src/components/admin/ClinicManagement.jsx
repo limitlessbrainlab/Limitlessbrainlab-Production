@@ -32,7 +32,8 @@ import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import DatabaseService from '../../services/databaseService';
 import { supabase } from '../../lib/supabaseClient';
-import { hashPassword, isHashed } from '../../utils/passwordUtils';
+import { isHashed } from '../../utils/passwordUtils';
+import credentialRpc from '../../services/credentialRpc';
 import { getOriginUrl, resolveEnv, canonicalUrlForEnv } from '../../utils/environment';
 import AdminAssignmentModal from './AdminAssignmentModal';
 import LocationService from '../../services/locationService';
@@ -447,9 +448,12 @@ const ClinicManagement = ({ onUpdate }) => {
         return;
       }
       const password = data.password.trim();
+      const clinicFields = { ...data };
+      delete clinicFields.password;
+      delete clinicFields.confirmPassword;
 
       const clinicData = {
-        ...data,
+        ...clinicFields,
         email: normalizedEmail,
         clinic_type: data.clinicType || 'lbl_partner', // Snake_case for Supabase
         countryCode: data.countryCode || '+91', // Save country code separately
@@ -472,14 +476,16 @@ const ClinicManagement = ({ onUpdate }) => {
         registrationMethod: 'super_admin_created', // Track how this was created
         origin_url: getOriginUrl(), // Environment (prod/staging) this clinic was created from — login is scoped to it
         // contract_agreed not saved — column not yet in DB
-        // Use single password field for authentication
-        password: await hashPassword(password), // Encrypted password for login
-        plain_password: password, // Plaintext kept so credentials email can re-show it (deliberate)
-        // Remove confirmPassword from stored data
-        confirmPassword: undefined
       };
 
-      await DatabaseService.add('clinics', clinicData);
+      const createdClinic = await DatabaseService.add('clinics', clinicData);
+      try {
+        const claimed = await credentialRpc.claimCredentials('clinics', normalizedEmail, password);
+        if (claimed !== true) throw new Error('Secure clinic credential service is unavailable.');
+      } catch (credentialError) {
+        await DatabaseService.delete('clinics', createdClinic.id).catch(() => {});
+        throw credentialError;
+      }
 
       // Close modal and reset form immediately after successful creation
       setShowModal(false);
@@ -551,16 +557,7 @@ const ClinicManagement = ({ onUpdate }) => {
       // Check if email has changed
       const emailChanged = (selectedClinic?.email || '').trim().toLowerCase() !== normalizedEmail;
 
-      // Resolve the plaintext password to show in the email-update mail. Priority:
-      //  1) a password the admin just typed,
-      //  2) the clinic's stored plaintext,
-      //  3) (legacy clinics with neither, only when the email actually changed) a freshly
-      //     generated one — bcrypt hashes can't be reversed, so we can't recover their old
-      //     password; issue a new one so the email always carries working credentials. The
-      //     email change already force-logs-out the clinic, so they sign in with this one.
-      let passwordForEmail = editPassword || selectedClinic?.plain_password || '';
-      let hashedPassword = editPassword ? await hashPassword(editPassword) : undefined;
-      let plainToStore = editPassword || undefined;
+      let passwordForEmail = editPassword || '';
 
       if (emailChanged && !passwordForEmail) {
         const generateSecurePassword = () => {
@@ -571,8 +568,10 @@ const ClinicManagement = ({ onUpdate }) => {
         };
         const generated = generateSecurePassword();
         passwordForEmail = generated;
-        hashedPassword = await hashPassword(generated);
-        plainToStore = generated;
+      }
+      if (passwordForEmail) {
+        const updated = await credentialRpc.setClinicPassword(selectedClinic.id, passwordForEmail);
+        if (updated !== true) throw new Error('Secure clinic credential service is unavailable.');
       }
 
       // Keep country code and phone separate
@@ -589,12 +588,6 @@ const ClinicManagement = ({ onUpdate }) => {
         contact_person: data.contactPerson || undefined, // Snake_case for Supabase
         country_code: data.countryCode || '+91', // Snake_case for Supabase
         // contract_agreed not saved — column not yet in DB
-        password: hashedPassword || undefined,
-        // Keep plaintext in sync so the credential emails always show the real current password
-        plain_password: plainToStore,
-        passwordResetAt: hashedPassword ? new Date().toISOString() : undefined,
-        // Bump on email OR password change so the clinic's open session is force-logged-out
-        credentials_updated_at: (emailChanged || hashedPassword) ? new Date().toISOString() : undefined
       };
 
 
@@ -924,10 +917,13 @@ const ClinicManagement = ({ onUpdate }) => {
     try {
       const BASE_URL = getBaseUrl();
       const email = (clinic.email || '').trim().toLowerCase();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error('Please sign in again before sending clinic credentials.');
 
       const response = await fetch(`${BASE_URL}/api/clinic-credentials`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           clinicName: clinic.name,
           email,
@@ -971,15 +967,8 @@ const ClinicManagement = ({ onUpdate }) => {
         return;
       }
       const password = newPassword.trim();
-      const hashedPassword = await hashPassword(password);
-      await DatabaseService.update('clinics', selectedClinic.id, {
-        password: hashedPassword,
-        // Keep plaintext in sync so the credential emails always show the real current password
-        plain_password: password,
-        passwordResetAt: new Date().toISOString(),
-        // Bump so the clinic's open session is force-logged-out after a password reset
-        credentials_updated_at: new Date().toISOString()
-      });
+      const updated = await credentialRpc.setClinicPassword(selectedClinic.id, password);
+      if (updated !== true) throw new Error('Secure clinic credential service is unavailable.');
 
       // Try to send email with credentials (no activation OTP — not used)
       try {

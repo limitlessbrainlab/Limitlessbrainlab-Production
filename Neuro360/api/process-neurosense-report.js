@@ -2,6 +2,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
+import portalIdentity from '../server/utils/verifiedPortalUser.js';
+const { verifiedPortalUser } = portalIdentity;
 
 const BUCKET = 'qeeg-uploads';
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -15,10 +17,8 @@ function serverClient() {
 }
 
 async function requireSuperAdmin(token, supabase) {
-  const { data } = await supabase.auth.getUser(token);
-  if (!data?.user) return null;
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single();
-  return profile?.role === 'super_admin' ? data.user : null;
+  const user = await verifiedPortalUser(supabase, token);
+  return user?.role === 'super_admin' ? user : null;
 }
 
 function safeName(name) {
@@ -67,6 +67,8 @@ async function processReport(req, res, supabase, user) {
   ]);
   req.body = fields;
   req.files = { eyesOpen: [eyesOpen], eyesClosed: [eyesClosed] };
+  req.user = user;
+  req.supabaseClient = supabase;
 
   try {
     const { default: router } = await import('../server/routes/qeegRoutes.js');

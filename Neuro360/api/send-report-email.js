@@ -1,6 +1,10 @@
 import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 import reportEmailTemplate from '../shared/reportEmailTemplate.cjs';
+import portalIdentity from '../server/utils/verifiedPortalUser.js';
+import patientAccess from '../server/utils/patientAccess.js';
+const { verifiedPortalUser } = portalIdentity;
+const { requirePatientAccess } = patientAccess;
 
 // Hardcoded on purpose: login/dashboard CTAs in emails must always land on production,
 // never a *.vercel.app deployment (FRONTEND_URL may point at a stale one).
@@ -22,23 +26,37 @@ function getBody(req) {
   return req.body;
 }
 
-let supabase;
+function serverClient() {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error('Supabase server credentials are not configured');
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+}
 
-async function requireUser(req) {
-  const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  if (!token) return null;
-
-  const url = process.env.VITE_SUPABASE_URL;
-  const anonKey = process.env.VITE_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) throw new Error('Auth service not configured');
-
-  supabase ||= createClient(url, anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-
-  const { data, error } = await supabase.auth.getUser(token);
-  if (error) return null;
-  return data?.user || null;
+export function parseReportReference(reference, supabaseUrl) {
+  if (typeof reference !== 'string' || !reference.trim()) throw new Error('Invalid report reference');
+  const trustedLocalOrigins = new Set([
+    new URL(FRONTEND_URL).origin,
+    'https://www.limitlessbrainlab.com',
+    'https://limitlessbrainlab-eight.vercel.app',
+    'https://limitlessbrainlab-production.vercel.app',
+    process.env.BACKEND_PUBLIC_URL && new URL(process.env.BACKEND_PUBLIC_URL).origin,
+    process.env.RENDER_EXTERNAL_URL && new URL(process.env.RENDER_EXTERNAL_URL).origin,
+  ].filter(Boolean));
+  const localUrl = new URL(reference, FRONTEND_URL);
+  if (localUrl.pathname.startsWith('/uploads/')) {
+    if (!trustedLocalOrigins.has(localUrl.origin)) throw new Error('Report URL must belong to this service');
+    const filename = decodeURIComponent(localUrl.pathname.slice('/uploads/'.length));
+    if (!filename || filename.includes('/') || filename.includes('\\') || filename === '.' || filename === '..') throw new Error('Invalid local report reference');
+    return { local: true, filename };
+  }
+  const url = new URL(reference);
+  if (url.origin !== new URL(supabaseUrl).origin) throw new Error('Report URL must belong to this service');
+  const match = url.pathname.match(/^\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/]+)\/(.+)$/);
+  if (!match) throw new Error('Invalid report reference');
+  const bucket = match[1]; const path = decodeURIComponent(match[2]);
+  if (!['patients_documents','neurosense-reports','patient-reports','edf-files','qeeg-uploads'].includes(bucket) || !path || path.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('Invalid report reference');
+  return { local: false, bucket, path };
 }
 
 export default async function handler(req, res) {
@@ -46,12 +64,32 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ success: false, message: 'Method not allowed' });
 
   try {
-    const user = await requireUser(req);
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
-    }
+    const supabase = serverClient();
+    const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    const actor = token ? await verifiedPortalUser(supabase, token) : null;
+    if (!actor) return res.status(401).json({ success: false, message: 'Authentication required' });
 
-    const { patientName, patientEmail, clinicName, clinicEmail, reportUrl, generatedAt, reportType } = getBody(req);
+    const { patientId, reportUrl, generatedAt, reportType } = getBody(req);
+    if (typeof patientId !== 'string' || !patientId) return res.status(400).json({ success: false, message: 'Patient ID is required' });
+    const patient = await requirePatientAccess(actor, patientId, null, supabase);
+    const reference = parseReportReference(reportUrl, supabase.supabaseUrl);
+    if (reference.local) {
+      const { data: owner, error } = await supabase.rpc('resolve_local_report_owner', { p_filename: reference.filename });
+      if (error) throw error;
+      if (owner !== patient.id) return res.status(403).json({ success: false, message: 'Report access denied' });
+    } else {
+      const { data: owner, error } = await supabase.rpc('resolve_document_owner', { p_bucket: reference.bucket, p_path: reference.path });
+      if (error) throw error;
+      if (owner !== patient.id) return res.status(403).json({ success: false, message: 'Report access denied' });
+    }
+    const patientName = patient.full_name || patient.name || 'Patient';
+    const patientEmail = patient.email;
+    const { data: clinic, error: clinicError } = patient.clinic_id
+      ? await supabase.from('clinics').select('email,name,clinic_name').eq('id', patient.clinic_id).maybeSingle()
+      : { data: null, error: null };
+    if (clinicError) throw clinicError;
+    const clinicName = clinic?.clinic_name || clinic?.name || '';
+    const clinicEmail = clinic?.email || '';
 
     // NeuroSense Report (QEEG) uses its own template/subject; anything else keeps the
     // existing Neuro Performance Report template unchanged.

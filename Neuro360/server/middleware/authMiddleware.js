@@ -1,57 +1,17 @@
 const jwt = require('jsonwebtoken');
-const { createClient } = require('@supabase/supabase-js');
+const { createRoutedClient } = require('../dbRouter');
 
-// Initialize Supabase admin client
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-const LEGACY_PATIENT_ISSUER = 'limitlessbrainlab';
-const LEGACY_PATIENT_AUDIENCE = 'legacy-patient-api';
-
-function legacyPatientSecret() {
-  // ponytail: reuse the server-only service key until LEGACY_AUTH_JWT_SECRET is configured; set the dedicated secret to decouple key rotation.
-  return process.env.LEGACY_AUTH_JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
-}
-
-function createLegacyPatientToken(patient) {
-  return jwt.sign({
-    type: 'legacy_patient',
-    email: patient.email,
-    credentialsUpdatedAt: patient.credentials_updated_at || null,
-  }, legacyPatientSecret(), {
-    subject: patient.id,
-    issuer: LEGACY_PATIENT_ISSUER,
-    audience: LEGACY_PATIENT_AUDIENCE,
-    expiresIn: '7d',
+// Routed per-request (prod vs staging by origin) so JWT verification
+// (supabase.auth.getUser) hits the same DB the request's data queries use.
+// Returns the plain prod client when staging env vars are not configured.
+const supabase = createRoutedClient();
+async function resolveVerifiedUser(user, claims) {
+  if (!claims?.session_id || claims.sub !== user.id) return null;
+  const { data, error } = await supabase.rpc('resolve_portal_identity', {
+    p_user_id: user.id, p_session_id: claims.session_id
   });
-}
-
-function legacyPatientFromToken(token) {
-  try {
-    const payload = jwt.verify(token, legacyPatientSecret(), {
-      issuer: LEGACY_PATIENT_ISSUER,
-      audience: LEGACY_PATIENT_AUDIENCE,
-    });
-    if (payload.type !== 'legacy_patient' || !payload.sub || !payload.email) return null;
-    return { id: payload.sub, email: payload.email, role: 'patient', credentialsUpdatedAt: payload.credentialsUpdatedAt || null };
-  } catch {
-    return null;
-  }
-}
-
-async function verifiedLegacyPatient(token) {
-  const tokenUser = legacyPatientFromToken(token);
-  if (!tokenUser) return null;
-  const { data: patient, error } = await supabase
-    .from('patients')
-    .select('id, email, credentials_updated_at')
-    .eq('id', tokenUser.id)
-    .eq('email', tokenUser.email)
-    .maybeSingle();
-  if (error || !patient || (patient.credentials_updated_at || null) !== tokenUser.credentialsUpdatedAt) return null;
-  return { id: patient.id, email: patient.email, role: 'patient' };
+  if (error) throw error;
+  return data;
 }
 
 /**
@@ -72,14 +32,24 @@ const authMiddleware = async (req, res, next) => {
       });
     }
 
-    const legacyPatient = await verifiedLegacyPatient(token);
-    if (legacyPatient) {
-      req.user = legacyPatient;
-      return next();
-    }
+    const startedAt = performance.now();
+    // Verify signed claims locally when Supabase's cached JWKS is available.
+    // `getUser()` always performs a remote Auth request and was holding up every
+    // admin page request even after its data query had completed.
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    let user = claimsData?.claims ? {
+      id: claimsData.claims.sub,
+      email: claimsData.claims.email,
+      app_metadata: claimsData.claims.app_metadata
+    } : null;
+    let error = claimsError;
 
-    // Verify Supabase token with Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    // Safe compatibility fallback for projects still using legacy symmetric JWTs.
+    if (!user) {
+      const result = await supabase.auth.getUser(token);
+      user = result.data.user;
+      error = result.error;
+    }
 
     if (error || !user) {
       console.error('[AuthMiddleware] Supabase error:', JSON.stringify(error), '| SUPABASE_URL set:', !!process.env.SUPABASE_URL, '| KEY set:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -91,11 +61,9 @@ const authMiddleware = async (req, res, next) => {
     }
 
     // Attach user to request for downstream use
-    req.user = {
-      id: user.id,
-      email: user.email,
-      role: user.user_metadata?.role || 'patient'
-    };
+    req.user = await resolveVerifiedUser(user, claimsData?.claims || jwt.decode(token));
+    if (!req.user) return res.status(401).json({ success: false, error: 'Invalid or expired session', code: 'INVALID_TOKEN' });
+    req.authDurationMs = performance.now() - startedAt;
 
     next();
   } catch (error) {
@@ -118,18 +86,9 @@ const optionalAuth = async (req, res, next) => {
     const token = authHeader?.split(' ')[1];
 
     if (token) {
-      const legacyPatient = await verifiedLegacyPatient(token);
-      if (legacyPatient) {
-        req.user = legacyPatient;
-        return next();
-      }
       const { data: { user }, error } = await supabase.auth.getUser(token);
       if (!error && user) {
-        req.user = {
-          id: user.id,
-          email: user.email,
-          role: user.user_metadata?.role || 'patient'
-        };
+        req.user = await resolveVerifiedUser(user, jwt.decode(token));
       }
     }
 
@@ -142,7 +101,5 @@ const optionalAuth = async (req, res, next) => {
 
 module.exports = {
   authMiddleware,
-  optionalAuth,
-  createLegacyPatientToken,
-  legacyPatientFromToken,
+  optionalAuth
 };

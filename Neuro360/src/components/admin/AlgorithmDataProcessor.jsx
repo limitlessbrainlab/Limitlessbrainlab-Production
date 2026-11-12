@@ -1342,7 +1342,7 @@ const AlgorithmDataProcessor = () => {
   // Claude Report: forward the already-generated NeuroSense PDF (at pdfUrl) to the
   // server, which reads its numbers and regenerates the polished 12-page
   // doctor-readable "Brain Type & Performance Report". Auth is a static long-lived
-  // token (VITE_CLAUDE_REPORT_TOKEN); the backend uses its own master key for the VPS.
+  // current Supabase session token; the report route verifies patient ownership.
   // Ordered stages shown in the progress panel. `upload` is the browser->server
   // fetch (before the first SSE event); the rest are streamed by the backend.
   const CLAUDE_STAGE_ORDER = [
@@ -1519,7 +1519,7 @@ const AlgorithmDataProcessor = () => {
         import.meta.env.PROD ? 'https://limitlessbrainlab-production-backend.onrender.com' : ''
       );
       const apiUrl = directBackendUrl ? `${directBackendUrl.replace(/\/$/, '')}/api` : proxyApiUrl;
-      const token = import.meta.env.VITE_CLAUDE_REPORT_TOKEN;
+      const token = await getFreshToken();
       console.log('[Claude Report] Step 1: fetching the generated NeuroSense PDF…', pdfUrl);
       // Fetch the just-generated NeuroSense PDF and forward it to the Claude endpoint.
       const srcRes = await fetch(pdfUrl);
@@ -1869,6 +1869,7 @@ const AlgorithmDataProcessor = () => {
           method: 'POST',
           headers: emailHeaders,
           body: JSON.stringify({
+            patientId: selectedPatient.id,
             patientName: patientName,
             patientEmail: selectedPatient.email,
             clinicName: clinicName,
@@ -2029,6 +2030,7 @@ const AlgorithmDataProcessor = () => {
           method: 'POST',
           headers: emailHeaders,
           body: JSON.stringify({
+            patientId: selectedPatient.id,
             patientName: patientName,
             patientEmail: selectedPatient.email,
             clinicName: clinicName,
@@ -2121,6 +2123,7 @@ const AlgorithmDataProcessor = () => {
         method: 'POST',
         headers: emailHeaders,
         body: JSON.stringify({
+          patientId,
           patientName: patientName,
           patientEmail: patientEmail,
           clinicName: clinicName,
@@ -2200,6 +2203,7 @@ const AlgorithmDataProcessor = () => {
         method: 'POST',
         headers: emailHeaders,
         body: JSON.stringify({
+          patientId,
           patientName: patientName,
           patientEmail: patientEmail,
           clinicName: clinicName,

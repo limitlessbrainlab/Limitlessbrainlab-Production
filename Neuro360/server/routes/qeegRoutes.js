@@ -16,6 +16,7 @@ const { getReportUploadDir, needsInstanceReportLock } = require('../services/rep
 const qeegExtractionCache = require('../services/qeegExtractionCache');
 const { renderPage6Maps } = require('../services/qeegPageMapRenderer');
 const { validateQeegInputs, canonicalQeegFileName } = require('../services/qeegInputValidation');
+const { requirePatientAccess } = require('../utils/patientAccess');
 
 // NEW: Gemini AI Service for report generation
 let GeminiService = null;
@@ -131,6 +132,9 @@ async function processQeegRequest(req, res) {
   };
 
   try {
+    const authorizedPatient = await requirePatientAccess(req.user, req.body?.patientId, req.body?.clinicId);
+    req.body.patientId = authorizedPatient.id;
+    req.body.clinicId = authorizedPatient.clinic_id;
     console.log('\n🔬 ========== QEEG PROCESSING DEBUG LOG ==========\n');
     logProgress('START', 'QEEG Processing Started', '🚀');
 
@@ -217,7 +221,7 @@ async function processQeegRequest(req, res) {
       const eoUploadResult = await SupabaseStorage.uploadFile(
         modifiedEyesOpenPath,
         'qeeg-uploads',
-        eyesOpenStoragePath
+        eyesOpenStoragePath, 'application/pdf', undefined, authorizedPatient.id
       );
       logProgress('SUPABASE_UPLOAD', 'Eyes Open uploaded successfully', '✅');
       eyesOpenUrl = eoUploadResult.url;  // Store URL for response
@@ -228,7 +232,7 @@ async function processQeegRequest(req, res) {
       const ecUploadResult = await SupabaseStorage.uploadFile(
         modifiedEyesClosedPath,
         'qeeg-uploads',
-        eyesClosedStoragePath
+        eyesClosedStoragePath, 'application/pdf', undefined, authorizedPatient.id
       );
       logProgress('SUPABASE_UPLOAD', 'Eyes Closed uploaded successfully', '✅');
       eyesClosedUrl = ecUploadResult.url;  // Store URL for response
@@ -656,7 +660,7 @@ async function processQeegRequest(req, res) {
         const uploadResult = await SupabaseStorage.uploadFile(
           pdfOutputPath,
           'neurosense-reports', // bucket name - All NeuroSense PDFs go here
-          supabaseClinicPath // Clinic-wise path: reports/[clinic]/[filename].pdf
+          supabaseClinicPath, 'application/pdf', undefined, authorizedPatient.id // Register this report to its verified patient
         );
 
         // Verify upload was successful and URL is valid
@@ -828,7 +832,7 @@ async function processQeegRequest(req, res) {
     }
 
     // Categorize errors for better user feedback
-    let statusCode = 500;
+    let statusCode = error.status || 500;
     let userMessage = error.message;
 
     // Check for Gemini quota error in error message
@@ -911,6 +915,7 @@ router.post('/process', reportLockMiddleware, parseQeegUploads, processQeegReque
  */
 router.post('/generate-pdf', async (req, res) => {
   try {
+    const authorizedPatient = await requirePatientAccess(req.user, req.body?.patientData?.id || req.body?.patientData?.patientId, req.body?.patientData?.clinicId);
     console.log('\n📄 === PDF Report Generation Started ===\n');
 
     const { patientData, algorithmResults, qeegData, parameterNotes } = req.body;
@@ -999,7 +1004,7 @@ router.post('/generate-pdf', async (req, res) => {
               SupabaseStorage.uploadFile(
                 pdfPath,
                 'neurosense-reports',
-                supabaseFolderPath
+                supabaseFolderPath, 'application/pdf', undefined, authorizedPatient.id
               ),
               new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('Supabase upload timeout (15s)')), 15000)
@@ -1017,6 +1022,7 @@ router.post('/generate-pdf', async (req, res) => {
     });
 
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: true, message: error.message });
     console.error('\n❌ === PDF Generation Failed ===');
     console.error('Error:', error.message);
     console.error('Stack:', error.stack);
@@ -1070,6 +1076,7 @@ router.post('/generate-sample-pdf', async (req, res) => {
  */
 router.post('/generate-ai-pdf', async (req, res) => {
   try {
+    const authorizedPatient = await requirePatientAccess(req.user, req.body?.patientData?.id || req.body?.patientData?.patientId, req.body?.patientData?.clinicId);
     console.log('\n🤖 === AI PDF Report Generation Started ===\n');
 
     const { patientData, algorithmResults, qeegData } = req.body;
@@ -1131,6 +1138,7 @@ router.post('/generate-ai-pdf', async (req, res) => {
     });
 
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: true, message: error.message });
     console.error('\n❌ === AI PDF Generation Failed ===');
     console.error('Error:', error.message);
     console.error('Stack:', error.stack);
@@ -1186,6 +1194,7 @@ router.post('/generate-ai-sample-pdf', async (req, res) => {
  */
 router.get('/supabase-pdfs', async (req, res) => {
   try {
+    if (req.user?.role !== 'super_admin') return res.status(403).json({ error: 'Super admin access required' });
     console.log('📋 Fetching PDFs from Supabase bucket (neurosense-reports)...');
 
     const files = await SupabaseStorage.listFiles('neurosense-reports', 'reports');
@@ -1498,6 +1507,7 @@ router.get('/patient-qeeg-files/:patientId', async (req, res) => {
       });
     }
 
+    await requirePatientAccess(req.user, patientId);
     console.log(`📂 Fetching QEEG files for patient: ${patientId}`);
 
     const qeegFiles = await SupabaseStorage.listPatientQEEGFiles(patientId);
@@ -1513,11 +1523,11 @@ router.get('/patient-qeeg-files/:patientId', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching patient QEEG files:', error);
-    res.status(500).json({
+    if (!error.status) console.error('❌ Error fetching patient QEEG files:', error.message);
+    res.status(error.status || 500).json({
       error: true,
-      message: 'Failed to fetch QEEG files',
-      details: error.message
+      message: error.status ? error.message : 'Failed to fetch QEEG files',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });

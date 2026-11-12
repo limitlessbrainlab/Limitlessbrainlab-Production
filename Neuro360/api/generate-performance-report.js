@@ -1,4 +1,8 @@
+import portalIdentity from '../server/utils/verifiedPortalUser.js';
+const { verifiedPortalUser } = portalIdentity;
 import { createClient } from '@supabase/supabase-js';
+import patientAccess from '../server/utils/patientAccess.js';
+const { requirePatientAccess } = patientAccess;
 import { PDFDocument } from 'pdf-lib';
 import claudeReportData from '../server/services/claudeReportData.js';
 import claudeReportGenerator from '../server/services/claudeReportGenerator.js';
@@ -26,10 +30,8 @@ function serverClient() {
 async function requireSuperAdmin(req, supabase) {
   const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) return null;
-  const { data } = await supabase.auth.getUser(token);
-  if (!data?.user) return null;
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single();
-  return profile?.role === 'super_admin' ? data.user : null;
+  const user = await verifiedPortalUser(supabase, token);
+  return user?.role === 'super_admin' ? user : null;
 }
 
 async function claimJob(supabase, idempotencyKey, body, userId) {
@@ -82,6 +84,16 @@ export default async function handler(req, res) {
   if (!body.savedResultId || !body.patientId || !body.canonicalResults || !body.qeegData) {
     return json(res, 400, { message: 'savedResultId, patientId, canonicalResults and qeegData are required' });
   }
+  try {
+    await requirePatientAccess(user, body.patientId, body.clinicId || null, supabase);
+    const { data: result, error } = await supabase.from('algorithm_results').select('patient_id,clinic_id').eq('id', body.savedResultId).maybeSingle();
+    if (error) throw error;
+    if (!result || result.patient_id !== body.patientId || (result.clinic_id && result.clinic_id !== body.clinicId)) {
+      return json(res, 403, { message: 'Report access denied' });
+    }
+  } catch (error) {
+    return json(res, error.status || 500, { message: error.status ? error.message : 'Unable to verify report access' });
+  }
   const idempotencyKey = String(body.idempotencyKey || `performance:${body.savedResultId}`);
   let job;
   let emit;
@@ -131,6 +143,8 @@ export default async function handler(req, res) {
     const { error: uploadError } = await supabase.storage.from('neurosense-reports')
       .upload(fileName, pdf, { contentType: 'application/pdf', upsert: false });
     if (uploadError) throw uploadError;
+    const { error: ownerError } = await supabase.rpc('register_document_owner', { p_bucket:'neurosense-reports', p_path:fileName, p_patient_id:body.patientId });
+    if (ownerError) { await supabase.storage.from('neurosense-reports').remove([fileName]); throw ownerError; }
     const { data: publicData } = supabase.storage.from('neurosense-reports').getPublicUrl(fileName);
     const pdfUrl = publicData.publicUrl;
 

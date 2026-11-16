@@ -19,6 +19,9 @@
     },
     "api/generate-performance-report.js": {
       "maxDuration": 800
+    },
+    "api/send-report-email.js": {
+      "maxDuration": 120
     }
   },
   "headers": [

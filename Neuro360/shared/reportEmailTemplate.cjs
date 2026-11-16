@@ -12,12 +12,14 @@ const fmtDateTime = (d = new Date()) => {
   });
 };
 
-const getReportEmailHtml = ({ isClinic, patientName, clinicName, reportUrl, loginUrl, generatedAt, logoSrc = 'cid:company-logo' }) => {
+const getReportEmailHtml = ({ isClinic, patientName, clinicName, reportUrl, loginUrl, generatedAt, logoSrc = 'cid:company-logo', attached = false }) => {
   const rows = [
     { label: 'Patient Name', value: patientName || 'Not provided' },
     ...(isClinic ? [{ label: 'Clinic', value: clinicName || 'Not provided' }] : []),
     { label: 'Report Type', value: 'Neuro Performance Report' },
-    { label: 'Report PDF', value: `<a href="${reportUrl}" style="color:#1e63b4;font-weight:600;text-decoration:none;">Download Report</a>` },
+    { label: 'Report PDF', value: attached
+      ? '<span style="color:#0f7a3d;font-weight:600;">Attached to this email (PDF)</span>'
+      : `<a href="${reportUrl}" style="color:#1e63b4;font-weight:600;text-decoration:none;">Download Report</a>` },
     { label: 'Generated', value: fmtDateTime(generatedAt) },
   ];
 
@@ -86,12 +88,14 @@ const getReportEmailHtml = ({ isClinic, patientName, clinicName, reportUrl, logi
 // Distinct template for the NeuroSense Report (detailed QEEG brain-health report).
 // Deliberately different design/palette from the Neuro Performance Report above so the
 // two reports are visually distinguishable. Titled "NeuroSense Report".
-const getNeuroSenseReportEmailHtml = ({ isClinic, patientName, clinicName, reportUrl, loginUrl, generatedAt, logoSrc = 'cid:company-logo' }) => {
+const getNeuroSenseReportEmailHtml = ({ isClinic, patientName, clinicName, reportUrl, loginUrl, generatedAt, logoSrc = 'cid:company-logo', attached = false }) => {
   const rows = [
     { label: 'Patient Name', value: patientName || 'Not provided' },
     ...(isClinic ? [{ label: 'Clinic', value: clinicName || 'Not provided' }] : []),
     { label: 'Report Type', value: 'NeuroSense Report' },
-    { label: 'Report PDF', value: `<a href="${reportUrl}" style="color:#1e63b4;font-weight:600;text-decoration:none;">Download Report</a>` },
+    { label: 'Report PDF', value: attached
+      ? '<span style="color:#0f7a3d;font-weight:600;">Attached to this email (PDF)</span>'
+      : `<a href="${reportUrl}" style="color:#1e63b4;font-weight:600;text-decoration:none;">Download Report</a>` },
     { label: 'Generated', value: fmtDateTime(generatedAt) },
   ];
 

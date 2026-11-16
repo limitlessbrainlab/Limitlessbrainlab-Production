@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Upload, Play, Download, FileText, CheckCircle, Activity, User, Building2, Calendar, History, X, ArrowLeft, Search, Filter, Send, Loader2, RefreshCw } from 'lucide-react';
 import DatabaseService from '../../services/databaseService';
 import SupabaseService from '../../services/supabaseService';
+import StorageService from '../../services/storageService';
 import toast from 'react-hot-toast';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
 import { grantCareProgramAccess } from '../../utils/careProgramEntitlements';
@@ -2453,15 +2454,30 @@ const AlgorithmDataProcessor = () => {
   };
 
   // Download a PDF by fetching its bytes and saving a blob, so the raw storage URL is never
-  // opened/shared. Retries on flaky networks; if every retry fails, falls back to opening the
-  // URL directly so the user still gets the file on a poor connection.
+  // opened/shared. Medical buckets are private, so any stored (possibly legacy public)
+  // Supabase URL is exchanged for a short-lived signed URL through the authenticated
+  // backend route first. Only backend-hosted /uploads/ files keep their direct path.
+  // No dead-link fallback: if the signed download fails, the file is genuinely
+  // unavailable and the user is told so instead of being handed a broken URL.
   const downloadViaBlob = async (url, filename, toastId = 'download-pdf') => {
     if (!url) { toast.error('Report not available yet.', { id: toastId }); return; }
     try {
       toast.loading('Downloading PDF…', { id: toastId });
-      const res = await fetchWithRetry(url);
+      let fetchUrl = url;
+      const isStorageUrl = /\/storage\/v1\/object\//.test(url);
+      if (isStorageUrl) {
+        try {
+          fetchUrl = await StorageService.getSignedUrl(url, 3600);
+        } catch (signError) {
+          console.error('Signed URL resolution failed:', signError);
+          toast.error('PDF is not accessible (file may be missing from storage). Please re-upload or contact support.', { id: toastId, duration: 6000 });
+          return;
+        }
+      }
+      const res = await fetchWithRetry(fetchUrl);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
+      if (!blob || blob.size === 0) throw new Error('Empty file');
       const objectUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = objectUrl;
@@ -2472,14 +2488,18 @@ const AlgorithmDataProcessor = () => {
       setTimeout(() => window.URL.revokeObjectURL(objectUrl), 100);
       toast.success('PDF download started!', { id: toastId });
     } catch (e) {
-      console.error('downloadViaBlob failed, falling back to direct open:', e);
-      // Last resort: open the URL directly so a flaky link still delivers the file.
-      try {
-        window.open(url, '_blank', 'noopener');
-        toast.success('Opening PDF…', { id: toastId });
-      } catch (_) {
-        toast.error('Could not download the PDF. Please try again.', { id: toastId });
+      console.error('downloadViaBlob failed:', e);
+      const isStorage = /\/storage\/v1\/object\//.test(url || '');
+      if (!isStorage) {
+        // Backend-hosted file (e.g. /uploads/…): opening it directly still delivers the bytes.
+        try {
+          window.open(url, '_blank', 'noopener');
+          toast.success('Opening PDF…', { id: toastId });
+          return;
+        } catch (_) { /* fall through to the honest error below */ }
       }
+      // Honest failure: private-bucket files have no working public URL to fall back to.
+      toast.error('Could not download the PDF. The file may be missing — please try again or contact support.', { id: toastId, duration: 6000 });
     }
   };
 

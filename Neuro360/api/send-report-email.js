@@ -119,6 +119,42 @@ export default async function handler(req, res) {
     const clinicLoginUrl = `${FRONTEND_URL}/clinic/login`;
     const replyTo = () => process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || FROM_ADDRESS;
 
+    // Attach the actual PDF bytes so recipients never depend on (possibly stale) storage
+    // URLs. If the bytes cannot be attached (missing object or above the 15MB Gmail-safe
+    // cap), fall back to a 7-day signed URL — never the dead public URL.
+    const MAX_INLINE_PDF_BYTES = 15 * 1024 * 1024;
+    let attachment = null;
+    let effectiveReportUrl = reportUrl;
+    const safeFileStem = (patientName || 'Report').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'Report';
+    const attachmentName = `${isNeuroSense ? 'NeuroSense' : 'Neuro-Performance'}-Report-${safeFileStem}.pdf`;
+    try {
+      let bytes;
+      if (!reference.local) {
+        const { data: objectData, error: objectError } = await supabase.storage.from(reference.bucket).download(reference.path);
+        if (objectError) throw objectError;
+        bytes = Buffer.from(await objectData.arrayBuffer());
+      } else {
+        const localOrigin = (/^https?:\/\//i.test(reportUrl) && reportUrl) || process.env.BACKEND_PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '';
+        if (!localOrigin) throw new Error('Local report origin is not configured');
+        const localUrl = /^https?:\/\//i.test(reportUrl)
+          ? reportUrl
+          : new URL(`/uploads/${encodeURIComponent(reference.filename)}`, localOrigin).toString();
+        const localRes = await fetch(localUrl);
+        if (!localRes.ok) throw new Error(`HTTP ${localRes.status}`);
+        bytes = Buffer.from(await localRes.arrayBuffer());
+      }
+      if (bytes.length > MAX_INLINE_PDF_BYTES) throw new Error(`PDF is ${(bytes.length / 1048576).toFixed(1)} MB (attach limit 15 MB)`);
+      attachment = { filename: attachmentName, content: bytes, contentType: 'application/pdf' };
+    } catch (attachError) {
+      console.warn('Report attachment unavailable, falling back to a 7-day signed link:', attachError.message);
+      if (!reference.local) {
+        try {
+          const { data: signedData, error: signError } = await supabase.storage.from(reference.bucket).createSignedUrl(reference.path, 7 * 24 * 60 * 60);
+          if (!signError && signedData?.signedUrl) effectiveReportUrl = signedData.signedUrl;
+        } catch (_) { /* keep the validated reportUrl */ }
+      }
+    }
+
     await transporter.sendMail({
       from: fromEmail,
       to: patientEmail,
@@ -128,8 +164,11 @@ export default async function handler(req, res) {
         'X-Mailer': 'Limitless Brain Lab Mailer'
       },
       subject: `Your ${reportLabel} is Ready`,
-      text: `Hi ${patientName || 'there'},\n\nYour ${reportLabel} is ready.\n\nDownload your report: ${reportUrl}\nLog in: ${patientLoginUrl}\n\nThe Limitless Brain Lab Team`,
-      html: buildReportHtml({ isClinic: false, patientName, clinicName, reportUrl, loginUrl: patientLoginUrl, generatedAt, logoSrc: LOGO_URL }),
+      text: attachment
+        ? `Hi ${patientName || 'there'},\n\nYour ${reportLabel} is ready and attached to this email (${attachmentName}).\nLog in: ${patientLoginUrl}\n\nThe Limitless Brain Lab Team`
+        : `Hi ${patientName || 'there'},\n\nYour ${reportLabel} is ready.\n\nDownload your report: ${effectiveReportUrl}\nLog in: ${patientLoginUrl}\n\nThe Limitless Brain Lab Team`,
+      html: buildReportHtml({ isClinic: false, patientName, clinicName, reportUrl: effectiveReportUrl, attached: !!attachment, loginUrl: patientLoginUrl, generatedAt, logoSrc: LOGO_URL }),
+      ...(attachment ? { attachments: [attachment] } : {}),
     });
 
     let clinicEmailSent = false;
@@ -144,8 +183,11 @@ export default async function handler(req, res) {
             'X-Mailer': 'Limitless Brain Lab Mailer'
           },
           subject: `${reportLabel} - ${patientName || 'Patient'}`,
-          text: `Hello ${clinicName || 'Clinic'},\n\nThe ${reportLabel} for ${patientName || 'your patient'} is ready.\n\nDownload: ${reportUrl}\nLog in: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
-          html: buildReportHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl: clinicLoginUrl, generatedAt, logoSrc: LOGO_URL }),
+          text: attachment
+            ? `Hello ${clinicName || 'Clinic'},\n\nThe ${reportLabel} for ${patientName || 'your patient'} is ready and attached to this email (${attachmentName}).\nLog in: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`
+            : `Hello ${clinicName || 'Clinic'},\n\nThe ${reportLabel} for ${patientName || 'your patient'} is ready.\n\nDownload: ${effectiveReportUrl}\nLog in: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
+          html: buildReportHtml({ isClinic: true, patientName, clinicName, reportUrl: effectiveReportUrl, attached: !!attachment, loginUrl: clinicLoginUrl, generatedAt, logoSrc: LOGO_URL }),
+          ...(attachment ? { attachments: [attachment] } : {}),
         });
         clinicEmailSent = true;
       } catch (error) {

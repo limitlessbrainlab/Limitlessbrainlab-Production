@@ -109,11 +109,21 @@ class StorageService {
    */
   async getSignedUrl(path, expiresIn = 3600, bucketName = null) {
     try {
-      // Auto-detect bucket from path pattern
       let bucket = bucketName || this.reportsBucket;
+      let storageUrl = false;
+      if (/^https?:\/\//i.test(path)) {
+        const url = new URL(path);
+        const object = url.pathname.match(/^\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/]+)\/(.+)$/);
+        if (url.origin !== new URL(supabase.supabaseUrl).origin || !object) {
+          throw new Error('URL is not an object in the configured storage project');
+        }
+        bucket = bucketName || decodeURIComponent(object[1]);
+        path = decodeURIComponent(object[2]);
+        storageUrl = true;
+      }
 
-      // If path follows pattern: clinicId/patientId/file → it's in edf-files bucket
-      if (!bucketName && path && path.match(/^[\w-]+\/[\w-]+\//)) {
+      // Preserve bucket inference for legacy object keys only.
+      if (!storageUrl && !bucketName && path && path.match(/^[\w-]+\/[\w-]+\//)) {
         bucket = 'edf-files';
       }
 

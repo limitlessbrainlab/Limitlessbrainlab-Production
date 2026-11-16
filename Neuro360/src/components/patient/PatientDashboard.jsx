@@ -4183,18 +4183,14 @@ const PatientDashboard = () => {
 
                         let downloadUrl = null;
 
-                        // Try direct file URL first (works for both local and public Supabase URLs)
-                        if (directFileUrl) {
-                          downloadUrl = directFileUrl;
-                        }
-
-                        // If no direct URL, try to get signed URL from Supabase Storage
-                        if (!downloadUrl && filePath && !filePath.startsWith('/uploads')) {
+                        const storageReference = filePath || directFileUrl;
+                        if (storageReference && !storageReference.startsWith('/uploads')) {
                           try {
-                            downloadUrl = await StorageService.getSignedUrl(filePath, 300);
+                            downloadUrl = await StorageService.getSignedUrl(storageReference, 300);
                           } catch (err) {
                           }
                         }
+                        if (!downloadUrl) downloadUrl = directFileUrl || null;
 
                         if (downloadUrl) {
                           // Fetch the file as blob to force download
@@ -9973,8 +9969,9 @@ const PatientDashboard = () => {
         if (!fName) fName = 'NeuroSense_Report.pdf';
 
         let downloadUrl = null;
-        if (filePath && !filePath.startsWith('/uploads')) {
-          try { downloadUrl = await StorageService.getSignedUrl(filePath, 300); } catch (err) { console.log('Signed URL failed:', err.message); }
+        const storageReference = filePath || directFileUrl;
+        if (storageReference && !storageReference.startsWith('/uploads')) {
+          try { downloadUrl = await StorageService.getSignedUrl(storageReference, 300); } catch (err) { console.log('Signed URL failed:', err.message); }
         }
         if (!downloadUrl) downloadUrl = directFileUrl || null;
 

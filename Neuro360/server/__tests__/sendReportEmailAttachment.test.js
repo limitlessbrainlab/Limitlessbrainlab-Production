@@ -11,6 +11,7 @@ test('report email attaches the owned PDF and never sends its storage URL', asyn
   let handler;
   let fileBytes = Buffer.from('%PDF-report');
   let downloadError = null;
+  let sendError = null;
   let activeSends = 0;
   let maxConcurrentSends = 0;
   vm.runInNewContext(source.slice(start, end + '\n});'.length), {
@@ -33,6 +34,7 @@ test('report email attaches the owned PDF and never sends its storage URL', asyn
       maxConcurrentSends = Math.max(maxConcurrentSends, activeSends);
       await new Promise(resolve => setTimeout(resolve, 20));
       activeSends--;
+      if (sendError) throw sendError;
     } },
     getNeuroSenseReportEmailHtml: options => JSON.stringify(options),
     getReportEmailHtml: options => JSON.stringify(options),
@@ -79,4 +81,10 @@ test('report email attaches the owned PDF and never sends its storage URL', asyn
   downloadError = null;
   assert.equal((await deliver()).statusCode, 413);
   assert.equal(messages.length, 2);
+
+  fileBytes = Buffer.from('%PDF-report');
+  sendError = Object.assign(new Error('Timeout'), { code: 'ETIMEDOUT' });
+  const timeoutResponse = await deliver();
+  assert.equal(timeoutResponse.statusCode, 504);
+  assert.match(timeoutResponse.body.message, /timed out during SMTP delivery/);
 });

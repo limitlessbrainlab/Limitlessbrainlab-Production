@@ -82,13 +82,16 @@ const activeTransporter = (() => {
       host: 'smtp.gmail.com',
       port: 465,
       secure: true,
+      pool: true,
+      maxConnections: 2,
+      maxMessages: 100,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
       },
       connectionTimeout: 30000,
       greetingTimeout: 30000,
-      socketTimeout: 30000
+      socketTimeout: 120000
     });
   }
 
@@ -7607,12 +7610,15 @@ app.post('/api/send-email-update-notification', authMiddleware, patientNotificat
 
 // Send QEEG Report Email to Clinic and Patient
 app.post('/api/send-report-email', authMiddleware, patientNotificationAccess('patientEmail'), async (req, res) => {
+  let reportEmailStage = 'request validation';
   try {
     const { patientId, reportUrl, generatedAt, reportType } = req.body || {};
     const { requirePatientAccess: requireOwnedPatient } = require('./utils/patientAccess');
     const reportRef = req.reportAttachmentRef;
     if (!patientId || !reportUrl || !reportRef || req.authorizedPatient?.id !== patientId) return res.status(403).json({ success: false, message: 'Report access denied' });
+    reportEmailStage = 'patient authorization';
     const patient = await requireOwnedPatient(req.user, patientId, null, supabase);
+    reportEmailStage = 'report ownership check';
     let owner;
     if (reportRef.local) {
       const { data, error } = await supabase.rpc('resolve_local_report_owner', { p_filename: reportRef.filename });
@@ -7626,6 +7632,7 @@ app.post('/api/send-report-email', authMiddleware, patientNotificationAccess('pa
     if (owner !== patient.id) return res.status(403).json({ success: false, message: 'Report access denied' });
     const patientName = patient.full_name || patient.name || 'Patient';
     const patientEmail = req.authorizedPatient?.email || patient.email;
+    reportEmailStage = 'clinic lookup';
     const { data: clinic } = patient.clinic_id ? await supabase.from('clinics').select('name,clinic_name,email').eq('id', patient.clinic_id).maybeSingle() : { data: null };
     const clinicName = clinic?.clinic_name || clinic?.name || '';
     const clinicEmail = clinic?.email || '';
@@ -7668,6 +7675,7 @@ app.post('/api/send-report-email', authMiddleware, patientNotificationAccess('pa
     const reportLabel = isNeuroSense ? 'NeuroSense Report' : 'Neuro Performance Report';
     const buildReportHtml = isNeuroSense ? getNeuroSenseReportEmailHtml : getReportEmailHtml;
 
+    reportEmailStage = 'PDF download';
     let pdfBytes;
     try {
       if (req.reportAttachmentRef?.local) {
@@ -7723,6 +7731,7 @@ app.post('/api/send-report-email', authMiddleware, patientNotificationAccess('pa
       };
     }
 
+    reportEmailStage = 'SMTP delivery';
     // Start both independent deliveries together so the patient does not wait for two SMTP round trips.
     const deliveryResults = await Promise.allSettled([
       transporter.sendMail(patientMailOptions),
@@ -7744,10 +7753,19 @@ app.post('/api/send-report-email', authMiddleware, patientNotificationAccess('pa
     return res.json({ success: true, message });
 
   } catch (error) {
-    console.error('❌ Error sending report emails:', error);
-    return res.status(500).json({
+    const timedOut = error.code === 'ETIMEDOUT' || /timeout/i.test(error.message || '');
+    console.error('❌ Report email failed:', {
+      stage: reportEmailStage,
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      responseCode: error.responseCode
+    });
+    return res.status(timedOut ? 504 : 502).json({
       success: false,
-      message: `Email send failed: ${error.message || 'Unknown error'}`
+      message: timedOut
+        ? `Report email timed out during ${reportEmailStage}; check the inbox before retrying`
+        : `Report email failed during ${reportEmailStage}`
     });
   }
 });

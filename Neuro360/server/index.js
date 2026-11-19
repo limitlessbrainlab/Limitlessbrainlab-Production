@@ -7633,7 +7633,7 @@ app.post('/api/send-report-email', authMiddleware, patientNotificationAccess('pa
     }
     if (owner !== patient.id) return res.status(403).json({ success: false, message: 'Report access denied' });
     const patientName = patient.full_name || patient.name || 'Patient';
-    const patientEmail = patient.email;
+    const patientEmail = req.authorizedPatient?.email || patient.email;
     const { data: clinic } = patient.clinic_id ? await supabase.from('clinics').select('name,clinic_name,email').eq('id', patient.clinic_id).maybeSingle() : { data: null };
     const clinicName = clinic?.clinic_name || clinic?.name || '';
     const clinicEmail = clinic?.email || '';

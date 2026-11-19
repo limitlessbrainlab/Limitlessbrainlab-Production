@@ -1,22 +1,11 @@
-import nodemailer from 'nodemailer';
+import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import reportEmailTemplate from '../shared/reportEmailTemplate.cjs';
 import portalIdentity from '../server/utils/verifiedPortalUser.js';
 import patientAccess from '../server/utils/patientAccess.js';
 const { verifiedPortalUser } = portalIdentity;
 const { requirePatientAccess } = patientAccess;
 
-// Hardcoded on purpose: login/dashboard CTAs in emails must always land on production,
-// never a *.vercel.app deployment (FRONTEND_URL may point at a stale one).
 const FRONTEND_URL = 'https://limitlessbrainlab.com';
-const FROM_ADDRESS = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'info@limitlessbrainlab.com';
-const EMAIL_FROM = { name: 'Limitless Brain Lab', address: FROM_ADDRESS };
-// Load the logo from the brand production domain (aligned with the From domain), never a
-// *.vercel.app host. A remote image from a domain other than the sender's is a spam smell;
-// this serverless function can't reliably read /public for a cid: attachment, so serving it
-// from the same brand domain as the sender is the robust equivalent.
-const LOGO_URL = 'https://limitlessbrainlab.com/IBW%20Logo.png';
-const { getReportEmailHtml, getNeuroSenseReportEmailHtml } = reportEmailTemplate;
 
 function getBody(req) {
   if (!req.body) return {};
@@ -93,108 +82,53 @@ export default async function handler(req, res) {
     const clinicName = clinic?.clinic_name || clinic?.name || '';
     const clinicEmail = clinic?.email || '';
 
-    // NeuroSense Report (QEEG) uses its own template/subject; anything else keeps the
-    // existing Neuro Performance Report template unchanged.
-    const isNeuroSense = reportType === 'neurosense';
-    const reportLabel = isNeuroSense ? 'NeuroSense Report' : 'Neuro Performance Report';
-    const buildReportHtml = isNeuroSense ? getNeuroSenseReportEmailHtml : getReportEmailHtml;
-
     if (!patientEmail || !reportUrl) {
       return res.status(400).json({ success: false, message: 'Patient email and report URL are required' });
     }
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      return res.status(500).json({ success: false, message: 'Email service not configured' });
-    }
-
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-      connectionTimeout: 30000,
-      greetingTimeout: 30000,
-      socketTimeout: 30000,
-    });
-    const fromEmail = EMAIL_FROM;
-
-    const patientLoginUrl = `${FRONTEND_URL}/patient/login`;
-    const clinicLoginUrl = `${FRONTEND_URL}/clinic/login`;
-    const replyTo = () => process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || FROM_ADDRESS;
-
-    // Send the PDF itself. Never expose a storage URL in email if attachment fails.
-    const MAX_INLINE_PDF_BYTES = 15 * 1024 * 1024;
-    const safeFileStem = (patientName || 'Report').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'Report';
-    const attachmentName = `${isNeuroSense ? 'NeuroSense' : 'Neuro-Performance'}-Report-${safeFileStem}.pdf`;
-    let attachment;
+    let attachmentBucket = reference.bucket;
+    let attachmentPath = reference.path;
+    const jobId = randomUUID();
     try {
-      let bytes;
-      if (!reference.local) {
-        const { data: objectData, error: objectError } = await supabase.storage.from(reference.bucket).download(reference.path);
-        if (objectError) throw objectError;
-        bytes = Buffer.from(await objectData.arrayBuffer());
-      } else {
+      if (reference.local) {
         const localOrigin = (/^https?:\/\//i.test(reportUrl) && reportUrl) || process.env.BACKEND_PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '';
         if (!localOrigin) throw new Error('Local report origin is not configured');
         const localUrl = /^https?:\/\//i.test(reportUrl)
           ? reportUrl
           : new URL(`/uploads/${encodeURIComponent(reference.filename)}`, localOrigin).toString();
-        const localRes = await fetch(localUrl);
+        const localRes = await fetch(localUrl, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000) });
         if (!localRes.ok) throw new Error(`HTTP ${localRes.status}`);
-        bytes = Buffer.from(await localRes.arrayBuffer());
+        const bytes = Buffer.from(await localRes.arrayBuffer());
+        if (bytes.length > 15 * 1024 * 1024) return res.status(413).json({ success: false, message: 'Report PDF exceeds the 15 MB email attachment limit' });
+        attachmentBucket = 'report-email-attachments';
+        attachmentPath = `${jobId}/${reference.filename}`;
+        const { error } = await supabase.storage.from(attachmentBucket).upload(attachmentPath, bytes, { contentType: 'application/pdf', upsert: false });
+        if (error) throw error;
       }
-      if (bytes.length > MAX_INLINE_PDF_BYTES) {
-        return res.status(413).json({ success: false, message: 'Report PDF exceeds the 15 MB email attachment limit; no email was sent' });
-      }
-      attachment = { filename: attachmentName, content: bytes, contentType: 'application/pdf' };
     } catch (attachError) {
-      console.error('Report attachment unavailable; no email was sent:', attachError.message);
-      return res.status(502).json({ success: false, message: 'Could not attach the report PDF; no email was sent' });
+      console.error('Report attachment could not be queued:', attachError.message);
+      return res.status(502).json({ success: false, message: 'Could not queue the report attachment' });
     }
-
-    await transporter.sendMail({
-      from: fromEmail,
-      to: patientEmail,
-      replyTo: replyTo(),
-      headers: {
-        'List-Unsubscribe': `<mailto:${replyTo()}?subject=unsubscribe>`,
-        'X-Mailer': 'Limitless Brain Lab Mailer'
-      },
-      subject: `Your ${reportLabel} is Ready`,
-      text: `Hi ${patientName || 'there'},\n\nYour ${reportLabel} is ready and attached to this email (${attachmentName}).\nLog in: ${patientLoginUrl}\n\nThe Limitless Brain Lab Team`,
-      html: buildReportHtml({ isClinic: false, patientName, clinicName, attached: true, loginUrl: patientLoginUrl, generatedAt, logoSrc: LOGO_URL }),
-      attachments: [attachment],
+    const { error: queueError } = await supabase.from('report_email_jobs').insert({
+      id: jobId,
+      requested_by: actor.id,
+      patient_id: patient.id,
+      clinic_id: patient.clinic_id || null,
+      patient_email: patientEmail,
+      clinic_email: clinicEmail || null,
+      patient_name: patientName || 'Patient',
+      clinic_name: clinicName || '',
+      report_type: reportType === 'neurosense' ? 'neurosense' : 'performance',
+      generated_at: generatedAt || null,
+      report_bucket: attachmentBucket,
+      report_path: attachmentPath
     });
-
-    let clinicEmailSent = false;
-    if (clinicEmail) {
-      try {
-        await transporter.sendMail({
-          from: fromEmail,
-          to: clinicEmail,
-          replyTo: replyTo(),
-          headers: {
-            'List-Unsubscribe': `<mailto:${replyTo()}?subject=unsubscribe>`,
-            'X-Mailer': 'Limitless Brain Lab Mailer'
-          },
-          subject: `${reportLabel} - ${patientName || 'Patient'}`,
-          text: `Hello ${clinicName || 'Clinic'},\n\nThe ${reportLabel} for ${patientName || 'your patient'} is ready and attached to this email (${attachmentName}).\nLog in: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
-          html: buildReportHtml({ isClinic: true, patientName, clinicName, attached: true, loginUrl: clinicLoginUrl, generatedAt, logoSrc: LOGO_URL }),
-          attachments: [attachment],
-        });
-        clinicEmailSent = true;
-      } catch (error) {
-        console.error('Clinic report email failed:', error.message);
-      }
+    if (queueError) {
+      if (reference.local) await supabase.storage.from(attachmentBucket).remove([attachmentPath]).catch(() => {});
+      return res.status(502).json({ success: false, message: 'Could not queue report email' });
     }
-
-    return res.json({
-      success: true,
-      message: clinicEmail
-        ? (clinicEmailSent ? 'Report emails sent to clinic and patient successfully' : 'Patient email sent; clinic email failed')
-        : 'Report email sent to patient successfully',
-    });
+    return res.status(202).json({ success: true, status: 'queued', jobId, message: 'Report email queued for background delivery' });
   } catch (error) {
-    console.error('Report email failed:', error.message);
-    return res.status(500).json({ success: false, message: `Email send failed: ${error.message || 'Unknown error'}` });
+    console.error('Report email queue failed:', error.message);
+    return res.status(500).json({ success: false, message: `Could not queue report email: ${error.message || 'Unknown error'}` });
   }
 }

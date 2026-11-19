@@ -24,6 +24,45 @@ const getFreshToken = async () => {
   return localStorage.getItem('authToken') || localStorage.getItem('access_token');
 };
 
+const watchReportEmailStatus = async (baseUrl, headers, jobId, toastId, sentMessage, onStatus) => {
+  if (!jobId) {
+    toast('Email request was accepted, but its final status cannot be checked.', { id: toastId, duration: 8000 });
+    return;
+  }
+  const stopAt = Date.now() + 10 * 60 * 1000;
+  toast.loading('Email queued. Waiting for delivery confirmation…', { id: toastId });
+  while (jobId && Date.now() < stopAt) {
+    try {
+      const response = await fetch(`${baseUrl}/api/report-email-status?jobId=${encodeURIComponent(jobId)}`, {
+        headers,
+        cache: 'no-store',
+        signal: AbortSignal.timeout(10000)
+      });
+      if (!response.ok) throw Object.assign(new Error('Status unavailable'), { status: response.status });
+      const { status, clinicCopyFailed } = await response.json();
+      if (status === 'sent') {
+        const finalStatus = clinicCopyFailed ? 'partial' : 'sent';
+        onStatus?.(finalStatus);
+        if (clinicCopyFailed) toast.error('Report was sent to the patient, but the clinic copy failed.', { id: toastId, duration: 8000 });
+        else toast.success(sentMessage, { id: toastId, duration: 6000 });
+        return;
+      }
+      if (status === 'failed') {
+        onStatus?.('failed');
+        toast.error('Email could not be sent after retries. Please try again.', { id: toastId, duration: 8000 });
+        return;
+      }
+    } catch (error) {
+      if ([400, 401, 403, 404].includes(error.status)) {
+        toast.error('Email is queued, but its delivery status could not be checked.', { id: toastId, duration: 8000 });
+        return;
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 5000));
+  }
+  toast('Email is still processing. Its final status is not confirmed yet.', { id: toastId, duration: 8000 });
+};
+
 const parseResultsData = (data) => {
   if (Array.isArray(data)) return data;
   if (typeof data === 'string') { try { return JSON.parse(data); } catch { return []; } }
@@ -98,8 +137,12 @@ const AlgorithmDataProcessor = () => {
   const [parameterNotes, setParameterNotes] = useState(''); // Notes for parameter analysis
   const [isSendingReport, setIsSendingReport] = useState(false); // State for sending report to clinic/patient
   const [sendingHistoryReportId, setSendingHistoryReportId] = useState(null);
-  const [reportSent, setReportSent] = useState(false); // Locks send button after successful send (prevents duplicate emails)
-  const [claudeReportSent, setClaudeReportSent] = useState(false); // Same for Claude report send button
+  const [reportSent, setReportSent] = useState(false); // Locks duplicate queue requests
+  const [claudeReportSent, setClaudeReportSent] = useState(false); // Locks duplicate queue requests
+  const [reportEmailStatus, setReportEmailStatus] = useState('idle');
+  const [claudeEmailStatus, setClaudeEmailStatus] = useState('idle');
+  const reportEmailJobRef = useRef(null);
+  const claudeEmailJobRef = useRef(null);
   const [processingStartTime, setProcessingStartTime] = useState(null); // Track processing start time
   const [processingDuration, setProcessingDuration] = useState(null); // Duration in ms
   const [isUploadingDoc, setIsUploadingDoc] = useState(false); // Uploading state for other docs
@@ -445,6 +488,10 @@ const AlgorithmDataProcessor = () => {
     setIsSaving(false);
     setReportSent(false);
     setClaudeReportSent(false);
+    setReportEmailStatus('idle');
+    setClaudeEmailStatus('idle');
+    reportEmailJobRef.current = null;
+    claudeEmailJobRef.current = null;
     // Reset QEEG PDF URLs for fresh session
     setEyesOpenUrl(null);
     setEyesClosedUrl(null);
@@ -487,6 +534,10 @@ const AlgorithmDataProcessor = () => {
     setIsSaving(false);
     setReportSent(false);
     setClaudeReportSent(false);
+    setReportEmailStatus('idle');
+    setClaudeEmailStatus('idle');
+    reportEmailJobRef.current = null;
+    claudeEmailJobRef.current = null;
     setParameterNotes(''); // Reset notes when going back
     // Reload patients to update status
     loadPatients();
@@ -520,8 +571,12 @@ const AlgorithmDataProcessor = () => {
     setReportAssessmentDate(null);
     setSavedResultId(null);
     setReportSent(false);
+    setReportEmailStatus('idle');
+    reportEmailJobRef.current = null;
     // Reset NeuroSense Performance (Claude) report state
     setClaudeReportSent(false);
+    setClaudeEmailStatus('idle');
+    claudeEmailJobRef.current = null;
     setClaudeReportUrl(null);
     setClaudeReportId(null);
     setClaudeReportError(null);
@@ -604,6 +659,10 @@ const AlgorithmDataProcessor = () => {
       setPdfUrl(null);
       setReportSent(false);
       setClaudeReportSent(false);
+      setReportEmailStatus('idle');
+      setClaudeEmailStatus('idle');
+      reportEmailJobRef.current = null;
+      claudeEmailJobRef.current = null;
     }
   };
 
@@ -1884,17 +1943,22 @@ const AlgorithmDataProcessor = () => {
           })
         });
 
+        const emailResult = await emailResponse.json().catch(() => null);
         if (!emailResponse.ok) {
-          const emailErrorData = await emailResponse.json().catch(() => null);
+          const emailErrorData = emailResult;
           const emailErrorMessage = emailErrorData?.message || emailErrorData?.error || `Server error (${emailResponse.status})`;
           console.error('Failed to send report emails:', emailErrorMessage);
           toast.error(`Report saved, but email delivery failed: ${emailErrorMessage}`, { id: sendToastId });
         } else {
-          toast.success(
-            `Report PDF sent to the patient and clinic. It is also available in clinic Reports.`,
-            { id: sendToastId, duration: 5000 }
-          );
           setReportSent(true);
+          setReportEmailStatus('queued');
+          reportEmailJobRef.current = emailResult?.jobId || null;
+          void watchReportEmailStatus(baseUrl, emailHeaders, emailResult?.jobId, sendToastId,
+            'Report email sent to the patient and clinic.', status => {
+              if (reportEmailJobRef.current !== emailResult?.jobId) return;
+              setReportEmailStatus(status);
+              if (status === 'failed') setReportSent(false);
+            });
         }
       } catch (emailError) {
         console.error('Error preparing report emails:', emailError);
@@ -2046,14 +2110,22 @@ const AlgorithmDataProcessor = () => {
           })
         });
 
+        const emailResult = await emailResponse.json().catch(() => null);
         if (!emailResponse.ok) {
-          const emailErrorData = await emailResponse.json().catch(() => null);
+          const emailErrorData = emailResult;
           const emailErrorMessage = emailErrorData?.message || emailErrorData?.error || `Server error (${emailResponse.status})`;
           console.error('Failed to send Claude report emails:', emailErrorMessage);
           toast.error(`Report saved, but email delivery failed: ${emailErrorMessage}`, { id: sendToastId });
         } else {
-          toast.success('Neurosense Performance Report PDF sent to the patient and clinic.', { id: sendToastId, duration: 5000 });
           setClaudeReportSent(true);
+          setClaudeEmailStatus('queued');
+          claudeEmailJobRef.current = emailResult?.jobId || null;
+          void watchReportEmailStatus(baseUrl, emailHeaders, emailResult?.jobId, sendToastId,
+            'Neurosense Performance Report sent to the patient and clinic.', status => {
+              if (claudeEmailJobRef.current !== emailResult?.jobId) return;
+              setClaudeEmailStatus(status);
+              if (status === 'failed') setClaudeReportSent(false);
+            });
         }
       } catch (emailError) {
         console.error('Error preparing Claude report emails:', emailError);
@@ -2141,9 +2213,10 @@ const AlgorithmDataProcessor = () => {
           generatedAt: record.processed_at || record.processedAt || record.created_at || record.createdAt || new Date().toISOString()
         })
       });
-      if (!response.ok) throw new Error(`Server error (${response.status})`);
-
-      toast.success('Neurosense Performance Report PDF sent to the patient and clinic.', { id: sendToastId });
+      const queued = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(queued?.message || `Server error (${response.status})`);
+      void watchReportEmailStatus(baseUrl, emailHeaders, queued?.jobId, sendToastId,
+        'Neurosense Performance Report sent to the patient and clinic.');
     } catch (error) {
       console.error('❌ Error sending Claude report for record:', error);
       toast.error(getFriendlyErrorMessage(error, 'Failed to send the Neurosense Performance Report. Please try again.'), { id: sendToastId });
@@ -2226,9 +2299,10 @@ const AlgorithmDataProcessor = () => {
           generatedAt: record.processed_at || record.processedAt || record.created_at || record.createdAt || new Date().toISOString()
         })
       });
-      if (!response.ok) throw new Error(`Server error (${response.status})`);
-
-      toast.success('NeuroSense Report PDF sent to the patient and clinic.', { id: sendToastId });
+      const queued = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(queued?.message || `Server error (${response.status})`);
+      void watchReportEmailStatus(baseUrl, emailHeaders, queued?.jobId, sendToastId,
+        'NeuroSense Report sent to the patient and clinic.');
     } catch (error) {
       console.error('❌ Error sending Neurosense Report for record:', error);
       toast.error(getFriendlyErrorMessage(error, 'Failed to send the Neurosense Report. Please try again.'), { id: sendToastId });
@@ -3505,10 +3579,10 @@ const AlgorithmDataProcessor = () => {
                       ? 'bg-purple-400 text-white cursor-wait'
                       : 'bg-purple-600 hover:bg-purple-700 text-white'
                   }`}
-                  title={reportSent ? 'Report already sent' : !pdfUrl ? 'Generate PDF report first' : 'Send report to clinic and patient'}
+                  title={reportSent ? (reportEmailStatus === 'sent' ? 'Report email sent' : reportEmailStatus === 'partial' ? 'Patient received the email; clinic copy failed' : 'Report email queued') : !pdfUrl ? 'Generate PDF report first' : 'Send report to clinic and patient'}
                 >
                   {isSendingReport ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                  <span aria-live="polite">{reportSent ? '✓ Sent' : isSendingReport ? 'Sending PDF to patient & clinic…' : 'Send Report to Clinic & Patient'}</span>
+                  <span aria-live="polite">{reportSent ? (reportEmailStatus === 'sent' ? '✓ Sent' : reportEmailStatus === 'partial' ? '⚠ Clinic copy failed' : '✓ Queued') : isSendingReport ? 'Queueing report email…' : reportEmailStatus === 'failed' ? 'Retry Report Email' : 'Send Report to Clinic & Patient'}</span>
                 </button>
                 ) : (
                 <>
@@ -3611,10 +3685,10 @@ const AlgorithmDataProcessor = () => {
                             ? 'bg-purple-400 text-white cursor-wait'
                             : 'bg-purple-600 hover:bg-purple-700 text-white'
                         }`}
-                        title={claudeReportSent ? 'Report already sent' : 'Send Claude report to clinic and patient'}
+                        title={claudeReportSent ? (claudeEmailStatus === 'sent' ? 'Report email sent' : claudeEmailStatus === 'partial' ? 'Patient received the email; clinic copy failed' : 'Report email queued') : 'Send Claude report to clinic and patient'}
                       >
                         {isSendingClaudeReport ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                        <span aria-live="polite">{claudeReportSent ? '✓ Sent' : isSendingClaudeReport ? 'Sending PDF to patient & clinic…' : 'Send Report to Clinic & Patient'}</span>
+                        <span aria-live="polite">{claudeReportSent ? (claudeEmailStatus === 'sent' ? '✓ Sent' : claudeEmailStatus === 'partial' ? '⚠ Clinic copy failed' : '✓ Queued') : isSendingClaudeReport ? 'Queueing report email…' : claudeEmailStatus === 'failed' ? 'Retry Report Email' : 'Send Report to Clinic & Patient'}</span>
                       </button>
                     </>
                   )}

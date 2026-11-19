@@ -98,8 +98,7 @@ const activeTransporter = (() => {
 const emailTransporter = activeTransporter;
 const mailerConfigured = gmailConfigured;
 const ACTIVE_MAIL_PROVIDER = gmailConfigured ? 'gmail' : 'none';
-const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME?.trim() || 'DecodeMyBrain';
-const formatEmailFrom = address => ({ name: EMAIL_FROM_NAME, address });
+const formatEmailFrom = (address, name = 'Limitless Brain Lab') => ({ name, address });
 
 // Deliverability: HTML-only mail scores worse with spam filters, so derive a
 // plain-text alternative for every outbound mail, and set Reply-To so replies
@@ -209,7 +208,7 @@ function attachEmailFooter(html) {
 // attachment the footer references is present, and keep the existing plain-text + reply-to behaviour.
 function enhanceMailOptions(mailOptions) {
   const enhanced = { ...mailOptions };
-  if (enhanced.html && !enhanced.html.includes('lbl-email-footer')) {
+  if (enhanced.html && !enhanced.html.includes('lbl-email-footer') && !enhanced.html.includes('decodemybrain-email')) {
     enhanced.html = attachEmailFooter(enhanced.html);
     if (fs.existsSync(SIGNATURE_PATH)) {
       const atts = Array.isArray(enhanced.attachments) ? [...enhanced.attachments] : [];
@@ -5225,35 +5224,39 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
     const { customerEmail, isRenewal, payment } = result;
     const { currency } = payment;
     const amountPaid = payment.amount.toFixed(2);
+    const invoiceMetadata = invoice.metadata || {};
+    const subscriptionMetadata = invoice.parent?.subscription_details?.metadata || invoice.subscription_details?.metadata || {};
+    const isDecodeMyBrain = /DecodeMyBrain/i.test(payment.package_name || '') ||
+      [invoiceMetadata.brand, invoiceMetadata.project, subscriptionMetadata.brand, subscriptionMetadata.project]
+        .some(value => /DecodeMyBrain/i.test(value || ''));
+    const brandName = isDecodeMyBrain ? 'DecodeMyBrain' : 'Limitless Brain Lab';
     const receiptTitle = isRenewal ? 'Subscription Renewed' : 'Payment Receipt';
     const adminTitle = isRenewal ? 'Subscription Renewal Received' : 'Invoice Payment Received';
     console.log(`✅ ${adminTitle}: ${invoice.id} - ${currency} ${amountPaid}`);
 
     if (mailerConfigured && await claimNotificationOnce(`subscription:${invoice.id}:renewal-emails`)) {
       const receiptMail = {
-        from: EMAIL_FROM,
+        from: formatEmailFrom(EMAIL_FROM.address, brandName),
         to: customerEmail,
-        subject: `${receiptTitle} - Limitless Brain Lab`,
-        attachments: [{ filename: 'logo.png', path: LOGO_PATH, cid: LOGO_CID }],
+        subject: `${receiptTitle} - ${brandName}`,
+        attachments: isDecodeMyBrain ? [] : [{ filename: 'logo.png', path: LOGO_PATH, cid: LOGO_CID }],
         html: `
           <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
             <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 24px 32px; text-align: center;">
-              <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover;" />
+              ${isDecodeMyBrain ? '<!-- decodemybrain-email --><div style="color:#fff;font-size:22px;font-weight:700;">DecodeMyBrain</div>' : '<img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover;" />'}
               <h1 style="color: #ffffff; margin: 12px 0 0; font-size: 20px;">${receiptTitle}</h1>
             </div>
             <div style="padding: 28px 32px;">
-              <p style="color: #333; font-size: 15px; line-height: 1.6;">${isRenewal ? 'Your Limitless Brain Lab subscription has been renewed successfully.' : 'We received your payment to Limitless Brain Lab.'}</p>
+              <p style="color: #333; font-size: 15px; line-height: 1.6;">${isDecodeMyBrain ? (isRenewal ? 'Your DecodeMyBrain subscription has been renewed successfully.' : 'We received your payment to DecodeMyBrain.') : (isRenewal ? 'Your Limitless Brain Lab subscription has been renewed successfully.' : 'We received your payment to Limitless Brain Lab.')}</p>
               <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px 20px; margin: 16px 0;">
                 <p style="margin: 0; color: #166534; font-weight: 600;">Amount Charged: ${currency} ${amountPaid}</p>
               </div>
               <p style="color: #555; font-size: 14px;">Invoice ID: ${invoice.id}</p>
-              <div style="text-align: center; margin-top: 24px;">
+              ${isDecodeMyBrain ? '' : `<div style="text-align: center; margin-top: 24px;">
                 <a href="${APP_URL}/dashboard" style="display: inline-block; background: #323956; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">Go to Dashboard</a>
-              </div>
+              </div>`}
             </div>
-            <div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="margin: 0; color: #94a3b8; font-size: 11px;">Limitless Brain Lab &bull; Health, Wealth & Happiness for All</p>
-            </div>
+            ${isDecodeMyBrain ? '' : '<div style="background: #f8fafc; padding: 16px 32px; text-align: center; border-top: 1px solid #e2e8f0;"><p style="margin: 0; color: #94a3b8; font-size: 11px;">Limitless Brain Lab &bull; Health, Wealth & Happiness for All</p></div>'}
           </div>
         `
       };
@@ -5264,7 +5267,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       emailTransporter.sendMail({
         from: EMAIL_FROM,
         to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-        subject: `${adminTitle} - ${customerEmail}`,
+        subject: `${adminTitle} - ${brandName} - ${customerEmail}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
             <div style="padding: 24px 28px;">

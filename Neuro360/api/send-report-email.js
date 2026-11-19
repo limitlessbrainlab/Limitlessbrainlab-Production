@@ -10,7 +10,7 @@ const { requirePatientAccess } = patientAccess;
 // never a *.vercel.app deployment (FRONTEND_URL may point at a stale one).
 const FRONTEND_URL = 'https://limitlessbrainlab.com';
 const FROM_ADDRESS = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'info@limitlessbrainlab.com';
-const EMAIL_FROM = { name: process.env.EMAIL_FROM_NAME?.trim() || 'DecodeMyBrain', address: FROM_ADDRESS };
+const EMAIL_FROM = { name: 'Limitless Brain Lab', address: FROM_ADDRESS };
 // Load the logo from the brand production domain (aligned with the From domain), never a
 // *.vercel.app host. A remote image from a domain other than the sender's is a spam smell;
 // this serverless function can't reliably read /public for a cid: attachment, so serving it

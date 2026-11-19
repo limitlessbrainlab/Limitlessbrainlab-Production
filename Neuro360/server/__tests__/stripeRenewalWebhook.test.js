@@ -19,6 +19,7 @@ test('Stripe webhook records paid invoices, labels receipts, and retries failed 
     app: { post: (_path, _middleware, handler) => { webhook = handler; } },
     express: { raw: () => () => {} },
     recordStripeInvoice,
+    formatEmailFrom: (address, name = 'Limitless Brain Lab') => ({ address, name }),
     stripe: {
       webhooks: { constructEvent: (body) => body },
       customers: { retrieve: (id) => customerLookup(id) },
@@ -51,7 +52,7 @@ test('Stripe webhook records paid invoices, labels receipts, and retries failed 
       notifications.add(key);
       return true;
     },
-    EMAIL_FROM: 'receipts@example.test',
+    EMAIL_FROM: { address: 'receipts@example.test', name: 'Limitless Brain Lab' },
     APP_URL: 'https://example.test',
     LOGO_PATH: 'logo.png',
     LOGO_CID: 'company-logo',
@@ -98,7 +99,12 @@ test('Stripe webhook records paid invoices, labels receipts, and retries failed 
   assert.equal(payments.get(manualInvoice.id).amount, 499);
   assert.equal(payments.get(manualInvoice.id).package_name, 'DecodeMyBrain™ Student');
   assert.match(messages[0].subject, /^Payment Receipt/);
-  assert.match(messages[0].html, /We received your payment/);
+  assert.equal(messages[0].from.name, 'DecodeMyBrain');
+  assert.match(messages[0].subject, /DecodeMyBrain/);
+  assert.match(messages[0].html, /We received your payment to DecodeMyBrain/);
+  assert.match(messages[0].html, /decodemybrain-email/);
+  assert.doesNotMatch(messages[0].html, /Limitless Brain Lab/);
+  assert.equal(messages[0].attachments.length, 0);
   assert.doesNotMatch(messages[0].html, /renew/i);
   assert.match(messages[1].subject, /^Invoice Payment Received/);
   assert.equal((await deliver({ ...invoice, id: null })).statusCode, 500);
@@ -129,6 +135,8 @@ test('Stripe webhook records paid invoices, labels receipts, and retries failed 
   });
   assert.equal(messages.length, 4);
   assert.match(messages[2].subject, /^Subscription Renewed/);
+  assert.equal(messages[2].from.name, 'Limitless Brain Lab');
+  assert.match(messages[2].html, /Your Limitless Brain Lab subscription/);
 
   const missingEmail = { ...manualInvoice, id: 'in_missing_email', customer_email: ' ', customer: 'cus_test' };
   customerLookup = async () => { throw new Error('Stripe unavailable'); };

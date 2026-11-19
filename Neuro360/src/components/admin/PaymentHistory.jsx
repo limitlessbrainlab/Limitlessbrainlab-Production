@@ -38,38 +38,34 @@ const PaymentHistory = ({ selectedClinic }) => {
 
   const loadData = async () => {
     try {
-      // Payment records live across three tables: `payments` (clinic credit
-      // purchases), `patient_payments` and `payment_history` (patient purchases /
-      // subscriptions). Read all three so the SuperAdmin sees every payment.
-      let paymentsRaw = [], patientPaymentsRaw = [], paymentHistoryRaw = [], clinicsData = [];
-
-      try {
-        [paymentsRaw, patientPaymentsRaw, paymentHistoryRaw, clinicsData] = await Promise.all([
-          DatabaseService.get('payments'),
-          DatabaseService.get('patient_payments'),
-          DatabaseService.get('payment_history'),
-          DatabaseService.get('clinics')
-        ]);
-      } catch (dbError) {
-        // Don't swallow a real DB failure into an empty table — surface it so the
-        // outer handler shows a visible error toast instead of a misleading
-        // "No payment transactions found" empty state.
-        console.error('ERROR: Supabase database error:', dbError.message);
-        throw dbError;
+      // Read the shared ledger and patient purchase history.
+      const results = await Promise.allSettled([
+        DatabaseService.get('payments', { throwOnError: true }),
+        DatabaseService.get('patient_payments', { throwOnError: true }),
+        DatabaseService.get('payment_history', { throwOnError: true }),
+        DatabaseService.get('clinics')
+      ]);
+      const errors = results.filter(result => result.status === 'rejected').map(result => result.reason);
+      if (errors.length) {
+        console.error('Error loading payment data:', errors);
+        toast.error('Some payment records could not be loaded');
       }
+      const [paymentsRaw, patientPaymentsRaw, paymentHistoryRaw, clinicsData] = results
+        .map(result => result.status === 'fulfilled' ? result.value : []);
 
-      // Normalize every source (raw snake_case rows) into one common shape
+      // Normalize the payment rows returned by DatabaseService.
       const normalize = (rows, sourceTable) => (rows || []).map(p => ({
         id: p.id,
         clinicId: p.clinic_id || p.clinicId || null,
         patientEmail: p.patient_email || p.patientEmail || null,
+        paymentId: p.stripeInvoiceId || p.paymentId || null,
         amount: Number(p.amount) || 0,
         currency: p.currency || 'INR',
         status: p.status || 'completed',
-        type: p.type || p.payment_type || 'payment',
-        packageName: p.package_name || p.item_name || p.tier || null,
+        type: p.type || p.paymentType || 'payment',
+        packageName: p.packageName || p.itemName || p.tier || null,
         createdAt: p.created_at || p.createdAt || null,
-        stripeSessionId: p.stripe_session_id || null,
+        stripeSessionId: p.stripeSessionId || null,
         paymentSourceTable: sourceTable
       }));
 
@@ -426,8 +422,7 @@ const PaymentHistory = ({ selectedClinic }) => {
                       </div>
                     </td>
                     {/* Actions hidden: receipt download was never implemented (the button
-                        only toasted "Receipt generated"), and the details modal's own
-                        download throws because normalize() never emits payment.paymentId.
+                        only toasted "Receipt generated").
                         Uncomment this and the matching <th> once download actually works.
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end space-x-2">

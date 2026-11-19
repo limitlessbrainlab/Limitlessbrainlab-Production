@@ -79,21 +79,31 @@ const PatientSubscriptions = () => {
     const email = patient.email?.toLowerCase();
     if (!email) return;
 
-    // Patient purchases are spread across several tables (the same ones the
-    // Wallet reads). payment_history holds ONLY subscription events, so reading
-    // it alone left this modal empty for patients who bought coaching /
-    // assessments / frequencies / meditations. Fetch them all and merge.
+    // Merge purchase history with Stripe invoices from the shared payments ledger.
     try {
-      const [payHist, patientPays, assessments, freqs, meds] = await Promise.all([
+      const results = await Promise.all([
         supabase.from('payment_history').select('*').eq('patient_email', email),
         supabase.from('patient_payments').select('*').eq('patient_email', email),
         supabase.from('assessment_purchases').select('*').eq('patient_email', email),
         supabase.from('frequency_purchases').select('*').eq('patient_email', email),
         supabase.from('meditation_purchases').select('*').eq('patient_email', email),
+        supabase.from('payments').select('*').eq('patient_email', email).not('stripe_invoice_id', 'is', null),
       ]);
+      const [payHist, patientPays, assessments, freqs, meds, invoices] = results;
+      const errors = results.map(({ error }) => error).filter(Boolean);
+      if (errors.length) {
+        console.error('Error loading patient payment history:', errors);
+        toast.error('Some payment records could not be loaded');
+      }
 
       const rows = [];
 
+      (invoices.data || []).forEach((p) => rows.push({
+        ...p,
+        rowKey: `invoice-${p.id}`,
+        payment_type: p.package_name || 'Stripe Invoice',
+        payment_provider: p.payment_method,
+      }));
       // Subscription events (already in the shape the modal expects)
       (payHist.data || []).forEach((p) => rows.push({ ...p, rowKey: `payHist-${p.id}` }));
 

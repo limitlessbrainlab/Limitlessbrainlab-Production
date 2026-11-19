@@ -28,6 +28,7 @@ const { createRoutedClient, createAuthClient, stagingOriginMiddleware } = requir
 const { verifiedPortalUser } = require('./utils/verifiedPortalUser');
 const { createAuthorizedBooking } = require('./services/bookingAuthority');
 const { resolveCheckout } = require('./services/checkoutAuthority');
+const { recordStripeInvoice } = require('./services/stripeInvoicePayment');
 const { requirePatientEmailAccess } = require('./utils/patientEmailAccess');
 const { patientNotificationAccess } = require('./middleware/patientNotificationAccess');
 const { requireClinicAccess } = require('./utils/patientAccess');
@@ -97,6 +98,8 @@ const activeTransporter = (() => {
 const emailTransporter = activeTransporter;
 const mailerConfigured = gmailConfigured;
 const ACTIVE_MAIL_PROVIDER = gmailConfigured ? 'gmail' : 'none';
+const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME?.trim() || 'DecodeMyBrain';
+const formatEmailFrom = address => ({ name: EMAIL_FROM_NAME, address });
 
 // Deliverability: HTML-only mail scores worse with spam filters, so derive a
 // plain-text alternative for every outbound mail, and set Reply-To so replies
@@ -227,7 +230,7 @@ function enhanceMailOptions(mailOptions) {
   // weakens the brand/trust signal that spam filters look at. Wrap bare addresses; leave
   // already-named ("Name" <addr>) values untouched.
   if (enhanced.from && typeof enhanced.from === 'string' && !enhanced.from.includes('<')) {
-    enhanced.from = `"Limitless Brain Lab" <${enhanced.from.trim()}>`;
+    enhanced.from = formatEmailFrom(enhanced.from.trim());
   }
   // Add List-Unsubscribe to every message. Gmail/Outlook reward its presence with better
   // inbox placement. Idempotent: the report/OTP flows that already set it are left as-is.
@@ -290,7 +293,8 @@ const DEPLOY_SIGNATURE = process.env.DEPLOY_SIGNATURE ||
 const SERVER_VERSION = DEPLOY_SIGNATURE;
 
 // Outbound email "From" address (all emails to users/patients/clinics)
-const EMAIL_FROM = `"Limitless Brain Lab" <${process.env.EMAIL_FROM || 'info@limitlessbrainlab.com'}>`;
+const EMAIL_FROM = formatEmailFrom(process.env.EMAIL_FROM || 'info@limitlessbrainlab.com');
+const SMTP_FROM = formatEmailFrom(process.env.EMAIL_FROM || process.env.EMAIL_USER || EMAIL_FROM.address);
 
 // Internal audit copy: specific credential + report emails are CC'd here (visible to
 // the recipient — deliberately CC, not BCC) so the business keeps a record of every
@@ -4011,7 +4015,7 @@ app.post('/api/wallet/invoice-email', async (req, res) => {
       : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
     const mailOptions = {
-      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      from: SMTP_FROM,
       to: email,
       subject: `Your Neuro360 Invoice ${invoice.id}`,
       attachments: getLogoAttachment(),
@@ -5170,33 +5174,45 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
       console.error('Database error:', dbError);
     }
 
-  // Handle subscription renewal success
+  // Record paid Stripe invoices and notify the customer and admin.
   } else if (event.type === 'invoice.payment_succeeded') {
     const invoice = event.data.object;
-    const customerEmail = invoice.customer_email;
-    const amountPaid = (invoice.amount_paid / 100).toFixed(2);
-    const currency = (invoice.currency || 'USD').toUpperCase();
+    if (invoice.status !== 'paid') return res.json({ received: true });
 
-    console.log(`✅ Subscription renewal successful for ${customerEmail} - ${currency} ${amountPaid}`);
+    let result;
+    try {
+      result = await recordStripeInvoice(invoice, stripe, supabase);
+      if (result.payerUnresolved) throw new Error('Stripe invoice has no customer email');
+    } catch (error) {
+      console.error('Stripe invoice payment record failed:', invoice.id, error.message);
+      return res.status(500).json({ error: 'Failed to record Stripe invoice payment' });
+    }
 
-    if (mailerConfigured && customerEmail) {
-      const renewalMail = {
+    const { customerEmail, isRenewal, payment } = result;
+    const { currency } = payment;
+    const amountPaid = payment.amount.toFixed(2);
+    const receiptTitle = isRenewal ? 'Subscription Renewed' : 'Payment Receipt';
+    const adminTitle = isRenewal ? 'Subscription Renewal Received' : 'Invoice Payment Received';
+    console.log(`✅ ${adminTitle}: ${invoice.id} - ${currency} ${amountPaid}`);
+
+    if (mailerConfigured && await claimNotificationOnce(`subscription:${invoice.id}:renewal-emails`)) {
+      const receiptMail = {
         from: EMAIL_FROM,
         to: customerEmail,
-        subject: `Subscription Renewed Successfully - Limitless Brain Lab`,
+        subject: `${receiptTitle} - Limitless Brain Lab`,
         attachments: [{ filename: 'logo.png', path: LOGO_PATH, cid: LOGO_CID }],
         html: `
           <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
             <div style="background: linear-gradient(135deg, #323956 0%, #1a1f36 100%); padding: 24px 32px; text-align: center;">
               <img src="cid:company-logo" alt="Limitless Brain Lab" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover;" />
-              <h1 style="color: #ffffff; margin: 12px 0 0; font-size: 20px;">Subscription Renewed</h1>
+              <h1 style="color: #ffffff; margin: 12px 0 0; font-size: 20px;">${receiptTitle}</h1>
             </div>
             <div style="padding: 28px 32px;">
-              <p style="color: #333; font-size: 15px; line-height: 1.6;">Your Limitless Brain Lab subscription has been renewed successfully.</p>
+              <p style="color: #333; font-size: 15px; line-height: 1.6;">${isRenewal ? 'Your Limitless Brain Lab subscription has been renewed successfully.' : 'We received your payment to Limitless Brain Lab.'}</p>
               <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px 20px; margin: 16px 0;">
                 <p style="margin: 0; color: #166534; font-weight: 600;">Amount Charged: ${currency} ${amountPaid}</p>
               </div>
-              <p style="color: #555; font-size: 14px;">Your access to all features continues uninterrupted. Thank you for being part of the Limitless Brain Lab community.</p>
+              <p style="color: #555; font-size: 14px;">Invoice ID: ${invoice.id}</p>
               <div style="text-align: center; margin-top: 24px;">
                 <a href="${APP_URL}/dashboard" style="display: inline-block; background: #323956; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px;">Go to Dashboard</a>
               </div>
@@ -5207,28 +5223,27 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
           </div>
         `
       };
-      emailTransporter.sendMail(renewalMail)
-        .then(() => console.log('✉️ Renewal confirmation email sent'))
-        .catch(err => console.error('❌ Renewal email failed:', err.message));
+      emailTransporter.sendMail(receiptMail)
+        .then(() => console.log('✉️ Stripe invoice receipt sent'))
+        .catch(err => console.error('❌ Stripe invoice receipt failed:', err.message));
 
-      // Internal copy — renewals previously notified no one internally
       emailTransporter.sendMail({
         from: EMAIL_FROM,
         to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-        subject: `Subscription Renewal Received - ${customerEmail}`,
+        subject: `${adminTitle} - ${customerEmail}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
             <div style="padding: 24px 28px;">
-              <h2 style="color: #323956; margin-top: 0;">Subscription Renewal</h2>
+              <h2 style="color: #323956; margin-top: 0;">${adminTitle}</h2>
               <p><strong>Customer:</strong> ${customerEmail}</p>
               <p><strong>Amount:</strong> ${currency} ${amountPaid}</p>
               <p><strong>Invoice ID:</strong> ${invoice.id}</p>
-              <p><strong>Date:</strong> ${new Date().toISOString()}</p>
+              <p><strong>Date:</strong> ${payment.created_at}</p>
             </div>
             ${CONTACT_STRIP_HTML}
           </div>
         `
-      }).catch(err => console.error('Admin renewal email failed:', err.message));
+      }).catch(err => console.error('Admin Stripe invoice email failed:', err.message));
     }
 
   // Handle failed payment
@@ -5245,7 +5260,7 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 
     if (mailerConfigured && customerEmail) {
       const failedMail = {
-        from: process.env.EMAIL_USER,
+        from: formatEmailFrom(process.env.EMAIL_USER || EMAIL_FROM.address),
         to: customerEmail,
         subject: `Payment Failed - Action Required - Limitless Brain Lab`,
         attachments: [{ filename: 'logo.png', path: LOGO_PATH, cid: LOGO_CID }],
@@ -7162,7 +7177,7 @@ app.post('/api/send-welcome-email', authMiddleware, patientNotificationAccess('e
 
     // Use clinic's own SMTP if configured, otherwise use default
     let transporter = emailTransporter;
-    let fromEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+    let fromEmail = SMTP_FROM;
     console.log('✅ Using fromEmail:', fromEmail);
 
     if (clinicSmtpEmail && clinicSmtpPassword) {
@@ -7180,12 +7195,12 @@ app.post('/api/send-welcome-email', authMiddleware, patientNotificationAccess('e
           socketTimeout: 120000,
           tls: { rejectUnauthorized: false, minVersion: 'TLSv1.2' }
         }));
-        fromEmail = clinicSmtpEmail;
+        fromEmail = { address: clinicSmtpEmail };
         console.log('✅ Using clinic SMTP:', clinicSmtpEmail);
       } catch (smtpError) {
         console.error('❌ Clinic SMTP setup failed, falling back to default:', smtpError.message);
         transporter = emailTransporter;
-        fromEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+        fromEmail = SMTP_FROM;
       }
     } else if (clinicSmtpEmail || clinicSmtpPassword) {
       console.warn('⚠️ Clinic SMTP incomplete - missing email or password, using default');
@@ -7274,7 +7289,7 @@ app.post('/api/send-welcome-email', authMiddleware, patientNotificationAccess('e
     } catch (sendErr) {
       if (transporter !== emailTransporter) {
         console.error('❌ Clinic SMTP send failed, retrying with default transporter:', sendErr.message);
-        mailOptions.from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+        mailOptions.from = SMTP_FROM;
         sendResult = await emailTransporter.sendMail(mailOptions);
       } else {
         throw sendErr;
@@ -7386,7 +7401,7 @@ app.post('/api/send-email-update-notification', authMiddleware, patientNotificat
 
     // Use clinic's own SMTP if configured, otherwise use default
     let transporter = emailTransporter;
-    let fromEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+    let fromEmail = SMTP_FROM;
 
     if (clinicSmtpEmail && clinicSmtpPassword) {
       try {
@@ -7403,12 +7418,12 @@ app.post('/api/send-email-update-notification', authMiddleware, patientNotificat
           socketTimeout: 120000,
           tls: { rejectUnauthorized: false, minVersion: 'TLSv1.2' }
         }));
-        fromEmail = clinicSmtpEmail;
+        fromEmail = { address: clinicSmtpEmail };
         console.log('✅ Using clinic SMTP:', clinicSmtpEmail);
       } catch (smtpError) {
         console.error('❌ Clinic SMTP setup failed, falling back to default:', smtpError.message);
         transporter = emailTransporter;
-        fromEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+        fromEmail = SMTP_FROM;
       }
     }
 
@@ -7502,7 +7517,7 @@ app.post('/api/send-email-update-notification', authMiddleware, patientNotificat
     } catch (sendErr) {
       if (transporter !== emailTransporter) {
         console.error('❌ Clinic SMTP send failed, retrying with default transporter:', sendErr.message);
-        mailOptions.from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+        mailOptions.from = SMTP_FROM;
         sendResult = await emailTransporter.sendMail(mailOptions);
       } else {
         throw sendErr;
@@ -7632,7 +7647,7 @@ app.post('/api/send-report-email', authMiddleware, patientNotificationAccess('pa
       from: fromEmail,
       to: patientEmail,
       cc: INTERNAL_COPY_EMAIL,
-      replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || EMAIL_FROM,
+      replyTo: process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || EMAIL_FROM.address,
       headers: {
         'List-Unsubscribe': `<mailto:${process.env.EMAIL_REPLY_TO || process.env.EMAIL_USER || 'noreply@limitlessbrainlab.com'}?subject=unsubscribe>`,
         'X-Mailer': 'Limitless Brain Lab Mailer'

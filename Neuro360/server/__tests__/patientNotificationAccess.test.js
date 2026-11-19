@@ -30,6 +30,20 @@ test('patient report email is bound to a clinic patient and gets a fresh signed 
   assert.deepEqual(f.calls.at(-1), ['sign', 'patients_documents', 'p1/report.pdf', 604800]);
 });
 
+test('report email keeps a verified storage reference instead of minting a signed URL', async () => {
+  const f = fixture();
+  const req = {
+    path: '/api/send-report-email',
+    user: { role: 'clinic_admin', clinic_id: 'c1' },
+    body: { patientEmail: 'PERSON@example.test', reportUrl: 'https://project.supabase.co/storage/v1/object/public/neurosense-reports/p1/report.pdf' }
+  };
+  await f.run(req);
+  assert.equal(f.state().next, 1);
+  assert.deepEqual(req.reportAttachmentRef, { bucket: 'neurosense-reports', path: 'p1/report.pdf' });
+  assert.equal(req.body.reportUrl, 'https://limitlessbrainlab.com/patient/login');
+  assert.equal(f.calls.some(call => call[0] === 'sign'), false);
+});
+
 test('unverified and cross-clinic email recipients are denied before mail handlers', async () => {
   const anonymous = fixture();
   await anonymous.run({ user: null, body: { patientEmail: 'person@example.test' } });

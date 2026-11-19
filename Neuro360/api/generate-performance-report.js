@@ -142,7 +142,7 @@ export default async function handler(req, res) {
     // Generation-time size budget: NPR PDFs are vector-first and must stay email-attachable
     // (send-report-email attaches the bytes directly up to a 15MB Gmail-safe cap).
     if (pdf.length > 10 * 1024 * 1024) {
-      console.warn(`[report-size] NPR exceeds the 10MB email budget: ${(pdf.length / 1048576).toFixed(2)} MB — email will fall back to a 7-day signed link.`);
+      console.warn(`[report-size] NPR exceeds the 10MB target: ${(pdf.length / 1048576).toFixed(2)} MB — email attachment hard limit is 15 MB; no storage link is sent if exceeded.`);
     }
     const fileName = `claude-reports/NPR-${String(reportData.patient.reportId || job.id).replace(/\D/g, '')}-${Date.now()}.pdf`;
     const { error: uploadError } = await supabase.storage.from('neurosense-reports')

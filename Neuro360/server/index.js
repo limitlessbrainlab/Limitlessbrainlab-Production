@@ -7610,27 +7610,19 @@ app.post('/api/send-report-email', authMiddleware, patientNotificationAccess('pa
   try {
     const { patientId, reportUrl, generatedAt, reportType } = req.body || {};
     const { requirePatientAccess: requireOwnedPatient } = require('./utils/patientAccess');
-    if (!patientId || !reportUrl || req.authorizedPatient?.id !== patientId) return res.status(403).json({ success: false, message: 'Report access denied' });
+    const reportRef = req.reportAttachmentRef;
+    if (!patientId || !reportUrl || !reportRef || req.authorizedPatient?.id !== patientId) return res.status(403).json({ success: false, message: 'Report access denied' });
     const patient = await requireOwnedPatient(req.user, patientId, null, supabase);
-    const reference = new URL(reportUrl, APP_URL);
     let owner;
-    if (req.reportReferenceIsLocal) {
-      owner = patient.id;
-    } else if (reference.pathname.startsWith('/uploads/')) {
-      const trustedOrigins = new Set([...allowedOrigins, APP_URL, process.env.RENDER_EXTERNAL_URL, process.env.BACKEND_PUBLIC_URL].filter(Boolean).map(value => new URL(value).origin));
-      if (!trustedOrigins.has(reference.origin)) return res.status(400).json({ success: false, message: 'Invalid report reference' });
-      const filename = decodeURIComponent(reference.pathname.slice('/uploads/'.length));
-      if (!filename || filename.includes('/') || filename.includes('\\')) return res.status(400).json({ success: false, message: 'Invalid report reference' });
-      const { data, error } = await supabase.rpc('resolve_local_report_owner', { p_filename: filename });
+    if (reportRef.local) {
+      const { data, error } = await supabase.rpc('resolve_local_report_owner', { p_filename: reportRef.filename });
       if (error) throw error;
       owner = data;
-    } else {
-      const match = reference.pathname.match(/^\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/]+)\/(.+)$/);
-      if (reference.origin !== new URL(supabase.supabaseUrl).origin || !match || !['patients_documents','neurosense-reports','patient-reports','edf-files','qeeg-uploads'].includes(match[1])) return res.status(400).json({ success: false, message: 'Invalid report reference' });
-      const { data, error } = await supabase.rpc('resolve_document_owner', { p_bucket: match[1], p_path: decodeURIComponent(match[2]) });
+    } else if (reportRef.bucket && reportRef.path) {
+      const { data, error } = await supabase.rpc('resolve_document_owner', { p_bucket: reportRef.bucket, p_path: reportRef.path });
       if (error) throw error;
       owner = data;
-    }
+    } else return res.status(400).json({ success: false, message: 'Invalid report reference' });
     if (owner !== patient.id) return res.status(403).json({ success: false, message: 'Report access denied' });
     const patientName = patient.full_name || patient.name || 'Patient';
     const patientEmail = req.authorizedPatient?.email || patient.email;
@@ -7643,7 +7635,6 @@ app.post('/api/send-report-email', authMiddleware, patientNotificationAccess('pa
       patientEmail,
       clinicName,
       clinicEmail,
-      reportUrl: reportUrl ? reportUrl.slice(0, 100) : undefined,
       generatedAt
     });
 
@@ -7677,8 +7668,32 @@ app.post('/api/send-report-email', authMiddleware, patientNotificationAccess('pa
     const reportLabel = isNeuroSense ? 'NeuroSense Report' : 'Neuro Performance Report';
     const buildReportHtml = isNeuroSense ? getNeuroSenseReportEmailHtml : getReportEmailHtml;
 
-    const reportHtmlPatient = buildReportHtml({ isClinic: false, patientName, clinicName, reportUrl, loginUrl: patientLoginUrl, generatedAt });
-    const reportHtmlClinic = buildReportHtml({ isClinic: true, patientName, clinicName, reportUrl, loginUrl: clinicLoginUrl, generatedAt });
+    let pdfBytes;
+    try {
+      if (req.reportAttachmentRef?.local) {
+        pdfBytes = await fs.promises.readFile(path.join(__dirname, 'uploads', req.reportAttachmentRef.filename));
+      } else if (req.reportAttachmentRef?.bucket && req.reportAttachmentRef?.path) {
+        const { data, error } = await supabase.storage.from(req.reportAttachmentRef.bucket).download(req.reportAttachmentRef.path);
+        if (error) throw error;
+        pdfBytes = Buffer.from(await data.arrayBuffer());
+      } else {
+        throw new Error('Verified report file reference is missing');
+      }
+    } catch (error) {
+      console.error('Report PDF attachment could not be loaded:', error.message);
+      return res.status(502).json({ success: false, message: 'Could not attach the report PDF; no email was sent' });
+    }
+    if (pdfBytes.length > 15 * 1024 * 1024) {
+      return res.status(413).json({ success: false, message: 'Report PDF exceeds the 15 MB email attachment limit; no email was sent' });
+    }
+    const safePatientName = String(patientName || 'Patient').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'Patient';
+    const pdfAttachment = {
+      filename: `${isNeuroSense ? 'NeuroSense' : 'Neuro-Performance'}-Report-${safePatientName}.pdf`,
+      content: pdfBytes,
+      contentType: 'application/pdf'
+    };
+    const reportHtmlPatient = buildReportHtml({ isClinic: false, patientName, clinicName, loginUrl: patientLoginUrl, generatedAt, attached: true });
+    const reportHtmlClinic = buildReportHtml({ isClinic: true, patientName, clinicName, loginUrl: clinicLoginUrl, generatedAt, attached: true });
 
     const patientMailOptions = {
       from: fromEmail,
@@ -7690,8 +7705,8 @@ app.post('/api/send-report-email', authMiddleware, patientNotificationAccess('pa
         'X-Mailer': 'Limitless Brain Lab Mailer'
       },
       subject: `Your ${reportLabel} is Ready`,
-      text: `Hi ${patientName || 'there'},\n\nYour ${reportLabel} is ready.\n\nDownload your report (PDF): ${reportUrl}\nLog in to your portal: ${patientLoginUrl}\n\nThe Limitless Brain Lab Team`,
-      attachments: getLogoAttachment(),
+      text: `Hi ${patientName || 'there'},\n\nYour ${reportLabel} is ready and attached to this email as a PDF.\nLog in to your portal: ${patientLoginUrl}\n\nThe Limitless Brain Lab Team`,
+      attachments: [...getLogoAttachment(), pdfAttachment],
       html: reportHtmlPatient
     };
 
@@ -7707,8 +7722,8 @@ app.post('/api/send-report-email', authMiddleware, patientNotificationAccess('pa
         to: clinicEmail,
         cc: INTERNAL_COPY_EMAIL,
         subject: `${reportLabel} — ${patientName || 'Patient'}`,
-        text: `Hello ${clinicName || 'Clinic'},\n\nThe ${reportLabel} for ${patientName || 'your patient'} is ready for clinical review.\n\nDownload the report (PDF): ${reportUrl}\nLog in to your portal: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
-        attachments: getLogoAttachment(),
+        text: `Hello ${clinicName || 'Clinic'},\n\nThe ${reportLabel} for ${patientName || 'your patient'} is ready for clinical review and attached to this email as a PDF.\nLog in to your portal: ${clinicLoginUrl}\n\nThe Limitless Brain Lab Team`,
+        attachments: [...getLogoAttachment(), pdfAttachment],
         html: reportHtmlClinic
       };
       try {

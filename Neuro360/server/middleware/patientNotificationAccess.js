@@ -22,11 +22,12 @@ function patientNotificationAccess(emailField, db = createRoutedClient()) {
           const backendOrigins = [process.env.RENDER_EXTERNAL_URL, process.env.BACKEND_PUBLIC_URL].filter(Boolean).map(value => new URL(value).origin);
           if (!backendOrigins.includes(url.origin)) return res.status(400).json({ message: 'Invalid report location' });
           const filename = decodeURIComponent(url.pathname.slice('/uploads/'.length));
-          if (!filename || filename.includes('/') || filename.includes('\\')) return res.status(400).json({ message: 'Invalid report location' });
+          if (!filename || filename.includes('/') || filename.includes('\\') || !/\.pdf$/i.test(filename)) return res.status(400).json({ message: 'Invalid report location' });
           const { data: owner, error: ownerError } = await db.rpc('resolve_local_report_owner', { p_filename: filename });
           if (ownerError) throw ownerError;
           if (owner !== patient.id) return res.status(403).json({ message: 'Report access denied' });
           req.reportReferenceIsLocal = true;
+          req.reportAttachmentRef = { local: true, filename };
           req.body.reportUrl = 'https://limitlessbrainlab.com/patient/login';
         } else {
         const match = url.pathname.match(/^\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/]+)\/(.+)$/);
@@ -42,9 +43,14 @@ function patientNotificationAccess(emailField, db = createRoutedClient()) {
           if (clinicOwnerError) throw clinicOwnerError;
           if (owner || ownerClinic !== (patient.clinic_id || patient.org_id)) return res.status(403).json({ message: 'Report access denied' });
         }
-        const { data: signed, error: signedError } = await db.storage.from(args.p_bucket).createSignedUrl(args.p_path, 604800);
-        if (signedError || !signed?.signedUrl) throw signedError || new Error('Report signing failed');
-        req.body.reportUrl = signed.signedUrl;
+        req.reportAttachmentRef = { bucket: args.p_bucket, path: args.p_path };
+        if (req.path === '/api/send-report-email') {
+          req.body.reportUrl = 'https://limitlessbrainlab.com/patient/login';
+        } else {
+          const { data: signed, error: signedError } = await db.storage.from(args.p_bucket).createSignedUrl(args.p_path, 604800);
+          if (signedError || !signed?.signedUrl) throw signedError || new Error('Report signing failed');
+          req.body.reportUrl = signed.signedUrl;
+        }
         }
       }
       req.authorizedPatient = patient;

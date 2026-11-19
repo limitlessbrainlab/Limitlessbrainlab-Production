@@ -21,6 +21,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/a
 const WebsitePayments = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [selectedItem, setSelectedItem] = useState(null);
@@ -35,17 +36,14 @@ const WebsitePayments = () => {
   const loadData = async () => {
     try {
       setLoading(true);
+      setLoadError(false);
       const response = await fetch(`${API_BASE_URL}/website-payments`, { headers: await StripeService.getCheckoutHeaders() });
       const result = await response.json();
-      if (result.success) {
-        setData(result.data || []);
-      } else {
-        toast.error('Failed to load payment records');
-        setData([]);
-      }
+      if (!response.ok || !result.success) throw new Error(result.message || 'Failed to load payment records');
+      setData(result.data || []);
     } catch (err) {
       console.error('Error:', err);
-      toast.error('Failed to load data');
+      setLoadError(true);
       setData([]);
     } finally {
       setLoading(false);
@@ -61,7 +59,7 @@ const WebsitePayments = () => {
   };
 
   const formatAmount = (amount, currency) => {
-    if (!amount) return 'N/A';
+    if (amount == null || amount === '') return 'N/A';
     return `${currency || 'USD'} ${parseFloat(amount).toFixed(2)}`;
   };
 
@@ -114,7 +112,7 @@ const WebsitePayments = () => {
 
   // Export CSV
   const exportCSV = () => {
-    const headers = ['Date', 'Type', 'Product', 'Email', 'Amount', 'Currency', 'Status', 'Session ID'];
+    const headers = ['Date', 'Type', 'Product', 'Email', 'Amount', 'Currency', 'Status', 'Session ID', 'Stripe Invoice ID'];
     const rows = filteredData.map(item => [
       formatDate(item.date),
       item.type,
@@ -123,9 +121,14 @@ const WebsitePayments = () => {
       item.amount,
       item.currency,
       item.status,
-      item.stripe_session_id || ''
+      item.stripe_session_id || '',
+      item.stripe_invoice_id || ''
     ]);
-    const csv = [headers, ...rows].map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n');
+    const csv = [headers, ...rows].map(row => row.map(cell => {
+      const value = String(cell ?? '');
+      const text = typeof cell === 'string' && /^\s*[=+@-]/.test(value) ? `'${value}` : value;
+      return `"${text.replace(/"/g, '""')}"`;
+    }).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -199,7 +202,7 @@ const WebsitePayments = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by email, product..."
+              placeholder="Search by email, product, or invoice ID"
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
@@ -216,11 +219,13 @@ const WebsitePayments = () => {
             <option value="Meditation">Meditations</option>
             <option value="Coaching">Coaching</option>
             <option value="Subscription">Subscriptions</option>
+            <option value="Stripe Invoice">Stripe Invoices</option>
           </select>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={exportCSV}
+            disabled={loading || loadError}
             className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             <Download className="w-4 h-4" />
@@ -238,7 +243,7 @@ const WebsitePayments = () => {
 
       {/* Count */}
       <div className="mb-3 text-sm text-gray-500 dark:text-gray-400">
-        {filteredData.length} {filteredData.length === 1 ? 'record' : 'records'} found
+        {!loading && !loadError && `${filteredData.length} ${filteredData.length === 1 ? 'record' : 'records'} found`}
       </div>
 
       {/* Table */}
@@ -248,6 +253,8 @@ const WebsitePayments = () => {
             <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
             <span className="ml-2 text-gray-500 dark:text-gray-400">Loading...</span>
           </div>
+        ) : loadError ? (
+          <p role="alert" className="text-center py-16 text-gray-600 dark:text-gray-300">Payment records could not be loaded. Select Refresh to try again.</p>
         ) : filteredData.length === 0 ? (
           <div className="text-center py-16">
             <CreditCard className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
@@ -337,6 +344,7 @@ const WebsitePayments = () => {
                 { icon: Banknote, label: 'Amount', value: formatAmount(selectedItem.amount, selectedItem.currency) },
                 { icon: CreditCard, label: 'Status', value: selectedItem.status },
                 { icon: CreditCard, label: 'Stripe Session', value: selectedItem.stripe_session_id },
+                { icon: CreditCard, label: 'Stripe Invoice ID', value: selectedItem.stripe_invoice_id },
               ].map((row, i) => {
                 if (!row.value || row.value === 'N/A') return null;
                 const Icon = row.icon;

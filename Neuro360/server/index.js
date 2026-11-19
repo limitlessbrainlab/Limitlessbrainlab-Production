@@ -1673,7 +1673,7 @@ app.delete('/api/inquiries/:type/:id', authMiddleware, async (req, res) => {
 
 // ============ Website Payment Records API ============
 
-// GET all payment records from all purchase tables
+// GET website purchase and Stripe payment records
 app.get('/api/website-payments', authMiddleware, async (req, res) => {
   try {
     if (req.user?.role !== 'super_admin') return res.status(403).json({ success: false, message: 'Super admin access required' });
@@ -1806,16 +1806,50 @@ app.get('/api/website-payments', authMiddleware, async (req, res) => {
       });
     }
 
-    // De-dup by Stripe session id — frequency/meditation purchases are written to
-    // BOTH their *_purchases table and patient_payments, so they would otherwise
-    // appear twice. Rows without a session id are always kept.
-    const seenSessionIds = new Set();
-    const dedupedPayments = allPayments.filter(p => {
-      if (!p.stripe_session_id) return true;
-      if (seenSessionIds.has(p.stripe_session_id)) return false;
-      seenSessionIds.add(p.stripe_session_id);
-      return true;
-    });
+    // Read every page of Stripe ledger entries, including payments with no purchase row.
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+      const { data: stripePayments, error } = await supabase.from('payments')
+        .select('id,type,package_name,patient_email,amount,currency,status,stripe_session_id,stripe_invoice_id,created_at')
+        .or('stripe_invoice_id.not.is.null,stripe_session_id.like.cs_*,and(payment_method.eq.stripe,stripe_session_id.not.is.null)')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(offset, offset + pageSize - 1);
+      if (error) throw error;
+
+      for (const item of stripePayments) {
+        const type = item.type === 'subscription_renewal' ? 'Subscription'
+          : item.stripe_invoice_id && !item.stripe_session_id ? 'Stripe Invoice'
+          : ['patient_subscription', 'subscription'].includes(item.type) ? 'Subscription' : ppType(item.type);
+        allPayments.push({
+          id: item.id,
+          type,
+          product: item.package_name || type,
+          email: item.patient_email,
+          amount: item.amount,
+          currency: item.currency || 'USD',
+          status: item.status || 'completed',
+          stripe_session_id: item.stripe_session_id,
+          stripe_invoice_id: item.stripe_invoice_id,
+          date: item.created_at
+        });
+      }
+      if (stripePayments.length < pageSize) break;
+    }
+
+    // Keep the source purchase details and attach the invoice ID for the same session.
+    const paymentsBySession = new Map();
+    const dedupedPayments = [];
+    for (const payment of allPayments) {
+      const sessionId = payment.stripe_session_id;
+      const existing = paymentsBySession.get(sessionId);
+      if (existing) {
+        if (payment.stripe_invoice_id) existing.stripe_invoice_id = payment.stripe_invoice_id;
+        continue;
+      }
+      if (sessionId) paymentsBySession.set(sessionId, payment);
+      dedupedPayments.push(payment);
+    }
 
     // Sort all by date descending
     dedupedPayments.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));

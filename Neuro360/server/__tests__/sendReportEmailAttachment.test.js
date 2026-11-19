@@ -11,21 +11,29 @@ test('report email attaches the owned PDF and never sends its storage URL', asyn
   let handler;
   let fileBytes = Buffer.from('%PDF-report');
   let downloadError = null;
+  let activeSends = 0;
+  let maxConcurrentSends = 0;
   vm.runInNewContext(source.slice(start, end + '\n});'.length), {
     app: { post: (_path, _auth, _access, callback) => { handler = callback; } },
     authMiddleware() {},
     patientNotificationAccess: () => () => {},
-    require: () => ({ requirePatientAccess: async () => ({ id: 'patient-1', full_name: 'Rakesh', clinic_id: null }) }),
+    require: () => ({ requirePatientAccess: async () => ({ id: 'patient-1', full_name: 'Rakesh', clinic_id: 'clinic-1' }) }),
     supabase: {
       rpc: async () => ({ data: 'patient-1' }),
-      from: () => ({ select() { return this; }, eq() { return this; }, async maybeSingle() { return { data: null }; } }),
+      from: () => ({ select() { return this; }, eq() { return this; }, async maybeSingle() { return { data: { email: 'clinic@example.test', clinic_name: 'Clinic' } }; } }),
       storage: { from: bucket => ({ async download(objectPath) {
         assert.equal(bucket, 'neurosense-reports');
         assert.equal(objectPath, 'reports/patient/report.pdf');
         return downloadError ? { error: downloadError } : { data: { arrayBuffer: async () => fileBytes.buffer.slice(fileBytes.byteOffset, fileBytes.byteOffset + fileBytes.byteLength) } };
       } }) }
     },
-    emailTransporter: { async sendMail(message) { messages.push(message); } },
+    emailTransporter: { async sendMail(message) {
+      messages.push(message);
+      activeSends++;
+      maxConcurrentSends = Math.max(maxConcurrentSends, activeSends);
+      await new Promise(resolve => setTimeout(resolve, 20));
+      activeSends--;
+    } },
     getNeuroSenseReportEmailHtml: options => JSON.stringify(options),
     getReportEmailHtml: options => JSON.stringify(options),
     getLogoAttachment: () => [],
@@ -54,7 +62,8 @@ test('report email attaches the owned PDF and never sends its storage URL', asyn
   };
 
   assert.equal((await deliver()).statusCode, 200);
-  assert.equal(messages.length, 1);
+  assert.equal(messages.length, 2);
+  assert.equal(maxConcurrentSends, 2);
   const attachment = messages[0].attachments.find(item => item.contentType === 'application/pdf');
   assert.equal(attachment.filename, 'NeuroSense-Report-Rakesh.pdf');
   assert.equal(attachment.content.toString(), '%PDF-report');
@@ -64,10 +73,10 @@ test('report email attaches the owned PDF and never sends its storage URL', asyn
 
   downloadError = new Error('missing PDF');
   assert.equal((await deliver()).statusCode, 502);
-  assert.equal(messages.length, 1);
+  assert.equal(messages.length, 2);
 
   fileBytes = Buffer.alloc(15 * 1024 * 1024 + 1);
   downloadError = null;
   assert.equal((await deliver()).statusCode, 413);
-  assert.equal(messages.length, 1);
+  assert.equal(messages.length, 2);
 });

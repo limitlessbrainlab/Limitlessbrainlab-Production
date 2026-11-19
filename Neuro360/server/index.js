@@ -7710,14 +7710,9 @@ app.post('/api/send-report-email', authMiddleware, patientNotificationAccess('pa
       html: reportHtmlPatient
     };
 
-    let clinicEmailSent = false;
-
-    // Always send to the patient first. The clinic copy is non-fatal.
-    await transporter.sendMail(patientMailOptions);
-    console.log('✉️ Patient report email sent:', patientEmail);
-
+    let clinicMailOptions;
     if (clinicEmail) {
-      const clinicMailOptions = {
+      clinicMailOptions = {
         from: fromEmail,
         to: clinicEmail,
         cc: INTERNAL_COPY_EMAIL,
@@ -7726,14 +7721,19 @@ app.post('/api/send-report-email', authMiddleware, patientNotificationAccess('pa
         attachments: [...getLogoAttachment(), pdfAttachment],
         html: reportHtmlClinic
       };
-      try {
-        await transporter.sendMail(clinicMailOptions);
-        clinicEmailSent = true;
-        console.log('✉️ Clinic report email sent:', clinicEmail);
-      } catch (clinicError) {
-        console.error('⚠️ Clinic report email failed:', clinicError);
-      }
     }
+
+    // Start both independent deliveries together so the patient does not wait for two SMTP round trips.
+    const deliveryResults = await Promise.allSettled([
+      transporter.sendMail(patientMailOptions),
+      ...(clinicMailOptions ? [transporter.sendMail(clinicMailOptions)] : [])
+    ]);
+    const patientDelivery = deliveryResults[0];
+    if (patientDelivery.status === 'rejected') throw patientDelivery.reason;
+    console.log('✉️ Patient report email sent:', patientEmail);
+    const clinicEmailSent = Boolean(clinicMailOptions && deliveryResults[1]?.status === 'fulfilled');
+    if (clinicEmailSent) console.log('✉️ Clinic report email sent:', clinicEmail);
+    else if (clinicMailOptions) console.error('⚠️ Clinic report email failed:', deliveryResults[1].reason);
 
     const message = clinicEmail
       ? clinicEmailSent

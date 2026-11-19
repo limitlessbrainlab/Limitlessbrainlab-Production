@@ -97,6 +97,7 @@ const AlgorithmDataProcessor = () => {
   const [dataType, setDataType] = useState(null); // 'raw' or 'zscore'
   const [parameterNotes, setParameterNotes] = useState(''); // Notes for parameter analysis
   const [isSendingReport, setIsSendingReport] = useState(false); // State for sending report to clinic/patient
+  const [sendingHistoryReportId, setSendingHistoryReportId] = useState(null);
   const [reportSent, setReportSent] = useState(false); // Locks send button after successful send (prevents duplicate emails)
   const [claudeReportSent, setClaudeReportSent] = useState(false); // Same for Claude report send button
   const [processingStartTime, setProcessingStartTime] = useState(null); // Track processing start time
@@ -1751,6 +1752,7 @@ const AlgorithmDataProcessor = () => {
     if (await blockIfNoCredits(selectedPatient?.clinicId || selectedPatient?.clinic_id || selectedPatient?.org_id)) return;
 
     setIsSendingReport(true);
+    const sendToastId = toast.loading('Preparing PDF and sending it to the patient and clinic…');
 
     try {
       const patientName = getPatientName(selectedPatient);
@@ -1886,22 +1888,22 @@ const AlgorithmDataProcessor = () => {
           const emailErrorData = await emailResponse.json().catch(() => null);
           const emailErrorMessage = emailErrorData?.message || emailErrorData?.error || `Server error (${emailResponse.status})`;
           console.error('Failed to send report emails:', emailErrorMessage);
-          toast.error(`Report saved, but email delivery failed: ${emailErrorMessage}`);
+          toast.error(`Report saved, but email delivery failed: ${emailErrorMessage}`, { id: sendToastId });
         } else {
           toast.success(
-            `Report sent successfully!\n\n✓ Emails sent to clinic and patient\n✓ Accessible in clinic Reports section`,
-            { duration: 5000 }
+            `Report PDF sent to the patient and clinic. It is also available in clinic Reports.`,
+            { id: sendToastId, duration: 5000 }
           );
           setReportSent(true);
         }
       } catch (emailError) {
         console.error('Error preparing report emails:', emailError);
-        toast.error('Report saved, but email delivery failed. Please check the server logs.');
+        toast.error('Report saved, but email delivery failed. Please try again.', { id: sendToastId });
       }
 
     } catch (error) {
       console.error('❌ Error sending report:', error);
-      toast.error(getFriendlyErrorMessage(error, 'Failed to send the report. Please try again.'));
+      toast.error(getFriendlyErrorMessage(error, 'Failed to send the report. Please try again.'), { id: sendToastId });
     } finally {
       setIsSendingReport(false);
     }
@@ -1922,6 +1924,7 @@ const AlgorithmDataProcessor = () => {
     if (await blockIfNoCredits(selectedPatient?.clinicId || selectedPatient?.clinic_id || selectedPatient?.org_id)) return;
 
     setIsSendingClaudeReport(true);
+    const sendToastId = toast.loading('Preparing PDF and sending it to the patient and clinic…');
 
     try {
       const patientName = getPatientName(selectedPatient);
@@ -2047,19 +2050,19 @@ const AlgorithmDataProcessor = () => {
           const emailErrorData = await emailResponse.json().catch(() => null);
           const emailErrorMessage = emailErrorData?.message || emailErrorData?.error || `Server error (${emailResponse.status})`;
           console.error('Failed to send Claude report emails:', emailErrorMessage);
-          toast.error(`Report saved, but email delivery failed: ${emailErrorMessage}`);
+          toast.error(`Report saved, but email delivery failed: ${emailErrorMessage}`, { id: sendToastId });
         } else {
-          toast.success('Neurosense Performance Report sent to patient & clinic + email.', { duration: 5000 });
+          toast.success('Neurosense Performance Report PDF sent to the patient and clinic.', { id: sendToastId, duration: 5000 });
           setClaudeReportSent(true);
         }
       } catch (emailError) {
         console.error('Error preparing Claude report emails:', emailError);
-        toast.error('Report saved, but email delivery failed. Please check the server logs.');
+        toast.error('Report saved, but email delivery failed. Please try again.', { id: sendToastId });
       }
 
     } catch (error) {
       console.error('❌ Error sending Claude report:', error);
-      toast.error(getFriendlyErrorMessage(error, 'Failed to send the Neurosense Performance Report. Please try again.'));
+      toast.error(getFriendlyErrorMessage(error, 'Failed to send the Neurosense Performance Report. Please try again.'), { id: sendToastId });
     } finally {
       setIsSendingClaudeReport(false);
     }
@@ -2070,6 +2073,9 @@ const AlgorithmDataProcessor = () => {
   const sendClaudeReportForRecord = async (record) => {
     const url = record.claude_report_url || record.claudeReportUrl;
     if (!url) { toast.error('No Neurosense Performance Report on this record'); return; }
+    if (sendingHistoryReportId) return;
+    setSendingHistoryReportId(`claude-${record.id}`);
+    const sendToastId = toast.loading('Preparing PDF and sending it to the patient and clinic…');
 
     try {
       const patientName = record.inputData?.patientName || record.patientName || getPatientName(selectedPatient);
@@ -2082,7 +2088,7 @@ const AlgorithmDataProcessor = () => {
       });
 
       // Hard block when the clinic has no report credits left.
-      if (await blockIfNoCredits(clinicId)) return;
+      if (await blockIfNoCredits(clinicId)) { toast.dismiss(sendToastId); return; }
 
       // Standard NPR-<ReportID>-<YYYYMMDD>.pdf name (matches the download buttons).
       const nprName = buildNprFilename(record.claude_report_id || claudeReportId, record.processed_at || record.created_at || selectedPatient?.lastProcessed);
@@ -2137,10 +2143,12 @@ const AlgorithmDataProcessor = () => {
       });
       if (!response.ok) throw new Error(`Server error (${response.status})`);
 
-      toast.success('Neurosense Performance Report sent to patient & clinic.');
+      toast.success('Neurosense Performance Report PDF sent to the patient and clinic.', { id: sendToastId });
     } catch (error) {
       console.error('❌ Error sending Claude report for record:', error);
-      toast.error(getFriendlyErrorMessage(error, 'Failed to send the Neurosense Performance Report. Please try again.'));
+      toast.error(getFriendlyErrorMessage(error, 'Failed to send the Neurosense Performance Report. Please try again.'), { id: sendToastId });
+    } finally {
+      setSendingHistoryReportId(null);
     }
   };
 
@@ -2150,6 +2158,9 @@ const AlgorithmDataProcessor = () => {
   const sendReportForRecord = async (record) => {
     const url = record.pdfUrl || record.pdf_url;
     if (!url) { toast.error('No Neurosense Report on this record'); return; }
+    if (sendingHistoryReportId) return;
+    setSendingHistoryReportId(`neurosense-${record.id}`);
+    const sendToastId = toast.loading('Preparing PDF and sending it to the patient and clinic…');
 
     try {
       const patientName = record.inputData?.patientName || record.patientName || getPatientName(selectedPatient);
@@ -2162,7 +2173,7 @@ const AlgorithmDataProcessor = () => {
       });
 
       // Hard block when the clinic has no report credits left.
-      if (await blockIfNoCredits(clinicId)) return;
+      if (await blockIfNoCredits(clinicId)) { toast.dismiss(sendToastId); return; }
 
       // Standard Neurosense-Report-<name>.pdf name (matches the download button).
       const fileName = `Neurosense-Report-${(patientName || 'patient').replace(/[^a-z0-9]/gi, '-')}.pdf`;
@@ -2217,10 +2228,12 @@ const AlgorithmDataProcessor = () => {
       });
       if (!response.ok) throw new Error(`Server error (${response.status})`);
 
-      toast.success('Neurosense Report sent to patient & clinic.');
+      toast.success('NeuroSense Report PDF sent to the patient and clinic.', { id: sendToastId });
     } catch (error) {
       console.error('❌ Error sending Neurosense Report for record:', error);
-      toast.error(getFriendlyErrorMessage(error, 'Failed to send the Neurosense Report. Please try again.'));
+      toast.error(getFriendlyErrorMessage(error, 'Failed to send the Neurosense Report. Please try again.'), { id: sendToastId });
+    } finally {
+      setSendingHistoryReportId(null);
     }
   };
 
@@ -3482,6 +3495,7 @@ const AlgorithmDataProcessor = () => {
                 <button
                   onClick={handleSendReport}
                   disabled={!pdfUrl || isSendingReport || reportSent}
+                  aria-busy={isSendingReport}
                   className={`w-full py-3 px-4 rounded-lg font-medium flex items-center justify-center space-x-2 transition-colors shadow-md ${
                     reportSent
                       ? 'bg-gray-400 text-white cursor-not-allowed'
@@ -3493,8 +3507,8 @@ const AlgorithmDataProcessor = () => {
                   }`}
                   title={reportSent ? 'Report already sent' : !pdfUrl ? 'Generate PDF report first' : 'Send report to clinic and patient'}
                 >
-                  <Send className="h-5 w-5" />
-                  <span>{reportSent ? '✓ Sent' : isSendingReport ? 'Sending...' : 'Send Report to Clinic & Patient'}</span>
+                  {isSendingReport ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                  <span aria-live="polite">{reportSent ? '✓ Sent' : isSendingReport ? 'Sending PDF to patient & clinic…' : 'Send Report to Clinic & Patient'}</span>
                 </button>
                 ) : (
                 <>
@@ -3589,6 +3603,7 @@ const AlgorithmDataProcessor = () => {
                       <button
                         onClick={handleSendClaudeReport}
                         disabled={isSendingClaudeReport || claudeReportSent}
+                        aria-busy={isSendingClaudeReport}
                         className={`w-full py-3 px-4 rounded-lg font-medium flex items-center justify-center space-x-2 transition-colors shadow-md ${
                           claudeReportSent
                             ? 'bg-gray-400 text-white cursor-not-allowed'
@@ -3598,8 +3613,8 @@ const AlgorithmDataProcessor = () => {
                         }`}
                         title={claudeReportSent ? 'Report already sent' : 'Send Claude report to clinic and patient'}
                       >
-                        <Send className="h-5 w-5" />
-                        <span>{claudeReportSent ? '✓ Sent' : isSendingClaudeReport ? 'Sending…' : 'Send Report to Clinic & Patient'}</span>
+                        {isSendingClaudeReport ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                        <span aria-live="polite">{claudeReportSent ? '✓ Sent' : isSendingClaudeReport ? 'Sending PDF to patient & clinic…' : 'Send Report to Clinic & Patient'}</span>
                       </button>
                     </>
                   )}
@@ -3958,11 +3973,13 @@ const AlgorithmDataProcessor = () => {
                     {(record.pdfUrl || record.pdf_url) && (
                       <button
                         onClick={() => sendReportForRecord(record)}
-                        className="px-3 py-2 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors flex items-center justify-center space-x-1"
+                        disabled={Boolean(sendingHistoryReportId)}
+                        aria-busy={sendingHistoryReportId === `neurosense-${record.id}`}
+                        className="px-3 py-2 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors flex items-center justify-center space-x-1 disabled:opacity-70 disabled:cursor-wait"
                         title="Send the Neurosense Report to the patient and clinic"
                       >
-                        <Send className="h-4 w-4" />
-                        <span>Send to Clinic & Patient</span>
+                        {sendingHistoryReportId === `neurosense-${record.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        <span>{sendingHistoryReportId === `neurosense-${record.id}` ? 'Sending PDF…' : 'Send to Clinic & Patient'}</span>
                       </button>
                     )}
 
@@ -3981,11 +3998,13 @@ const AlgorithmDataProcessor = () => {
                     {(record.claude_report_url || record.claudeReportUrl) && (
                       <button
                         onClick={() => sendClaudeReportForRecord(record)}
-                        className="px-3 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center justify-center space-x-1"
+                        disabled={Boolean(sendingHistoryReportId)}
+                        aria-busy={sendingHistoryReportId === `claude-${record.id}`}
+                        className="px-3 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center justify-center space-x-1 disabled:opacity-70 disabled:cursor-wait"
                         title="Send the Claude report to the patient and clinic"
                       >
-                        <Send className="h-4 w-4" />
-                        <span>Send Neurosense Performance Report</span>
+                        {sendingHistoryReportId === `claude-${record.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        <span>{sendingHistoryReportId === `claude-${record.id}` ? 'Sending PDF…' : 'Send Neurosense Performance Report'}</span>
                       </button>
                     )}
                   </div>

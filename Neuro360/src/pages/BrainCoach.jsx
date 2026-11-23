@@ -914,24 +914,24 @@ const BrainCoach = () => {
   };
 
   // Process payment via Stripe
-  const handlePayment = async () => {
-    if (!paymentCoach) return;
+  const handlePayment = async (coach = paymentCoach) => {
+    if (!coach) return;
 
     setIsProcessingPayment(true);
     try {
       const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 
       // Use the numeric catalog amount; display strings may contain decimals or extra text.
-      const numericPrice = paymentCoach.checkoutPrice;
+      const numericPrice = coach.checkoutPrice;
 
       // Create Stripe checkout session
       const response = await fetch(`${API_URL}/create-coaching-checkout`, {
         method: 'POST',
         headers: await StripeService.getCheckoutHeaders(),
         body: JSON.stringify({
-          coachId: paymentCoach.id,
-          coachName: paymentCoach.name,
-          coachEmail: paymentCoach.email,
+          coachId: coach.id,
+          coachName: coach.name,
+          coachEmail: coach.email,
           calendlyUrl: CALENDLY_LINK,
           price: numericPrice,
           patientEmail: user?.email,
@@ -945,8 +945,8 @@ const BrainCoach = () => {
       if (data.success && data.url) {
         const returnParams = new URLSearchParams({
           payment: 'success',
-          coach: paymentCoach.name,
-          ...(paymentCoach.email ? { coachEmail: paymentCoach.email } : {})
+          coach: coach.name,
+          ...(coach.email ? { coachEmail: coach.email } : {})
         });
         localStorage.setItem('paymentReturnUrl', `/dashboard/brain-coach?${returnParams.toString()}`);
         window.location.href = data.url;
@@ -1347,7 +1347,7 @@ const BrainCoach = () => {
       <div className="px-4 sm:px-5 pb-3 sm:pb-4 flex-grow">
         <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mb-1.5 sm:mb-2">Next available:</p>
         <div className="flex flex-wrap gap-1.5 sm:gap-2">
-          {coach.nextSlots.slice(0, 3).map((slot, idx) => (
+          {(coach.nextSlots?.length ? coach.nextSlots : ['Contact for availability']).slice(0, 3).map((slot, idx) => (
             <span
               key={idx}
               className="text-[10px] sm:text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md sm:rounded-lg"
@@ -1378,7 +1378,7 @@ const BrainCoach = () => {
           <button
             onClick={() => {
               setPaymentCoach(coach);
-              handlePayment();
+              handlePayment(coach);
             }}
             disabled={isProcessingPayment}
             className="flex-1 py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-1.5"
@@ -1856,7 +1856,7 @@ const BrainCoach = () => {
               <div>
                 <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-white mb-1.5 sm:mb-2">Next Available Slots</h3>
                 <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                  {selectedCoach.nextSlots.map((slot, idx) => (
+                  {(selectedCoach.nextSlots?.length ? selectedCoach.nextSlots : ['Contact for availability']).map((slot, idx) => (
                     <button key={idx} className="px-2.5 sm:px-4 py-1.5 sm:py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-[#E4EFFF] dark:hover:bg-blue-900/30 transition-colors text-[10px] sm:text-sm">
                       {slot}
                     </button>

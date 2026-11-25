@@ -27,6 +27,7 @@ import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabaseClient';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
+import { uploadCoachPhoto, validateCoachPhoto } from '../../services/coachPhoto';
 
 const CoachManagement = ({ onUpdate }) => {
   const [coaches, setCoaches] = useState([]);
@@ -55,7 +56,7 @@ const CoachManagement = ({ onUpdate }) => {
     }
   };
 
-  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm();
+  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm();
 
   const specialtyOptions = [
     'Stress Management',
@@ -153,6 +154,7 @@ const CoachManagement = ({ onUpdate }) => {
   const handleCreateCoach = async (data) => {
     try {
       const coachData = {
+        photo: await uploadCoachPhoto(supabase.storage, data.photoFile?.[0]),
         name: data.name?.toUpperCase(),
         credentials: data.credentials?.toUpperCase(),
         bio: data.bio?.toUpperCase(),
@@ -172,7 +174,7 @@ const CoachManagement = ({ onUpdate }) => {
         is_in_person: data.is_in_person === true || data.is_in_person === 'true',
         role_category: data.role_category || null,
         is_active: true,
-        rating: 5.0,
+        rating: Math.min(5, Math.max(0, Number(data.rating) || 0)),
         reviews_count: 0,
         clinic_id: null,
         created_at: new Date().toISOString(),
@@ -210,6 +212,7 @@ const CoachManagement = ({ onUpdate }) => {
         calendly_url: data.calendly_url?.toUpperCase() || null,
         booking_preference: data.booking_preference || 'whatsapp',
         price: parseFloat(data.price) || 0,
+        rating: Math.min(5, Math.max(0, Number(data.rating) || 0)),
         price_display: data.price_display ? data.price_display.toUpperCase() : `₹${data.price}/session`,
         specialties: data.specialties ? data.specialties.toUpperCase().split(',').map(s => s.trim()) : [],
         modalities: data.modalities ? data.modalities.toUpperCase().split(',').map(s => s.trim()) : [],
@@ -221,11 +224,15 @@ const CoachManagement = ({ onUpdate }) => {
         is_in_person: data.is_in_person === true || data.is_in_person === 'true',
         updated_at: new Date().toISOString()
       };
+      const photo = await uploadCoachPhoto(supabase.storage, data.photoFile?.[0]);
+      if (photo) updateData.photo = photo;
 
       const { error } = await supabase
         .from('coaches')
         .update(updateData)
-        .eq('id', selectedCoach.id);
+        .eq('id', selectedCoach.id)
+        .select('id')
+        .single();
 
       if (error) throw error;
 
@@ -309,6 +316,7 @@ const CoachManagement = ({ onUpdate }) => {
     setValue('calendly_url', coach.calendly_url || '');
     setValue('booking_preference', coach.booking_preference || 'whatsapp');
     setValue('price', coach.price);
+    setValue('rating', coach.rating ?? 5);
     setValue('price_display', coach.price_display);
     setValue('specialties', coach.specialties?.join(', ') || '');
     setValue('modalities', coach.modalities?.join(', ') || '');
@@ -735,6 +743,7 @@ const CoachManagement = ({ onUpdate }) => {
                   {selectedCoach ? 'Edit Coach' : 'Add New Coach'}
                 </h3>
                 <button
+                  disabled={isSubmitting}
                   onClick={() => { setShowModal(false); setSelectedCoach(null); reset(); }}
                   className="p-2 text-gray-400 hover:text-gray-600 bg-gray-100 dark:bg-gray-700 rounded-lg"
                 >
@@ -743,6 +752,28 @@ const CoachManagement = ({ onUpdate }) => {
               </div>
 
               <form onSubmit={handleSubmit(selectedCoach ? handleUpdateCoach : handleCreateCoach)} className="p-6 space-y-4">
+                <div>
+                  <label htmlFor="coach-photo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Coach photo (optional)
+                  </label>
+                  {selectedCoach?.photo && (
+                    <img src={selectedCoach.photo} alt="Current coach photo" className="mb-2 h-16 w-16 rounded-lg object-cover" />
+                  )}
+                  <input
+                    id="coach-photo"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    aria-describedby="coach-photo-help"
+                    disabled={isSubmitting}
+                    {...register('photoFile', { validate: validateCoachPhoto })}
+                    className="block w-full text-sm text-gray-700 dark:text-gray-300"
+                  />
+                  <p id="coach-photo-help" className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    JPG, PNG or WebP up to 5 MB. The photo appears in the coach directory.
+                  </p>
+                  {errors.photoFile && <p role="alert" className="mt-1 text-xs text-red-500">{errors.photoFile.message}</p>}
+                </div>
+
                 {/* Basic Info */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -897,6 +928,20 @@ const CoachManagement = ({ onUpdate }) => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Coach Rating (0–5)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="5"
+                      step="0.1"
+                      {...register('rating', { valueAsNumber: true, min: 0, max: 5 })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#323956]"
+                      placeholder="5"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Session Price (₹) *
                     </label>
                     <input
@@ -1012,6 +1057,7 @@ const CoachManagement = ({ onUpdate }) => {
                 <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <button
                     type="button"
+                    disabled={isSubmitting}
                     onClick={() => { setShowModal(false); setSelectedCoach(null); reset(); }}
                     className="flex-1 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                   >
@@ -1019,9 +1065,10 @@ const CoachManagement = ({ onUpdate }) => {
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-3 bg-[#323956] text-white rounded-xl hover:bg-[#232D3C] transition-colors"
+                    disabled={isSubmitting}
+                    className="flex-1 py-3 bg-[#323956] text-white rounded-xl hover:bg-[#232D3C] transition-colors disabled:opacity-50"
                   >
-                    {selectedCoach ? 'Update Coach' : 'Add Coach'}
+                    {isSubmitting ? 'Saving…' : selectedCoach ? 'Update Coach' : 'Add Coach'}
                   </button>
                 </div>
               </form>

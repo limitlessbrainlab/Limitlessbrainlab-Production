@@ -27,7 +27,7 @@ import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabaseClient';
 import { getFriendlyErrorMessage } from '../../utils/friendlyError';
-import { uploadCoachPhoto, validateCoachPhoto } from '../../services/coachPhoto';
+import { normalizeCoachPhotoUrl, uploadCoachPhoto, validateCoachPhoto } from '../../services/coachPhoto';
 
 const CoachManagement = ({ onUpdate }) => {
   const [coaches, setCoaches] = useState([]);
@@ -498,7 +498,14 @@ const CoachManagement = ({ onUpdate }) => {
                         <div className="flex items-center space-x-3">
                           <div className="w-10 h-10 rounded-full bg-[#323956] flex items-center justify-center text-white font-semibold overflow-hidden">
                             {coach.photo ? (
-                              <img src={coach.photo} alt={coach.name || 'Coach'} className="h-full w-full object-cover" />
+                              <img
+                                src={normalizeCoachPhotoUrl(coach.photo)}
+                                alt={coach.name || 'Coach'}
+                                className="h-full w-full object-cover"
+                                onError={(event) => {
+                                  event.currentTarget.remove();
+                                  event.currentTarget.parentElement.textContent = coach.name?.charAt(0) || 'C';
+                                }}
                             ) : (
                               coach.name?.charAt(0) || 'C'
                             )}

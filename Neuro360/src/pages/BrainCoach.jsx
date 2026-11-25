@@ -43,6 +43,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import coachService from '../services/coachService';
+import { normalizeCoachPhotoUrl } from '../services/coachPhoto';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -53,13 +54,6 @@ const CALENDLY_LINK = 'https://calendly.com/admin-bettroi/30min';
 const HIDDEN_COACH_NAMES = ['sweta adatia'];
 const excludeHiddenCoaches = (list) =>
   (list || []).filter(c => !HIDDEN_COACH_NAMES.some(h => (c?.name || '').toLowerCase().includes(h)));
-const SUPABASE_STORAGE_URL = (import.meta.env.VITE_SUPABASE_URL || 'https://puzdgwtprcpaaxxwkwtk.supabase.co').replace(/\/$/, '');
-const normalizeCoachPhotoUrl = (url) => {
-  if (!url || typeof url !== 'string') return url;
-  if (!url.includes('/storage/v1/object/public/')) return url;
-  return url.replace(/^https:\/\/[^/]+\.supabase\.co/, SUPABASE_STORAGE_URL);
-};
-
 const BrainCoach = () => {
   const navigate = useNavigate();
   const location = useLocation();

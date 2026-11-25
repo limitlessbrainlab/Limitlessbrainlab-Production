@@ -4,6 +4,13 @@ const photoExtensions = {
   'image/webp': 'webp'
 };
 
+const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL?.replace(/\/$/, '');
+
+export function normalizeCoachPhotoUrl(url) {
+  if (!url || !supabaseUrl || !url.includes('/storage/v1/object/public/')) return url;
+  return url.replace(/^https:\/\/[^/]+\.supabase\.co/, supabaseUrl);
+}
+
 export function validateCoachPhoto(files) {
   const file = files?.[0];
   if (!file) return true;

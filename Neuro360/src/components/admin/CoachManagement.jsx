@@ -506,6 +506,7 @@ const CoachManagement = ({ onUpdate }) => {
                                   event.currentTarget.remove();
                                   event.currentTarget.parentElement.textContent = coach.name?.charAt(0) || 'C';
                                 }}
+                              />
                             ) : (
                               coach.name?.charAt(0) || 'C'
                             )}

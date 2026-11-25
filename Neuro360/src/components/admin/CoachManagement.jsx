@@ -40,6 +40,7 @@ const CoachManagement = ({ onUpdate }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState('');
 
   // Reload all three data sets with visible feedback (spinner + toast) so the
   // Refresh button clearly does something even when the data is unchanged.
@@ -57,6 +58,9 @@ const CoachManagement = ({ onUpdate }) => {
   };
 
   const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm();
+  useEffect(() => () => {
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+  }, [photoPreviewUrl]);
 
   const specialtyOptions = [
     'Stress Management',
@@ -306,6 +310,7 @@ const CoachManagement = ({ onUpdate }) => {
   };
 
   const openEditModal = (coach) => {
+    setPhotoPreviewUrl('');
     setSelectedCoach(coach);
     setValue('name', coach.name);
     setValue('credentials', coach.credentials);
@@ -330,6 +335,7 @@ const CoachManagement = ({ onUpdate }) => {
   };
 
   const openCreateModal = () => {
+    setPhotoPreviewUrl('');
     setSelectedCoach(null);
     reset();
     setShowModal(true);
@@ -762,12 +768,15 @@ const CoachManagement = ({ onUpdate }) => {
                   </label>
                   <div className="flex items-center gap-4 rounded-xl border border-gray-200 dark:border-gray-600 p-4">
                     <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full bg-[#323956] flex items-center justify-center text-xl font-semibold text-white">
-                      {selectedCoach?.photo ? (
+                      {photoPreviewUrl || selectedCoach?.photo ? (
                         <img
-                          src={selectedCoach.photo}
+                          src={photoPreviewUrl || selectedCoach.photo}
                           alt={selectedCoach.name || 'Coach'}
                           className="h-full w-full object-cover"
-                          onError={(event) => { event.currentTarget.style.display = 'none'; }}
+                          onError={(event) => {
+                            if (photoPreviewUrl) setPhotoPreviewUrl('');
+                            else event.currentTarget.style.display = 'none';
+                          }}
                         />
                       ) : (
                         selectedCoach?.name?.charAt(0) || 'C'
@@ -780,7 +789,13 @@ const CoachManagement = ({ onUpdate }) => {
                         accept="image/jpeg,image/png,image/webp"
                         aria-describedby="coach-photo-help"
                         disabled={isSubmitting}
-                        {...register('photoFile', { validate: validateCoachPhoto })}
+                        {...register('photoFile', {
+                          validate: validateCoachPhoto,
+                          onChange: (event) => {
+                            const file = event.target.files?.[0];
+                            setPhotoPreviewUrl(file ? URL.createObjectURL(file) : '');
+                          }
+                        })}
                         className="block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:rounded-lg file:border-0 file:bg-[#323956] file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-[#232D3C]"
                       />
                       <p id="coach-photo-help" className="mt-2 text-xs text-gray-500 dark:text-gray-400">

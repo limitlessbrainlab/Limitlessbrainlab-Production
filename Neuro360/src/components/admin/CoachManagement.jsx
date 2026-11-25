@@ -503,8 +503,7 @@ const CoachManagement = ({ onUpdate }) => {
                                 alt={coach.name || 'Coach'}
                                 className="h-full w-full object-cover"
                                 onError={(event) => {
-                                  event.currentTarget.remove();
-                                  event.currentTarget.parentElement.textContent = coach.name?.charAt(0) || 'C';
+                                  event.currentTarget.style.display = 'none';
                                 }}
                               />
                             ) : (
@@ -779,7 +778,7 @@ const CoachManagement = ({ onUpdate }) => {
                       {photoPreviewUrl || selectedCoach?.photo ? (
                         <img
                           src={photoPreviewUrl || selectedCoach.photo}
-                          alt={selectedCoach.name || 'Coach'}
+                          alt={selectedCoach?.name || 'Coach'}
                           className="h-full w-full object-cover"
                           onError={(event) => {
                             if (photoPreviewUrl) setPhotoPreviewUrl('');

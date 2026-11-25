@@ -490,8 +490,12 @@ const CoachManagement = ({ onUpdate }) => {
                     <tr key={coach.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 rounded-full bg-[#323956] flex items-center justify-center text-white font-semibold">
-                            {coach.name?.charAt(0) || 'C'}
+                          <div className="w-10 h-10 rounded-full bg-[#323956] flex items-center justify-center text-white font-semibold overflow-hidden">
+                            {coach.photo ? (
+                              <img src={coach.photo} alt={coach.name || 'Coach'} className="h-full w-full object-cover" />
+                            ) : (
+                              coach.name?.charAt(0) || 'C'
+                            )}
                           </div>
                           <div>
                             <p className="font-medium text-gray-900 dark:text-white">{coach.name}</p>
@@ -756,21 +760,34 @@ const CoachManagement = ({ onUpdate }) => {
                   <label htmlFor="coach-photo" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Coach photo (optional)
                   </label>
-                  {selectedCoach?.photo && (
-                    <img src={selectedCoach.photo} alt="Current coach photo" className="mb-2 h-16 w-16 rounded-lg object-cover" />
-                  )}
-                  <input
-                    id="coach-photo"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    aria-describedby="coach-photo-help"
-                    disabled={isSubmitting}
-                    {...register('photoFile', { validate: validateCoachPhoto })}
-                    className="block w-full text-sm text-gray-700 dark:text-gray-300"
-                  />
-                  <p id="coach-photo-help" className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    JPG, PNG or WebP up to 5 MB. The photo appears in the coach directory.
-                  </p>
+                  <div className="flex items-center gap-4 rounded-xl border border-gray-200 dark:border-gray-600 p-4">
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full bg-[#323956] flex items-center justify-center text-xl font-semibold text-white">
+                      {selectedCoach?.photo ? (
+                        <img
+                          src={selectedCoach.photo}
+                          alt={selectedCoach.name || 'Coach'}
+                          className="h-full w-full object-cover"
+                          onError={(event) => { event.currentTarget.style.display = 'none'; }}
+                        />
+                      ) : (
+                        selectedCoach?.name?.charAt(0) || 'C'
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <input
+                        id="coach-photo"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        aria-describedby="coach-photo-help"
+                        disabled={isSubmitting}
+                        {...register('photoFile', { validate: validateCoachPhoto })}
+                        className="block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:rounded-lg file:border-0 file:bg-[#323956] file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-[#232D3C]"
+                      />
+                      <p id="coach-photo-help" className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        JPG, PNG or WebP up to 5 MB. This photo appears in the coach directory.
+                      </p>
+                    </div>
+                  </div>
                   {errors.photoFile && <p role="alert" className="mt-1 text-xs text-red-500">{errors.photoFile.message}</p>}
                 </div>
 
